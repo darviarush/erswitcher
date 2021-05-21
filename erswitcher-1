@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Транслитерировать предыдущее слово и поменять раскладку
+
+# ################################################ #
+# Author: Yaroslav O. Kosmina                      #
+# E-mail: darviarush@mail.ru                       #
+# GitHUB: https://github.com/darviarush/erswitcher #
+# ################################################ #
+
+
+case $1 in
+start) alltray -i ;;
+*) echo "Укажите команду.";;
+esac
+
