@@ -69,7 +69,7 @@ main(int argc, char **argv) {
     XEvent ev;
     Display *display;
     int screen;
-    Window root, win;
+    Window root, tray;
 
     /* init */
     if (!(display=XOpenDisplay(NULL)))
@@ -81,13 +81,13 @@ main(int argc, char **argv) {
     width = height = MIN(wa.width, wa.height);
 
     /* create window */
-    win = XCreateSimpleWindow(display, root, 0, 0, width, height, 0, 0, 0xFFFF5656);
+    tray = XCreateSimpleWindow(display, root, 0, 0, width, height, 0, 0, 0xFFFF5656);
 
     // устанавливаем окно в системный лоток
-    send_systray_message(display, SYSTEM_TRAY_REQUEST_DOCK, win, 0, 0);
-    XMapWindow(display, win);
+    send_systray_message(display, SYSTEM_TRAY_REQUEST_DOCK, tray, 0, 0);
+    XMapWindow(display, tray);
 
-    XSelectInput(display, win, ButtonPressMask|ExposureMask);
+    XSelectInput(display, tray, ButtonPressMask|ExposureMask);
 
     XSync(display, False);
 
@@ -98,7 +98,7 @@ main(int argc, char **argv) {
             switch(ev.type)
             {
             case Expose:
-
+                break;
             case ButtonPress:
                 exit(0);
             }

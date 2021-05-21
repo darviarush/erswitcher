@@ -1,15 +1,19 @@
-# NAME
+## NAME
 
-**erswitcher** - 
+**erswitcher** - транслитератор текста и переключатель клавиатуры по совместительству.
 
-# SYNOPSIS
+## VERSION
+
+0.0.1-pre-alpha
+
+## SYNOPSIS
 
 
 
-# DESCIPTION
+## DESCIPTION
 
 
 
-# AUTHOR
+## AUTHOR
 
-Yaroslav O. Kosmina <darviarush@mail.ru>
+Yaroslav O. Kosmina <darviarush@mail.ru>.
