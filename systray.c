@@ -1,4 +1,5 @@
 #include <X11/Xutil.h>
+#include <X11/xpm.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -61,6 +62,16 @@ send_systray_message(Display* display, long message, long data1, long data2, lon
         /* Handle errors */
     }
 }
+
+
+void
+load_flag(char* path) {
+    if (XpmReadFileToImage (dpy, path, &img, NULL, NULL)) {
+        printf ("Error reading file\n");
+        exit (1);
+    }
+}
+
 /* ------------ Regular X stuff */
 int
 main(int argc, char **argv) {
