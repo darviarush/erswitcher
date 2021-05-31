@@ -7,14 +7,18 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <wctype.h>
+#include <xkbcommon/xkbcommon.h>
 
 
 #define BIT(c, x)   ( c[x/8]&(1<<(x%8)) )
 #define TRUE    1
 #define FALSE   0
 
-int mod_pressed(char* keys);
-void printState(XkbStateRec* state);
+// Объявления функций
+//int mod_pressed(char* keys);
+void print_state(XkbStateRec* state);
+Window get_current_window();
+void set_active_group(int group);
 
 static int xerror = 0;
 static int *null_X_error (Display *d, XErrorEvent *e) {
@@ -23,21 +27,16 @@ static int *null_X_error (Display *d, XErrorEvent *e) {
 }
 
 
-Display *d;
-Window current_win;
+Display *d;					// текущий дисплей
+Window current_win;			// окно устанавливается при вводе с клавиатуры
+useconds_t delay = 12000;	// интервал проверки клавиатуры и ввода символов
 #define SIZE	1024
-wchar_t word[SIZE];
-int pos;
+wint_t word[SIZE];
+wint_t backspace[SIZE];
+int pos = 0;
 
 
-const char* 
-key2str(int code) {
-	KeySym ks = XkbKeycodeToKeysym(d, code, 0, 0);
-	return XKeysymToString(ks);
-}
-
-void
-change_key(char* keys, int code) {
+void change_key(char* keys, int code) {
 	printf("change_key! code=%d\n", code); fflush(stdout);
 
 
@@ -45,45 +44,61 @@ change_key(char* keys, int code) {
 	// if(mod_pressed(keys)) return;
 
 	XkbStateRec state;
-	memset(&state, 0, sizeof(state));
 	XkbGetState(d, XkbUseCoreKbd, &state);
-	printState(&state);
+	print_state(&state);
 
 	int shiftLevel = ((state.mods & (ShiftMask | LockMask)) 
 		&& !(state.mods & ShiftMask && state.mods & LockMask))? 1: 0;
 	printf("shiftLevel=%i\n", shiftLevel);
 	// ks на самом деле - символ юникода (wchar_t)
 	KeySym ks = XkbKeycodeToKeysym(d, code, state.group, shiftLevel);
+	//if(ks == NoSymbol) return;
 
 	const char *s1 = XKeysymToString(ks);
 	//if(strlen(s1) != 1) return;
 
 	// Если сменилось окно, то начинаем ввод с начала
-	Window w = 0;
-  	int revert_to = 0;
-	XGetInputFocus(d, &w, &revert_to);
-
+	Window w = get_current_window();
 	if(w != current_win) {
 		pos = 0;
 		current_win = w;
 	}
 
-	printf ("0x%04x: %s\n", (unsigned int) ks, s1);
-	printf ("wide char (%C)\n", (wchar_t) ks);
+	wint_t cs = xkb_keysym_to_utf32(ks);
 
-	wchar_t cs = (wchar_t) ks;
+	printf ("0x%04llx -> 0x%04lx: %s `%C`\n", ks, cs, s1, cs);
 
-	if(iswspace(cs)) {
-		pos = 0;
+	// BackSpace - удаляем последний символ
+	if(cs == 8) {
+		if(pos != 0) --pos;
 		return;
 	}
 
-	if(!iswprint(cs)) return;
+	// нажата Pause - переводим
+	if(ks == 0xff13) {
+		// Если нечего переводить, то показываем сообщение на месте ввода
+		if(pos == 0) { return; }
+		// отправляем бекспейсы, чтобы удалить ввод
+		for(int i=0; i<pos; i++) backspace[i] = 8;
+		backspace[pos] = 0;
+		type(backspace);
+		// меняем раскладку
+		set_active_group(? : );
+		// вводим ввод, но в альтернативной раскладке
+		type(word);
+		return;
+	}
+
+	//if(cs == 0) { pos = 0; return; } // разные управляющие клавиши
+	//if(iswspace(cs)) { pos = 0;	return;	}
+	// Если символ не печатный, то начинаем ввод с начала
+	if(!iswprint(cs)) {	pos = 0; return; }
 
 	// Записываем символ в буфер
 	if(pos >= SIZE) pos = 0;
 	word[pos++] = cs;
-	printf("s=%.*S\n", pos, word);	fflush(stdout);
+	word[pos] = 0;
+	printf("len=%i s=%S\n", pos, word);	fflush(stdout);
 }
 
 
@@ -93,11 +108,13 @@ void main(int ac, char** av) {
 	// printf("test(%C) = %i\n", c, iswprint(c));
 	// exit(0);
 
-	int delay = 10000;
-
 	char* display = XDisplayName(NULL);
 
 	printf("display: %s\n", display);
+	printf("size KeySym: %i\n", sizeof(KeySym));
+	printf("size wchar_t: %i\n", sizeof(wchar_t));
+	printf("size wint_t: %i\n", sizeof(wint_t));
+	printf("size *S: %i\n", sizeof(*(L"Л")));
 
 	d = XOpenDisplay(display);
 	if(!d) { fprintf(stderr, "Not open display!\n"); exit(1); }
@@ -106,8 +123,8 @@ void main(int ac, char** av) {
 
 	XSynchronize(d, TRUE);	
 
-	int revert_to = 0;
-	XGetInputFocus(d, &current_win, &revert_to);
+	// Начальные установки
+	current_win = get_current_window();
 	pos = 0;
 
 	char buf1[32], buf2[32];
@@ -117,7 +134,13 @@ void main(int ac, char** av) {
    	while (1) {
    		XQueryKeymap(d, keys);
       	for(int i=0; i<32*8; i++) {
-      		if(BIT(keys, i)!=0 && BIT(keys, i)!=BIT(saved, i)) change_key(keys, i);
+      		if(BIT(keys, i)!=BIT(saved, i)) {
+      			if(BIT(keys, i)!=0) { // клавиша нажата
+      				change_key(keys, i);
+      			} else {	// клавиша отжата
+
+      			}
+      		} 
       	}
 
       	char* char_ptr=saved;
@@ -128,9 +151,53 @@ void main(int ac, char** av) {
    	}
 }
 
+// Переключение раскладки
+// group - номер раскладки (обычно порядковый номер 
+//         в списке включенных раскладок, счет с 0
+void set_active_group(int group) {
+    // Отправка запроса на переключение раскладки
+    XkbLockGroup(d, XkbUseCoreKbd, group);
 
-void
-printState(XkbStateRec* state) {
+    // Вызов `XkbGetState()` (получение состояния клавиатуры) для выполнения запроса, без этого вызова переключение раскладки не сработает
+    XkbStateRec state;
+    XkbGetState(d, XkbUseCoreKbd, &state);
+}
+
+// возвращает текущее окно
+Window get_current_window() {
+	Window w = 0;
+  	int revert_to = 0;
+	XGetInputFocus(d, &w, &revert_to);
+	return w;
+}
+
+// транслитерирует текст с русской раскладки в английскую
+static wint_t *ru = L"ё1234567890-="
+					 L"йцукенгшщзхъ"
+					 L"фывапролджэ\\"
+					 L"/ячсмитьбю."
+					 ;
+static wint_t *en = L"`1234567890-=" 
+					 L"qwertyuiop[]"
+					 L"asdfghjkl;'\\"
+					 L"<zxcvbnm,./"
+					 ;
+void translation(wint_t *s) {
+
+}
+
+// ввод с клавиатуры строки в юникоде
+void type(wint_t *s) {
+
+}
+
+// отправляет символ
+void send_key(wint_t cs) {
+	
+}
+
+// печатает в stdout состояние клавиатуры
+void print_state(XkbStateRec* state) {
 	printf("unsigned char	group: %i\n", (unsigned int) (state->group));
 	printf("unsigned char   locked_group: %i\n", (unsigned int) (state->locked_group));
 	printf("unsigned short	base_group: %i\n", (unsigned int) (state->base_group));
@@ -147,6 +214,12 @@ printState(XkbStateRec* state) {
 	printf("unsigned short	ptr_buttons: %i\n", (unsigned int) (state->ptr_buttons));
 }
 
+
+/*
+const char* key2str(int code) {
+	KeySym ks = XkbKeycodeToKeysym(d, code, 0, 0);
+	return XKeysymToString(ks);
+}
 
 int mod_pressed(char* keys) {
 	XModifierKeymap *mmap = XGetModifierMapping(d);
@@ -170,21 +243,4 @@ int mod_pressed(char* keys) {
 	if(keys_pressed>1) return 1;
 	if(keys_pressed==1 && modkey_code != ShiftMapIndex) return 1;
 	return 0;
-}
-
-
-// Переключение раскладки
-// group - номер раскладки (обычно порядковый номер 
-//         в списке включенных раскладок, счет с 0
-int setActiveGroup(int group) {
-    // Отправка запроса на переключение раскладки
-    XkbLockGroup(d, XkbUseCoreKbd, group);
-
-    // Вызов XkbGetState() для выполнения запроса,
-    // без этого вызова переключение раскладки не сработает
-    XkbStateRec state;
-    memset(&state, 0, sizeof(state));
-    XkbGetState(d, XkbUseCoreKbd, &state);
-
-    return 0;
-}
+} */
