@@ -19,6 +19,8 @@
 void print_state(XkbStateRec* state);
 Window get_current_window();
 void set_active_group(int group);
+void send_key_event(int code, int group, int mods, int is_press);
+int get_group_by_name(char* name);
 
 static int xerror = 0;
 static int *null_X_error (Display *d, XErrorEvent *e) {
@@ -29,10 +31,15 @@ static int *null_X_error (Display *d, XErrorEvent *e) {
 
 Display *d;					// текущий дисплей
 Window current_win;			// окно устанавливается при вводе с клавиатуры
-useconds_t delay = 12000;	// интервал проверки клавиатуры и ввода символов
+useconds_t delay = 10000;	// интервал проверки клавиатуры
+
+int group_ru;
+int group_en;
+
 #define SIZE	1024
 wint_t word[SIZE];
-wint_t backspace[SIZE];
+int key_code[SIZE];
+int key_mods[SIZE];
 int pos = 0;
 
 
@@ -43,6 +50,13 @@ void change_key(char* keys, int code) {
 	// нажата функциональная клавиша и это не shift
 	// if(mod_pressed(keys)) return;
 
+	// устанавливаем клавы
+	group_en = get_group_by_name("English");
+	group_ru = get_group_by_name("Russian");
+
+	if(group_en == -1) group_en = 0;
+	if(group_ru == -1) group_ru = 1;
+
 	XkbStateRec state;
 	XkbGetState(d, XkbUseCoreKbd, &state);
 	print_state(&state);
@@ -50,11 +64,12 @@ void change_key(char* keys, int code) {
 	int shiftLevel = ((state.mods & (ShiftMask | LockMask)) 
 		&& !(state.mods & ShiftMask && state.mods & LockMask))? 1: 0;
 	printf("shiftLevel=%i\n", shiftLevel);
-	// ks на самом деле - символ юникода (wchar_t)
+	// 8-байтный символ иксов
 	KeySym ks = XkbKeycodeToKeysym(d, code, state.group, shiftLevel);
-	//if(ks == NoSymbol) return;
+	KeySym ks_pause = XkbKeycodeToKeysym(d, code, group_en, shiftLevel);
 
 	const char *s1 = XKeysymToString(ks);
+	const char *s_pause = XKeysymToString(ks_pause);
 	//if(strlen(s1) != 1) return;
 
 	// Если сменилось окно, то начинаем ввод с начала
@@ -66,7 +81,7 @@ void change_key(char* keys, int code) {
 
 	wint_t cs = xkb_keysym_to_utf32(ks);
 
-	printf ("0x%04llx -> 0x%04lx: %s `%C`\n", ks, cs, s1, cs);
+	printf ("0x%04llx -> 0x%04lx: %s `%C` en: %s\n", ks, cs, s1, cs, s_pause);
 
 	// BackSpace - удаляем последний символ
 	if(cs == 8) {
@@ -75,17 +90,30 @@ void change_key(char* keys, int code) {
 	}
 
 	// нажата Pause - переводим
-	if(ks == 0xff13) {
+	if(ks_pause == 0xff13) {
 		// Если нечего переводить, то показываем сообщение на месте ввода
 		if(pos == 0) { return; }
+
+		// на какую клаву переводим
+		int group = state.group == group_ru? group_en: group_ru;
+
 		// отправляем бекспейсы, чтобы удалить ввод
-		for(int i=0; i<pos; i++) backspace[i] = 8;
-		backspace[pos] = 0;
-		type(backspace);
-		// меняем раскладку
-		set_active_group(? : );
+		int backspace = XKeysymToKeycode(d, (KeySym) 0xff08);
+		printf("BackSpace = %i\n", backspace);
+		for(int i=0; i<pos; i++) {
+			send_key_event(backspace, state.group, state.mods, 1);
+			send_key_event(backspace, state.group, state.mods, 0);
+		}		
+
 		// вводим ввод, но в альтернативной раскладке
-		type(word);
+		for(int i=0; i<pos; i++) {
+			printf("code=%i group=%i mods=%i\n", key_code[i], group, key_mods[i]);
+			send_key_event(key_code[i], group, key_mods[i], 1);
+			send_key_event(key_code[i], group, key_mods[i], 0);
+		}		
+
+		// меняем раскладку
+		set_active_group(group);
 		return;
 	}
 
@@ -94,8 +122,10 @@ void change_key(char* keys, int code) {
 	// Если символ не печатный, то начинаем ввод с начала
 	if(!iswprint(cs)) {	pos = 0; return; }
 
-	// Записываем символ в буфер
+	// Записываем символ в буфер с его раскладкой клавиатуры
 	if(pos >= SIZE) pos = 0;
+	key_code[pos] = code;
+	key_mods[pos] = state.mods;
 	word[pos++] = cs;
 	word[pos] = 0;
 	printf("len=%i s=%S\n", pos, word);	fflush(stdout);
@@ -126,6 +156,9 @@ void main(int ac, char** av) {
 	// Начальные установки
 	current_win = get_current_window();
 	pos = 0;
+	group_en = get_group_by_name("en");
+	//if(group_en == -1) { fprintf(stderr, "Нет клавиатуры en, следует установить\n"); }
+	group_ru = get_group_by_name("ru");
 
 	char buf1[32], buf2[32];
 	char *saved=buf1, *keys=buf2;
@@ -191,9 +224,52 @@ void type(wint_t *s) {
 
 }
 
-// отправляет символ
-void send_key(wint_t cs) {
+// возвращает номер раскладки по имени: en или ru
+int get_group_by_name(char* name) {
+	XkbDescRec* kb = XkbAllocKeyboard();
+	if(!kb) return -1;
+
+	kb->dpy = d;
+	if(XkbGetNames(d, XkbGroupNamesMask, kb) != Success) return -1;
+
+	Atom* gs = kb->names->groups;
+	for(int i = 0; i < XkbNumKbdGroups && gs[i] != 0; ++i) {
+		char* kb_name = XGetAtomName(d, gs[i]);
+		//printf("kb_name: %s\n", kb_name);
+		if(strncmp(kb_name, name, strlen(name)) == 0) return i;
+	}
 	
+	XkbFreeNames(kb, XkbGroupNamesMask, 0);
+
+	return -1;
+}
+
+/* отправляет символ в активное окно
+ * 
+ * code - номер клавиши в клавиатуре
+ * group - раскладка клавиатуры
+ * mods - какие модифицирующие клавиши нажаты
+ * is_press - клавиша нажата или отжата
+ */
+void send_key_event(int code, int group, int mods, int is_press) {
+	XKeyEvent xk;
+
+	xk.display = d;
+	xk.subwindow = None;
+	xk.time = CurrentTime;
+	xk.same_screen = True;
+	xk.send_event = True; // событие послано другим клиентом через вызов XSendEvent
+
+	// Позиция курсора мыши в окне и на экране
+	xk.x = xk.y = xk.x_root = xk.y_root = 1;
+
+	xk.window = current_win;
+    xk.keycode = code;
+    xk.state = mods | (group << 13);
+    xk.type = is_press? KeyPress: KeyRelease;
+    XSendEvent(d, xk.window, True, KeyPressMask, (XEvent *)&xk);
+
+    XFlush(d);
 }
 
 // печатает в stdout состояние клавиатуры
@@ -214,6 +290,33 @@ void print_state(XkbStateRec* state) {
 	printf("unsigned short	ptr_buttons: %i\n", (unsigned int) (state->ptr_buttons));
 }
 
+// // выводит подсказку с текстом
+// void show_hint(wchar_t *s) {
+// 	// номер основного экрана
+// 	int ScreenNumber = DefaultScreen(d);
+
+// 	// окно
+// 	Window window = XCreateSimpleWindow(
+// 		d,
+// 		RootWindow(d, ScreenNumber),
+// 		X, Y, WIDTH, HEIGHT, BORDER_WIDTH,
+// 		BlackPixel(d, ScreenNumber),
+// 		WhitePixel(d, ScreenNumber)
+// 	);
+
+// 	 Задаем рекомендации для менеджера окон 
+// 	SetWindowManagerHints ( display, PRG_CLASS, argv, argc,
+// 	window, X, Y, WIDTH, HEIGHT, WIDTH_MIN,
+// 	HEIGHT_MIN, TITLE, ICON_TITLE, 0 );
+
+// 	// Выбираем события,  которые будет обрабатывать программа */
+// 	//XSelectInput ( display, window, ExposureMask | KeyPressMask);
+
+// 	// Отображает окно
+// 	XMapWindow(d, window);
+
+
+// }
 
 /*
 const char* key2str(int code) {
