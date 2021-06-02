@@ -7,5 +7,5 @@ start: erswitcher
 # systray: systray.c
 # 	gcc -lX11  -o $@ $^
 
-erswitcher:	erswitcher.c
-	gcc -lX11 -lxkbcommon -o erswitcher erswitcher.c
+erswitcher:	src/erswitcher.c src/keyboard.c src/keyboard.h
+	gcc -lX11 -lxkbcommon -o erswitcher src/keyboard.c src/erswitcher.c

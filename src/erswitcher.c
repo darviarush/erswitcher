@@ -9,18 +9,15 @@
 #include <wctype.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "keyboard.h"
+
 
 #define BIT(c, x)   ( c[x/8]&(1<<(x%8)) )
-#define TRUE    1
-#define FALSE   0
 
 // Объявления функций
 //int mod_pressed(char* keys);
 void print_state(XkbStateRec* state);
 Window get_current_window();
-void set_active_group(int group);
-void send_key_event(int code, int group, int mods, int is_press);
-int get_group_by_name(char* name);
 
 static int xerror = 0;
 static int *null_X_error (Display *d, XErrorEvent *e) {
@@ -31,15 +28,9 @@ static int *null_X_error (Display *d, XErrorEvent *e) {
 
 Display *d;					// текущий дисплей
 Window current_win;			// окно устанавливается при вводе с клавиатуры
-useconds_t delay = 10000;	// интервал проверки клавиатуры
-
-int group_ru;
-int group_en;
 
 #define SIZE	1024
 wint_t word[SIZE];
-int key_code[SIZE];
-int key_mods[SIZE];
 int pos = 0;
 
 
@@ -49,10 +40,6 @@ void change_key(char* keys, int code) {
 
 	// нажата функциональная клавиша и это не shift
 	// if(mod_pressed(keys)) return;
-
-	// устанавливаем клавы
-	group_en = get_group_by_name("English");
-	group_ru = get_group_by_name("Russian");
 
 	if(group_en == -1) group_en = 0;
 	if(group_ru == -1) group_ru = 1;
@@ -66,7 +53,7 @@ void change_key(char* keys, int code) {
 	printf("shiftLevel=%i\n", shiftLevel);
 	// 8-байтный символ иксов
 	KeySym ks = XkbKeycodeToKeysym(d, code, state.group, shiftLevel);
-	KeySym ks_pause = XkbKeycodeToKeysym(d, code, group_en, shiftLevel);
+	KeySym ks_pause = XkbKeycodeToKeysym(d, code, group_en, 0);
 
 	const char *s1 = XKeysymToString(ks);
 	const char *s_pause = XKeysymToString(ks_pause);
@@ -98,22 +85,18 @@ void change_key(char* keys, int code) {
 		int group = state.group == group_ru? group_en: group_ru;
 
 		// отправляем бекспейсы, чтобы удалить ввод
-		int backspace = XKeysymToKeycode(d, (KeySym) 0xff08);
-		printf("BackSpace = %i\n", backspace);
 		for(int i=0; i<pos; i++) {
-			send_key_event(backspace, state.group, state.mods, 1);
-			send_key_event(backspace, state.group, state.mods, 0);
+			press_key(8);
 		}		
 
 		// вводим ввод, но в альтернативной раскладке
 		for(int i=0; i<pos; i++) {
-			printf("code=%i group=%i mods=%i\n", key_code[i], group, key_mods[i]);
-			send_key_event(key_code[i], group, key_mods[i], 1);
-			send_key_event(key_code[i], group, key_mods[i], 0);
-		}		
+			wchar_t uk = translate(word[i]);
+			press_key(uk);
+		}
 
 		// меняем раскладку
-		set_active_group(group);
+		set_group(group);
 		return;
 	}
 
@@ -124,8 +107,6 @@ void change_key(char* keys, int code) {
 
 	// Записываем символ в буфер с его раскладкой клавиатуры
 	if(pos >= SIZE) pos = 0;
-	key_code[pos] = code;
-	key_mods[pos] = state.mods;
 	word[pos++] = cs;
 	word[pos] = 0;
 	printf("len=%i s=%S\n", pos, word);	fflush(stdout);
@@ -151,14 +132,11 @@ void main(int ac, char** av) {
 
 	XSetErrorHandler((XErrorHandler) null_X_error);
 
-	XSynchronize(d, TRUE);	
+	XSynchronize(d, True);	
 
 	// Начальные установки
 	current_win = get_current_window();
 	pos = 0;
-	group_en = get_group_by_name("en");
-	//if(group_en == -1) { fprintf(stderr, "Нет клавиатуры en, следует установить\n"); }
-	group_ru = get_group_by_name("ru");
 
 	char buf1[32], buf2[32];
 	char *saved=buf1, *keys=buf2;
@@ -180,7 +158,7 @@ void main(int ac, char** av) {
       	saved=keys;
       	keys=char_ptr;
 
-      	usleep(delay);
+      	usleep(DELAY);
    	}
 }
 
@@ -216,11 +194,6 @@ static wint_t *en = L"`1234567890-="
 					 L"<zxcvbnm,./"
 					 ;
 void translation(wint_t *s) {
-
-}
-
-// ввод с клавиатуры строки в юникоде
-void type(wint_t *s) {
 
 }
 
