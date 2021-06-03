@@ -69,11 +69,14 @@ int get_mods() {
 // устанавливает модификаторы
 void set_mods(int mods) {
 	int active = get_mods();
-	XkbLockModifiers(d, XkbUseCoreKbd, active, 0);
-	usleep(10000);
-	XkbLockModifiers(d, XkbUseCoreKbd, mods, 1);
-	usleep(10000);
-	get_mods();
+	if(active) {
+		XkbLockModifiers(d, XkbUseCoreKbd, active, 0);
+		usleep(10000);
+	}
+	if(mods) {
+		XkbLockModifiers(d, XkbUseCoreKbd, mods, 1);
+		usleep(10000);
+	}
 }
 
 // инициализирует названия клавиатуры

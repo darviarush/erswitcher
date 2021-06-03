@@ -19,8 +19,8 @@ void print_state(XkbStateRec* state);
 Window get_current_window();
 
 // Обработка ошибок
-static int xerror = 0;
-static int *null_X_error (Display *d, XErrorEvent *err) {
+int xerror = 0;
+int *null_X_error (Display *d, XErrorEvent *err) {
 	xerror = 1;
 	#define BUFLEN		(1024*64)
 	char buf[BUFLEN];
@@ -47,7 +47,14 @@ void change_key(char* keys, int code) {
 	XkbGetState(d, XkbUseCoreKbd, &state);
 	//print_state(&state);
 
-	int shiftLevel = ((state.mods & (ShiftMask | LockMask)) 
+	// Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
+	if(state.mods & ~(ShiftMask|LockMask)) {
+		return;
+	}
+
+	// нажата одна из шифта или капслок
+	int shiftLevel = ((state.mods & (ShiftMask | LockMask))
+		// и не нажаты обе
 		&& !(state.mods & ShiftMask && state.mods & LockMask))? 1: 0;
 	//printf("shiftLevel=%i\n", shiftLevel);
 
@@ -109,6 +116,9 @@ void change_key(char* keys, int code) {
 		wint_t *x = trans;
 		trans = word;
 		word = x;
+
+		// сбрасываем shift, чтобы она не осталась зажата
+		set_mods(state.mods);
 
 		// меняем раскладку
 		set_group(trans_group);

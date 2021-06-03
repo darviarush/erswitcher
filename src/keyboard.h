@@ -24,6 +24,7 @@ typedef struct {
 #define DELAY	10000
 
 extern Display* d;
+extern int xerror;
 
 extern int groups;			// Количество раскладок
 extern int group_ru;		// Номер русской раскладки или -1
