@@ -52,15 +52,18 @@ int get_key(wint_t cs) {
 
 // сопоставляет символ из другой раскладки
 wint_t translate(wint_t cs) {
-	if(!get_key(cs)) return 0;
+	if(!get_key(cs)) return cs;
 	int group = 
 		key.group == group_ru? group_en:
 		key.group == group_en? group_ru:
 		key.group;
-	return xkb_keysym_to_utf32(keyboard[group][key.mods? 1: 0][key.code]);
+
+	KeySym ks = keyboard[group][key.mods? 1: 0][key.code];
+	if(ks == NoSymbol) return cs;
+	return xkb_keysym_to_utf32(ks);
 }
 
-// Переключение раскладки
+// Переключает раскладку
 void set_group(int group) {
     XkbLockGroup(d, XkbUseCoreKbd, group);
     get_group();	// без этого вызова в силу переключение не вступит
