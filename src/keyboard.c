@@ -6,47 +6,54 @@
 #include "keyboard.h"
 #include "erswitcher.h"
 
-#define KEYBOARD_SIZE	(32*8)
-
-
-struct {
+typedef struct {
 	int code;
 	int mods;
 	int group;
-} key;
+} unikey_t;
+
+// ответ для get_key()
+unikey_t key;
+
+#define KEYBOARD_SIZE	(32*8)
 
 // набор клавиатур: keyboard[group][shift][scancode] -> utf32
-wint_t keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
+KeySym keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
 
-int groups = 0;		// Количество раскладок
-int group_ru;		// Номер русской раскладки или -1
-int group_en;		// Номер английской раскладки или -1
+int groups = 0;			// Количество раскладок
+int group_ru = -1;		// Номер русской раскладки или -1
+int group_en = -1;		// Номер английской раскладки или -1
 
-// инициализирует массив и его длину
+// инициализирует массив keyboard
 void keysym_init() {
 	init_keyboard(d);
 	for(int group = 0; group < groups; ++group)
-	for(int code = 0; code < KEYBOARD_SIZE; ++code) {
-		KeySym ks = XkbKeycodeToKeysym(d, code, group, 0);
-		keyboard[group][0][code] = xkb_keysym_to_utf32(ks);
-		ks = XkbKeycodeToKeysym(d, code, group, 1);
-		keyboard[group][1][code] = xkb_keysym_to_utf32(ks);
-	}
+	for(int code = 0; code < KEYBOARD_SIZE; ++code)
+	for(int shift = 0; shift < 2; ++shift)
+		keyboard[group][shift][code] = XkbKeycodeToKeysym(d, code, group, shift);
 }
 
+// сопоставляет сканкод, раскладку и модификатор символу юникода
 // устанавливает key
 int get_key(wint_t cs) {
+	KeySym ks = xkb_utf32_to_keysym(cs);
+
 	for(int group = 0; group < groups; ++group)
 	for(int code = 0; code < KEYBOARD_SIZE; ++code) 
 	for(int shift = 0; shift < 2; ++shift) {
-		if(keyboard[group][shift][code] != cs) continue;
+		if(keyboard[group][shift][code] != ks) continue;
 		key.code = code;
 		key.group = group;
 		key.mods = shift? ShiftMask: 0;
 		return 1;
 	}
-
 	return 0;
+}
+
+// сопоставляет символ из другой раскладки
+wint_t translate(wint_t cs, int to_group) {
+	if(!get_key(cs)) return 0;
+	return xkb_keysym_to_utf32(keyboard[to_group][key.mods? 1: 0][key.code]);
 }
 
 // Переключение раскладки

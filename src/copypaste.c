@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "erswitcher.h"
+#include "keyboard.h"
 #include "copypaste.h"
 
 
@@ -88,7 +89,7 @@ void copypaste() {
         int res = mbstowcs(ws, s+i, 1);
         if(res != 1) break;
 
-
+        wint_t cs = translate(, );
     }
 
 	XFree(s);
