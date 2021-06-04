@@ -88,11 +88,13 @@ void set_mods(int mods) {
 	int active = get_mods();
 	if(active) {
 		XkbLockModifiers(d, XkbUseCoreKbd, active, 0);
-		usleep(10000);
+		XFlush(d);
+		//usleep(10000);
 	}
 	if(mods) {
 		XkbLockModifiers(d, XkbUseCoreKbd, mods, 1);
-		usleep(10000);
+		XFlush(d);
+		//usleep(10000);
 	}
 }
 
