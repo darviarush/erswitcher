@@ -89,7 +89,8 @@ void copypaste() {
         int res = mbstowcs(ws, s+i, 1);
         if(res != 1) break;
 
-        wint_t cs = translate(, );
+        wint_t cs = translate(ws[0]);
+        press_key(cs);
     }
 
 	XFree(s);

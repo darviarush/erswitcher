@@ -44,6 +44,6 @@ void press_key(wint_t cs);
 void send_key(wint_t cs, int is_press);
 
 // сопоставляет символ из другой раскладки
-wint_t translate(wint_t cs, int to_group)
+wint_t translate(wint_t cs)
 
 #endif
