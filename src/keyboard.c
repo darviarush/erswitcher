@@ -7,27 +7,20 @@
 #include "erswitcher.h"
 
 #define KEYBOARD_SIZE	(32*8)
-#define MAX_KEYSYM		(KEYBOARD_SIZE*XkbNumKbdGroups)
 
-unikey_t keysym[MAX_KEYSYM];		// символы юникода, которые есть в установленных в системе раскладках клавиатуры
-int keysyms = 0;	// Количество символов
+
+struct {
+	int code;
+	int mods;
+	int group;
+} key;
+
+// набор клавиатур: keyboard[group][shift][scancode] -> utf32
+wint_t keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
+
 int groups = 0;		// Количество раскладок
 int group_ru;		// Номер русской раскладки или -1
 int group_en;		// Номер английской раскладки или -1
-
-// добавляет символ, если его ещё нет
-void add_keysym(KeySym ks, int code, int group, int mods) {
-	wint_t cs = xkb_keysym_to_utf32(ks);
-
-	if(cs == 0) return;
-	for (int i=0; i<keysyms; ++i) if(keysym[i].key == cs) return;
-
-	keysym[keysyms].key = cs;
-	keysym[keysyms].code = code;
-	keysym[keysyms].group = group;
-	keysym[keysyms].mods = mods;
-	keysyms++;
-}
 
 // инициализирует массив и его длину
 void keysym_init() {
@@ -35,16 +28,25 @@ void keysym_init() {
 	for(int group = 0; group < groups; ++group)
 	for(int code = 0; code < KEYBOARD_SIZE; ++code) {
 		KeySym ks = XkbKeycodeToKeysym(d, code, group, 0);
-		add_keysym(ks, code, group, 0);
+		keyboard[group][0][code] = xkb_keysym_to_utf32(ks);
 		ks = XkbKeycodeToKeysym(d, code, group, 1);
-		add_keysym(ks, code, group, ShiftMask);
+		keyboard[group][1][code] = xkb_keysym_to_utf32(ks);
 	}
 }
 
-// возвращает указатель на символ по коду или NULL
-unikey_t* get_key(wchar_t cs) {
-	for (int i=0; i<keysyms; ++i) if(keysym[i].key == cs) return keysym+i;
-	return NULL;
+// устанавливает key
+int get_key(wint_t cs) {
+	for(int group = 0; group < groups; ++group)
+	for(int code = 0; code < KEYBOARD_SIZE; ++code) 
+	for(int shift = 0; shift < 2; ++shift) {
+		if(keyboard[group][shift][code] != cs) continue;
+		key.code = code;
+		key.group = group;
+		key.mods = shift? ShiftMask: 0;
+		return 1;
+	}
+
+	return 0;
 }
 
 // Переключение раскладки
@@ -113,20 +115,19 @@ void type(wchar_t* s) {
 }
 
 // Эмулирует нажатие и отжатие клавиши
-void press_key(wchar_t cs) {
+void press_key(wint_t cs) {
 	send_key(cs, 1);
 	send_key(cs, 0);
 }
 
 // Эмулирует нажатие или отжатие клавиши
-void send_key(wchar_t cs, int is_press) {
-	unikey_t* key = get_key(cs);
-	if(key == NULL) return;
+void send_key(wint_t cs, int is_press) {
+	if(!get_key(cs)) return;
 
-	set_group(key->group);
-    set_mods(key->mods);
+	set_group(key.group);
+    set_mods(key.mods);
 
-    XTestFakeKeyEvent(d, key->code, is_press, CurrentTime);
+    XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
     
     XSync(d, False);
     XFlush(d);
