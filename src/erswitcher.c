@@ -4,19 +4,19 @@
 #include <X11/XKBlib.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <wctype.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "keyboard.h"
+#include "copypaste.h"
+#include "erswitcher.h"
 
 
 #define BIT(c, x)   ( c[x/8]&(1<<(x%8)) )
 
-// Объявления функций
+// распечатывает состояние клавиш
 void print_state(XkbStateRec* state);
-Window get_current_window();
 
 // Обработка ошибок
 int xerror = 0;
@@ -91,6 +91,11 @@ void change_key(char* keys, int code) {
 		return;
 	}
 
+	// нажата Shift+Pause - переводим выделенный фрагмент
+	if(ks_pause == 0xff13 && state.mods & ShiftMask) {
+		copypaste();
+		return;
+	}
 	// нажата Pause - переводим
 	if(ks_pause == 0xff13) {
 
@@ -144,7 +149,11 @@ void change_key(char* keys, int code) {
 
 
 void main(int ac, char** av) {
-	setlocale(LC_ALL, "ru_RU.UTF-8");
+	char* locale = "ru_RU.UTF-8";
+	if(!setlocale(LC_ALL, locale)) {
+		fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
+        return;
+	}
 	// wchar_t c = L'Л';
 	// printf("test(%C) = %i\n", c, iswprint(c));
 	// exit(0);

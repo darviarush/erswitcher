@@ -4,6 +4,7 @@
 #include <X11/extensions/XTest.h>
 
 #include "keyboard.h"
+#include "erswitcher.h"
 
 #define KEYBOARD_SIZE	(32*8)
 #define MAX_KEYSYM		(KEYBOARD_SIZE*XkbNumKbdGroups)
