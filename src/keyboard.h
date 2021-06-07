@@ -7,8 +7,10 @@
  * Заполняет массивы для сопоставления сканкодов и wint_t
  */
 
-#include <wchar.h>
+#include <X11/keysym.h>
 #include <X11/extensions/XKB.h>
+#include <xkbcommon/xkbcommon.h>
+
 
 extern int groups;			// Количество раскладок
 extern int group_ru;		// Номер русской раскладки или -1
@@ -35,15 +37,18 @@ int get_mods();
 void set_mods(int mods);
 
 // эмулирует ввод текста
-void type(wchar_t* s);
+void type(KeySym* s);
 
 // Эмулирует нажатие и отжатие клавиши
-void press_key(wint_t cs);
+void press_key(KeySym ks);
 
 // Эмулирует нажатие или отжатие клавиши
-void send_key(wint_t cs, int is_press);
+void send_key(KeySym ks, int is_press);
 
 // сопоставляет символ из другой раскладки
-wint_t translate(wint_t cs);
+KeySym translate(KeySym ks);
+
+// "нажимает" lock, если он нажат
+void reset_mods(int mods);
 
 #endif

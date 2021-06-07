@@ -2,45 +2,41 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
+#include <xkbcommon/xkbcommon.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <wctype.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include "keyboard.h"
 #include "copypaste.h"
 #include "erswitcher.h"
 
 
-#define BIT(c, x)   ( c[x/8]&(1<<(x%8)) )
-
 // распечатывает состояние клавиш
 void print_state(XkbStateRec* state);
 
 // Обработка ошибок
 int xerror = 0;
-int *null_X_error (Display *d, XErrorEvent *err) {
-	xerror = 1;
+static int null_X_error(Display *d, XErrorEvent *err) {
+	xerror = True;
 	#define BUFLEN		(1024*64)
 	char buf[BUFLEN];
     XGetErrorText(d, err->error_code, buf, BUFLEN);
-	fprintf(stderr, "x error! %s\n", buf);
+	printf("!!!!!!!!!!!!! X ERROR !!!!!!!!!!!!! %s\n", buf);
+    return False;
 }
-
 
 Display *d;					// текущий дисплей
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 
-#define SIZE	1024
-wint_t word_buf[SIZE];
+static wint_t word_buf[BUF_SIZE];
 wint_t *word = word_buf;
-wint_t trans_buf[SIZE];
+static wint_t trans_buf[BUF_SIZE];
 wint_t *trans = trans_buf;
 int pos = 0;
 
-
-void change_key(char* keys, int code) {
+void change_key(int code) {
 	printf("change_key! code=%d\n", code); fflush(stdout);
 
 	XkbStateRec state;
@@ -66,6 +62,9 @@ void change_key(char* keys, int code) {
 	KeySym ks_trans = XkbKeycodeToKeysym(d, code, trans_group, shiftLevel);
 	KeySym ks_pause = XkbKeycodeToKeysym(d, code, group_en, 0);
 
+    // Пробел почему-то существует только в английской раскладке
+    if(ks_trans == NoSymbol && ks_pause != NoSymbol) ks_trans = ks;
+
 	const char *s1 = XKeysymToString(ks);
 	const char *s_pause = XKeysymToString(ks_pause);
 	//if(strlen(s1) != 1) return;
@@ -79,68 +78,93 @@ void change_key(char* keys, int code) {
 
 	wint_t cs = xkb_keysym_to_utf32(ks);
 	wint_t cs_trans = xkb_keysym_to_utf32(ks_trans);
-	wint_t cs_pause = xkb_keysym_to_utf32(ks_pause);
+	//wint_t cs_pause = xkb_keysym_to_utf32(ks_pause);
 
-	printf ("0x%04llx -> 0x%04lx: %s `%C` en: %s\n", ks, cs, s1, cs, s_pause);
+	printf ("0x%04lx -> 0x%04x: %s `%C` en: %s\n", ks, cs, s1, cs, s_pause);
 
 	// BackSpace - удаляем последний символ
-	if(ks_pause == 0xff08) {
+	if(ks_pause == XK_BackSpace) {
 		if(pos != 0) --pos;
 		word[pos] = trans[pos] = 0;
 		printf("backspace: %S -> %S\n", word, trans);
 		return;
 	}
 
-	// нажата Shift+Pause - переводим выделенный фрагмент
-	if(ks_pause == 0xff13 && state.mods & ShiftMask) {
-		copypaste();
-		return;
-	}
 	// нажата Pause - переводим
-	if(ks_pause == 0xff13) {
+	if(ks_pause == XK_Pause) {
+
+		// нажата Shift+Pause - переводим выделенный фрагмент
+		if(state.mods & ShiftMask) {
+			if(!copy_selection()) return;
+		}
+		else {
+			// отправляем бекспейсы, чтобы удалить ввод
+			for(int i=0; i<pos; i++) {
+				press_key(XK_BackSpace);
+			}
+		}
 
 		word[pos] = trans[pos] = 0;
-		printf("pause! %S -> %S\n", word, trans);
+		printf("pause!!! %S -> %S\n", word, trans);
 
 		// Если нечего переводить, то показываем сообщение на месте ввода
 		if(pos == 0) {
 			//...
+			// и меняем раскладку и буфера
+			set_group(trans_group);
+			swap_buf();
+			return;
 		}
-
-		// отправляем бекспейсы, чтобы удалить ввод
-		for(int i=0; i<pos; i++) {
-			press_key(8);
-		}		
 
 		// вводим ввод, но в альтернативной раскладке
 		for(int i=0; i<pos; i++) {
-			press_key(trans[i]);
+			press_key(xkb_utf32_to_keysym(trans[i]));
 		}
 
 		// меняем буфера местами
-		wint_t *x = trans;
-		trans = word;
-		word = x;
-
-		// сбрасываем shift, чтобы она не осталась зажата
-		set_mods(state.mods);
+		swap_buf();
 
 		// меняем раскладку
 		set_group(trans_group);
+
+		// // восстанавливаем shift
+		// set_mods(state.mods);
+	 //    if(xerror) {
+	 //    	xerror = 0;
+			
+	 //    }
+
+		// сбрасываем shift
+		set_mods(0);
+		send_key(XK_Shift_L, 0);
+		usleep(DELAY);
+		XSynchronize(d, True);
+
+		// Переоткрываем соединение с X-сервером. 
+		// Это нужно, чтобы избежать изменения настроек CapsLock, если она 
+    	//reset_display();
+
+		return;
+	}
+
+	// Если это переход на другую строку, то начинаем ввод с начала
+	KeySym control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, NoSymbol};
+	for(KeySym *cx = control; *cx!=NoSymbol; cx++) if(ks_pause == *cx) {
+		printf("is control!\n");
+		pos = 0;
 		return;
 	}
 
 	//if(cs == 0) { pos = 0; return; } // разные управляющие клавиши
 	//if(iswspace(cs)) { pos = 0;	return;	}
-	// Если символ не печатный, то начинаем ввод с начала
-	if(!iswprint(cs)) {	
-		//pos = 0; 
+	// Если символ не печатный, то пропускаем
+	if(ks != XK_space && !iswprint(cs)) {
 		printf("not isprint! `%C`\n", cs);
 		return; 
 	}
 
 	// Записываем символ в буфер с его раскладкой клавиатуры
-	if(pos >= SIZE) pos = 0;
+	if(pos >= BUF_SIZE) pos = 0;
 	trans[pos] = cs_trans;
 	word[pos++] = cs;
 	trans[pos] = word[pos] = 0;
@@ -148,11 +172,11 @@ void change_key(char* keys, int code) {
 }
 
 
-void main(int ac, char** av) {
+int main() {
 	char* locale = "ru_RU.UTF-8";
 	if(!setlocale(LC_ALL, locale)) {
 		fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
-        return;
+        return 1;
 	}
 	// wchar_t c = L'Л';
 	// printf("test(%C) = %i\n", c, iswprint(c));
@@ -161,17 +185,12 @@ void main(int ac, char** av) {
 	char* display = XDisplayName(NULL);
 
 	printf("display: %s\n", display);
-	printf("size KeySym: %i\n", sizeof(KeySym));
-	printf("size wchar_t: %i\n", sizeof(wchar_t));
-	printf("size wint_t: %i\n", sizeof(wint_t));
-	printf("size *S: %i\n", sizeof(*(L"Л")));
+	printf("size KeySym: %li\n", sizeof(KeySym));
+	printf("size wchar_t: %li\n", sizeof(wchar_t));
+	printf("size wint_t: %li\n", sizeof(wint_t));
+	printf("size *S: %li\n", sizeof(*(L"Л")));
 
-	d = XOpenDisplay(display);
-	if(!d) { fprintf(stderr, "Not open display!\n"); exit(1); }
-
-	XSetErrorHandler((XErrorHandler) null_X_error);
-
-	XSynchronize(d, True);	
+	open_display();
 
 	// Начальные установки
 	current_win = get_current_window();
@@ -187,7 +206,7 @@ void main(int ac, char** av) {
       	for(int i=0; i<32*8; i++) {
       		if(BIT(keys, i)!=BIT(saved, i)) {
       			if(BIT(keys, i)!=0) { // клавиша нажата
-      				change_key(keys, i);
+      				change_key(i);
       			} else {	// клавиша отжата
 
       			}
@@ -200,6 +219,8 @@ void main(int ac, char** av) {
 
       	usleep(DELAY);
    	}
+
+   	return 0;
 }
 
 
@@ -209,6 +230,22 @@ Window get_current_window() {
   	int revert_to = 0;
 	XGetInputFocus(d, &w, &revert_to);
 	return w;
+}
+
+// подключается к дисплею
+void open_display() {
+	d = XOpenDisplay(NULL);
+	if(!d) { fprintf(stderr, "Not open display!\n"); exit(1); }
+
+	XSetErrorHandler(null_X_error);
+
+	XSynchronize(d, True);
+}
+
+// переподключается к дисплею
+void reset_display() {
+	XCloseDisplay(d);
+	open_display();
 }
 
 // печатает в stdout состояние клавиатуры

@@ -35,9 +35,7 @@ void keysym_init() {
 
 // сопоставляет сканкод, раскладку и модификатор символу юникода
 // устанавливает key
-int get_key(wint_t cs) {
-	KeySym ks = xkb_utf32_to_keysym(cs);
-
+int get_key(KeySym ks) {
 	for(int group = 0; group < groups; ++group)
 	for(int code = 0; code < KEYBOARD_SIZE; ++code) 
 	for(int shift = 0; shift < 2; ++shift) {
@@ -51,16 +49,16 @@ int get_key(wint_t cs) {
 }
 
 // сопоставляет символ из другой раскладки
-wint_t translate(wint_t cs) {
-	if(!get_key(cs)) return cs;
-	int group = 
+KeySym translate(KeySym ks) {
+	if(!get_key(ks)) return NoSymbol;
+	int group =
 		key.group == group_ru? group_en:
 		key.group == group_en? group_ru:
 		key.group;
 
-	KeySym ks = keyboard[group][key.mods? 1: 0][key.code];
-	if(ks == NoSymbol) return cs;
-	return xkb_keysym_to_utf32(ks);
+	KeySym toks = keyboard[group][key.mods? 1: 0][key.code];
+	if(toks == NoSymbol) return ks;
+	return toks;
 }
 
 // Переключает раскладку
@@ -86,15 +84,44 @@ int get_mods() {
 // устанавливает модификаторы
 void set_mods(int mods) {
 	int active = get_mods();
+	
+	if(active == mods) return;
+
 	if(active) {
-		XkbLockModifiers(d, XkbUseCoreKbd, active, 0);
-		XFlush(d);
-		//usleep(10000);
+		int res = XkbLockModifiers(d, XkbUseCoreKbd, active, 0);
+		printf("XkbLockModifiers(active) res: %i xerror: %i active: %i\n", res, xerror, active);
 	}
 	if(mods) {
-		XkbLockModifiers(d, XkbUseCoreKbd, mods, 1);
-		XFlush(d);
-		//usleep(10000);
+		int res = XkbLockModifiers(d, XkbUseCoreKbd, mods, 1);
+		printf("XkbLockModifiers(mods) res: %i xerror: %i mods: %i\n", res, xerror, mods);
+	}
+
+	XSync(d, True);
+}
+
+// Эмулирует нажатие и отжатие клавиши
+void press_key(KeySym ks) {
+	send_key(ks, 1);
+	send_key(ks, 0);
+}
+
+// Эмулирует нажатие или отжатие клавиши
+void send_key(KeySym ks, int is_press) {
+	if(!get_key(ks)) return;
+
+	set_group(key.group);
+    set_mods(key.mods);
+
+    XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
+    
+    XSync(d, True);
+    usleep(DELAY);
+}
+
+// "нажимает" lock, если он нажат
+void reset_mods(int mods) {
+	if(mods & LockMask) {
+		press_key(XK_Caps_Lock);
 	}
 }
 
@@ -120,7 +147,7 @@ void init_keyboard(Display* d) {
 }
 
 // эмулирует ввод текста
-void type(wchar_t* s) {
+void type(KeySym* s) {
     int current_group = get_group();
     int current_mods = get_mods();
 
@@ -128,24 +155,4 @@ void type(wchar_t* s) {
 
     set_group(current_group);
     set_mods(current_mods);
-}
-
-// Эмулирует нажатие и отжатие клавиши
-void press_key(wint_t cs) {
-	send_key(cs, 1);
-	send_key(cs, 0);
-}
-
-// Эмулирует нажатие или отжатие клавиши
-void send_key(wint_t cs, int is_press) {
-	if(!get_key(cs)) return;
-
-	set_group(key.group);
-    set_mods(key.mods);
-
-    XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
-    
-    XSync(d, False);
-    XFlush(d);
-    usleep(DELAY);
 }

@@ -11,14 +11,33 @@
 #include <wchar.h>
 #include <stdio.h>
 
+// Установлен ли бит
+#define BIT(c, x)   ( ((char*)c)[x/8]&(1<<(x%8)) )
+
 // интервал проверки клавиатуры
 #define DELAY	10000
 
+// размер буферов trans и word
+#define BUF_SIZE	1024
+
 extern Display* d;
 extern int xerror;
+extern wint_t *word, *trans;
+extern int pos;
+
+// меняет буфера местами
+inline void swap_buf() {
+	wint_t* swap = word; word = trans; trans = swap;
+}
 
 // возвращает текущее окно
 Window get_current_window();
+
+// подключается к дисплею
+void open_display();
+
+// переподключается к дисплею
+void reset_display();
 
 
 #endif

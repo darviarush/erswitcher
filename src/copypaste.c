@@ -24,7 +24,8 @@ int utf8len(char* s) {
 	return len;
 }
 
-void copypaste() {
+// копируем в наш буфер выделение
+int copy_selection() {
 	// Создаём окно
 	int black = BlackPixel(d, DefaultScreen(d));
 	int root = XDefaultRootWindow(d);
@@ -49,7 +50,7 @@ void copypaste() {
 	XSync(d, False);
 	
 	// строка которую получим
-	unsigned char* s = NULL;
+	char* s = NULL;
 	int format;	// в этом формате
 	unsigned long bytesafter, length;
 	Atom target;
@@ -71,27 +72,41 @@ void copypaste() {
 			    event.xselection.requestor,
 			    event.xselection.property, 0L, 1000000,
 			    False, (Atom) AnyPropertyType, &target,
-			    &format, &length, &bytesafter, &s);
+			    &format, &length, &bytesafter, (unsigned char**) &s);
 
 		break;
 	}
 
 	XDestroyWindow(d, w);
 
-	if(s == NULL) return;
+	if(s == NULL) return 0;
 
-	printf("len: %i x: %s\n", length, s);
+	printf("len: %lu x: %s\n", length, s);
 
 	// utf8 переводим в символы юникода, затем в символы x11, после - в сканкоды
 	mbstate_t mbs = {0};
-	for(size_t charlen, i = 0; (charlen = mbrlen(s+i, MB_CUR_MAX, &mbs)) != 0 && charlen >= 0; i += charlen) {
+	pos = 0;
+	for(size_t charlen, i = 0;
+        (charlen = mbrlen(s+i, MB_CUR_MAX, &mbs)) != 0
+        && charlen > 0
+        && i < BUF_SIZE;
+        i += charlen
+    ) {
         wchar_t ws[4];
         int res = mbstowcs(ws, s+i, 1);
         if(res != 1) break;
 
-        wint_t cs = translate(ws[0]);
-        press_key(cs);
+        KeySym ks = xkb_utf32_to_keysym(ws[0]);
+        KeySym ks_trans = translate(ks);
+
+        wint_t cs = xkb_keysym_to_utf32(ks);
+        wint_t cs_trans = xkb_keysym_to_utf32(ks_trans);
+
+        trans[pos] = cs_trans? cs_trans: cs;
+        word[pos++] = cs;
     }
 
 	XFree(s);
+
+	return 1;
 }
