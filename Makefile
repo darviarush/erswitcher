@@ -21,3 +21,8 @@ erswitcher:	o/ $(OBJECTS)
 
 clean:
 	rm -fr erswitcher o/
+
+install:
+	mkdir -p ~/.local/bin
+	cp erswitcher ~/.local/bin
+	grep "exec ~/.local/bin/erswitcher &" ~/.xinitrc > /dev/null || echo "exec ~/.local/bin/erswitcher &" >> ~/.xinitrc
