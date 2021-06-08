@@ -43,6 +43,16 @@ $ ~/.local/bin/erswitcher &
 
 Для того, чтобы erswitcher запускался вместе с иксами `make install` добавляет его в `~/.xinitrc`.
 
+## DEPENDENCIES
+
+Для сборки потребуются:
+
+* gcc
+* make
+* X11
+* xkbcommon
+* Xtst
+
 ## AUTHOR
 
 Yaroslav O. Kosmina <darviarush@mail.ru>.
