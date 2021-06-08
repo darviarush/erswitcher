@@ -7,10 +7,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <wctype.h>
-#include <xdo.h>
 
 #include "keyboard.h"
-#include "copypaste.h"
+#include "selection.h"
 #include "erswitcher.h"
 
 
@@ -93,10 +92,6 @@ void change_key(int code) {
 
 	// нажата Pause - переводим
 	if(ks_pause == XK_Pause) {
-
-		unsigned int mask = get_input_state();
-		printf("mask: %u\n", mask);
-
 		int active_mods[KEYBOARD_SIZE];
 		int nactive_mods = get_active_mods(active_mods);
 		clear_active_mods(active_mods, nactive_mods);
@@ -113,7 +108,7 @@ void change_key(int code) {
 		}
 
 		word[pos] = trans[pos] = 0;
-		printf("pause!!! %S -> %S\n", word, trans);
+		printf("%i pause!!! %S -> %S\n", nactive_mods, word, trans);
 
 		// Если нечего переводить, то показываем сообщение на месте ввода
 		if(pos == 0) {
@@ -136,25 +131,13 @@ void change_key(int code) {
 		set_group(state.group);
 		set_active_mods(active_mods, nactive_mods);
 
-		// меняем раскладку
+        // восстанавливаем Капс-лок (он не входит в модификаторы)
+        if(state.mods & LockMask) {
+            press_key(XK_Caps_Lock);
+        }
+
+		// меняем group раскладку
 		set_group(trans_group);
-
-		// // восстанавливаем shift
-		// set_mods(state.mods);
-	 //    if(xerror) {
-	 //    	xerror = 0;
-			
-	 //    }
-
-		// сбрасываем shift
-		//set_mods(0);
-		//send_key(XK_Shift_L, 0);
-		//usleep(DELAY);
-		//XSynchronize(d, True);
-
-		// Переоткрываем соединение с X-сервером. 
-		// Это нужно, чтобы избежать изменения настроек CapsLock, если она 
-    	//reset_display();
 
 		return;
 	}
@@ -205,6 +188,10 @@ int main() {
 	current_win = get_current_window();
 	pos = 0;
 	keysym_init();
+
+//press_key(XK_Caps_Lock);
+//exit(0);
+
 
 	char buf1[32], buf2[32];
 	char *saved=buf1, *keys=buf2;

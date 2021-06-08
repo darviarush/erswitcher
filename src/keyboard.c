@@ -113,29 +113,8 @@ void send_key(KeySym ks, int is_press) {
 	XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
     XSync(d, False);
 
-	// Window root = XDefaultRootWindow(d);
-
-	// XKeyEvent xk;
-	// xk.display = d;
-	// xk.root = root;
- //  	xk.subwindow = None;
-	// xk.time = CurrentTime;
-	// xk.same_screen = True;
-	// xk.x = xk.y = xk.x_root = xk.y_root = 1;
-
- //    xk.window = get_current_window();
- //    printf("w: %li\n", xk.window);
- //    xk.keycode = key.code;
- //    xk.state = key.mods | (key.group << 13);
- //    xk.type = (is_press ? KeyPress : KeyRelease);
- //    XSendEvent(d, xk.window, True, KeyPressMask, (XEvent *)&xk);
-
-	// set_group(key.group);
- //    set_mods(key.mods);
-
     XFlush(d);
     usleep(DELAY);
-    // XPending(d);
 }
 
 // возвращает модификатры с кнопками мыши
@@ -209,6 +188,7 @@ void clear_active_mods(int* keys, int nkeys) {
 
 void set_active_mods(int* keys, int nkeys) {
 	unsigned int state = get_input_state();
+    printf("state: %i\n", state);
 	for(int i = 0; i<nkeys; i++) {
 		printf("set_active_mods %i\n", i);
 		XTestFakeKeyEvent(d, keys[i], 1, CurrentTime);
@@ -216,6 +196,7 @@ void set_active_mods(int* keys, int nkeys) {
 	}
 
 	if(state & LockMask) {
+        printf("capslock\n");
 		press_key(XK_Caps_Lock);
 	}
 

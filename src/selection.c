@@ -4,7 +4,7 @@
 
 #include "erswitcher.h"
 #include "keyboard.h"
-#include "copypaste.h"
+#include "selection.h"
 
 
 // static unsigned char *
