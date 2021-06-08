@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <wctype.h>
+#include <xdo.h>
 
 #include "keyboard.h"
 #include "copypaste.h"
@@ -93,6 +94,13 @@ void change_key(int code) {
 	// нажата Pause - переводим
 	if(ks_pause == XK_Pause) {
 
+		unsigned int mask = get_input_state();
+		printf("mask: %u\n", mask);
+
+		int active_mods[KEYBOARD_SIZE];
+		int nactive_mods = get_active_mods(active_mods);
+		clear_active_mods(active_mods, nactive_mods);
+
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
 			if(!copy_selection()) return;
@@ -124,6 +132,10 @@ void change_key(int code) {
 		// меняем буфера местами
 		swap_buf();
 
+		// восстанавливаем модификаторы
+		set_group(state.group);
+		set_active_mods(active_mods, nactive_mods);
+
 		// меняем раскладку
 		set_group(trans_group);
 
@@ -135,10 +147,10 @@ void change_key(int code) {
 	 //    }
 
 		// сбрасываем shift
-		set_mods(0);
-		send_key(XK_Shift_L, 0);
-		usleep(DELAY);
-		XSynchronize(d, True);
+		//set_mods(0);
+		//send_key(XK_Shift_L, 0);
+		//usleep(DELAY);
+		//XSynchronize(d, True);
 
 		// Переоткрываем соединение с X-сервером. 
 		// Это нужно, чтобы избежать изменения настроек CapsLock, если она 
@@ -178,9 +190,6 @@ int main() {
 		fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
         return 1;
 	}
-	// wchar_t c = L'Л';
-	// printf("test(%C) = %i\n", c, iswprint(c));
-	// exit(0);
 
 	char* display = XDisplayName(NULL);
 
@@ -203,7 +212,7 @@ int main() {
 
    	while (1) {
    		XQueryKeymap(d, keys);
-      	for(int i=0; i<32*8; i++) {
+      	for(int i=0; i<KEYBOARD_SIZE; i++) {
       		if(BIT(keys, i)!=BIT(saved, i)) {
       			if(BIT(keys, i)!=0) { // клавиша нажата
       				change_key(i);

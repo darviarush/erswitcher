@@ -12,6 +12,12 @@
 #include <xkbcommon/xkbcommon.h>
 
 
+// количество клавишь клавиатуры
+#define KEYBOARD_SIZE	(32*8)
+
+// Установлен ли бит
+#define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
+
 extern int groups;			// Количество раскладок
 extern int group_ru;		// Номер русской раскладки или -1
 extern int group_en;		// Номер английской раскладки или -1
@@ -34,7 +40,7 @@ int get_group();
 int get_mods();
 
 // устанавливает модификаторы
-void set_mods(int mods);
+//void set_mods(int mods);
 
 // эмулирует ввод текста
 void type(KeySym* s);
@@ -50,5 +56,16 @@ KeySym translate(KeySym ks);
 
 // "нажимает" lock, если он нажат
 void reset_mods(int mods);
+
+// устанавливает модификаторы путём ввода клавиш
+void send_mods(int mods, int is_press);
+
+// возвращает модификатры с кнопками мыши
+unsigned int get_input_state();
+
+// активные модификаторы
+int get_active_mods(int *keys);
+void clear_active_mods(int* keys, int nkeys);
+void set_active_mods(int* keys, int nkeys);
 
 #endif

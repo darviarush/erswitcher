@@ -11,8 +11,6 @@
 #include <wchar.h>
 #include <stdio.h>
 
-// Установлен ли бит
-#define BIT(c, x)   ( ((char*)c)[x/8]&(1<<(x%8)) )
 
 // интервал проверки клавиатуры
 #define DELAY	10000
