@@ -92,7 +92,7 @@ int copy_selection() {
         wint_t cs_trans = xkb_keysym_to_utf32(ks_trans);
 
         trans[pos] = cs_trans? cs_trans: cs;
-        word[pos++] = cs;
+        word[pos++] = cs? cs: cs_trans;
     }
 
 	XFree(s);

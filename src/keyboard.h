@@ -43,7 +43,7 @@ int get_mods();
 //void set_mods(int mods);
 
 // эмулирует ввод текста
-void type(KeySym* s);
+void type(char* s);
 
 // Эмулирует нажатие и отжатие клавиши
 void press_key(KeySym ks);

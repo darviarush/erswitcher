@@ -1,4 +1,4 @@
-.PHONY: start clean
+.PHONY: start clean install
 
 OBJECTS = $(patsubst src/%.c,o/%.o,$(wildcard src/*.c))
 CLIBS = -lX11 -lxkbcommon -lXtst
@@ -16,13 +16,11 @@ o/%.o: src/%.c src/%.h
 erswitcher:	o/ $(OBJECTS)
 	gcc $(CLIBS) -o erswitcher $(OBJECTS)
 
-# systray: systray.c
-# 	gcc -lX11  -o $@ $^
-
 clean:
 	rm -fr erswitcher o/
 
 install:
 	mkdir -p ~/.local/bin
 	cp erswitcher ~/.local/bin
+	if [ ! -e ~/.xinitrc ]; then cp /etc/X11/xinit/xinitrc ~/.xinitrc; fi
 	grep "exec ~/.local/bin/erswitcher &" ~/.xinitrc > /dev/null || echo "exec ~/.local/bin/erswitcher &" >> ~/.xinitrc

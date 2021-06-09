@@ -231,8 +231,10 @@ void init_keyboard(Display* d) {
 	XkbFreeNames(kb, XkbGroupNamesMask, 0);
 }
 
-// эмулирует ввод текста
-void type(KeySym* s) {
+// эмулирует ввод текста в utf8
+// контролирующие клавиши вводятся в фигурных скобках {Caps_Lock}{Ctrl+X}
+// для ввода фигурных скобок используется
+void type(char* s) {
     int current_group = get_group();
     //int current_mods = get_mods();
 

@@ -16,6 +16,12 @@
 // распечатывает состояние клавиш
 void print_state(XkbStateRec* state);
 
+// входит в массив
+int in_sym(KeySym symbol, KeySym* symbols) {
+	while(*symbols) if(symbol == *symbols++) return 1;
+	return 0;
+}
+
 // Обработка ошибок
 int xerror = 0;
 static int null_X_error(Display *d, XErrorEvent *err) {
@@ -63,7 +69,8 @@ void change_key(int code) {
 	KeySym ks_pause = XkbKeycodeToKeysym(d, code, group_en, 0);
 
     // Пробел почему-то существует только в английской раскладке
-    if(ks_trans == NoSymbol && ks_pause != NoSymbol) ks_trans = ks;
+    if(ks == NoSymbol) ks = ks_trans;
+    if(ks_trans == NoSymbol) ks_trans = ks;
 
 	const char *s1 = XKeysymToString(ks);
 	const char *s_pause = XKeysymToString(ks_pause);
@@ -143,8 +150,8 @@ void change_key(int code) {
 	}
 
 	// Если это переход на другую строку, то начинаем ввод с начала
-	KeySym control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, NoSymbol};
-	for(KeySym *cx = control; *cx!=NoSymbol; cx++) if(ks_pause == *cx) {
+	KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, 0};
+	if(in_sym(ks_pause, is_control)) {
 		printf("is control!\n");
 		pos = 0;
 		return;
@@ -153,7 +160,8 @@ void change_key(int code) {
 	//if(cs == 0) { pos = 0; return; } // разные управляющие клавиши
 	//if(iswspace(cs)) { pos = 0;	return;	}
 	// Если символ не печатный, то пропускаем
-	if(ks != XK_space && !iswprint(cs)) {
+	KeySym is_print[] = {XK_space, XK_underscore, 0};
+	if(!iswprint(cs) && !in_sym(ks, is_print)) {
 		printf("not isprint! `%C`\n", cs);
 		return; 
 	}
