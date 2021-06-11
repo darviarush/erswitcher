@@ -59,9 +59,6 @@ void send_key(KeySym ks, int is_press);
 // сопоставляет символ из другой раскладки
 KeySym translate(KeySym ks);
 
-// "нажимает" lock, если он нажат
-void reset_mods(int mods);
-
 // устанавливает модификаторы путём ввода клавиш
 void send_mods(int mods, int is_press);
 

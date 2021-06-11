@@ -22,6 +22,19 @@ int in_sym(KeySym symbol, KeySym* symbols) {
 	return 0;
 }
 
+void print_mods(int mods) {
+	char s[2] = "";
+	printf("mods: %i", mods);
+	if(mods & ShiftMask) { printf("Shift"); s[0]='+';}
+	if(mods & LockMask) { printf("%sCapsLock", s); s[0]='+';}
+	if(mods & Mod1Mask) { printf("%sMod1Mask", s); s[0]='+';}
+	if(mods & Mod2Mask) { printf("%sNumLock", s); s[0]='+';}
+	if(mods & Mod3Mask) { printf("%sMod3Mask", s); s[0]='+';}
+	if(mods & Mod4Mask) { printf("%sMod4Mask", s); s[0]='+';}
+	if(mods & Mod5Mask) { printf("%sMod5Mask", s); s[0]='+';}
+	printf("\n");
+}
+
 // Обработка ошибок
 int xerror = 0;
 static int null_X_error(Display *d, XErrorEvent *err) {
@@ -48,9 +61,10 @@ void change_key(int code) {
 	XkbStateRec state;
 	XkbGetState(d, XkbUseCoreKbd, &state);
 	//print_state(&state);
+	//print_mods(state.mods);
 
 	// Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
-	if(state.mods & ~(ShiftMask|LockMask)) {
+	if(state.mods & ~(ShiftMask|LockMask|Mod2Mask)) {
 		return;
 	}
 

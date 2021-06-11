@@ -181,9 +181,7 @@ void clear_active_mods(int* keys, int nkeys) {
         XSync(d, False);
 	}
 
-	if(state & LockMask) {
-		press_key(XK_Caps_Lock);
-	}
+	if(state & LockMask) press_key(XK_Caps_Lock);
 
 	XSync(d, False);
 }
@@ -203,13 +201,6 @@ void set_active_mods(int* keys, int nkeys) {
 	}
 
 	XSync(d, False);
-}
-
-// "нажимает" lock, если он нажат
-void reset_mods(int mods) {
-	if(mods & LockMask) {
-		press_key(XK_Caps_Lock);
-	}
 }
 
 // инициализирует названия клавиатуры
