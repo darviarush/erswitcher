@@ -15,6 +15,8 @@ typedef struct {
 // ответ для get_key()
 unikey_t key;
 
+int delay = DELAY;
+
 // набор клавиатур: keyboard[group][shift][scancode] -> utf32
 KeySym keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
 
@@ -114,7 +116,7 @@ void send_key(KeySym ks, int is_press) {
     XSync(d, False);
 
     XFlush(d);
-    usleep(DELAY);
+    if(delay) usleep(delay/2);
 }
 
 // возвращает модификатры с кнопками мыши

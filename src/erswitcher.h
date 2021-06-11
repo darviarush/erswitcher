@@ -11,10 +11,6 @@
 #include <wchar.h>
 #include <stdio.h>
 
-
-// интервал проверки клавиатуры
-#define DELAY	10000
-
 // размер буферов trans и word
 #define BUF_SIZE	1024
 

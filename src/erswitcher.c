@@ -103,19 +103,29 @@ void change_key(int code) {
 		int nactive_mods = get_active_mods(active_mods);
 		clear_active_mods(active_mods, nactive_mods);
 
+		int from = 0;
+
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
 			if(!copy_selection()) return;
 		}
 		else {
+			from=pos-1;
+			printf("from: %i %s\n", from, trans[from] == XK_space? "space": "nospace");
+			for(; from>0 && XK_space == trans[from]; from--);
+			printf("from2: %i\n", from);
+			for(; from>0; from--) if(XK_space == trans[from]) break;
+			printf("from3: %i\n", from);
 			// отправляем бекспейсы, чтобы удалить ввод
-			for(int i=0; i<pos; i++) {
+			word[pos] = trans[pos] = 0;
+			printf("send backspaces: %i (%i) for: `%S` -> `%S`\n", pos-from, from, word+from, trans+from);
+			for(int i=from; i<pos; i++) {
 				press_key(XK_BackSpace);
 			}
 		}
 
 		word[pos] = trans[pos] = 0;
-		printf("%i pause!!! %S -> %S\n", nactive_mods, word, trans);
+		printf("PRESS PAUSE: `%S` -> `%S`\n", word, trans);
 
 		// Если нечего переводить, то показываем сообщение на месте ввода
 		if(pos == 0) {
@@ -127,7 +137,7 @@ void change_key(int code) {
 		}
 
 		// вводим ввод, но в альтернативной раскладке
-		for(int i=0; i<pos; i++) {
+		for(int i=from; i<pos; i++) {
 			press_key(xkb_utf32_to_keysym(trans[i]));
 		}
 
@@ -221,7 +231,7 @@ int main() {
       	saved=keys;
       	keys=char_ptr;
 
-      	usleep(DELAY);
+      	usleep(delay);
    	}
 
    	return 0;

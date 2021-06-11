@@ -18,6 +18,11 @@
 // Установлен ли бит
 #define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
 
+// дефолтная задержка
+#define DELAY 		10000
+
+extern int delay;			// задержка после нажатия клавиши
+
 extern int groups;			// Количество раскладок
 extern int group_ru;		// Номер русской раскладки или -1
 extern int group_en;		// Номер английской раскладки или -1
