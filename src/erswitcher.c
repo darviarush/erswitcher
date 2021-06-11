@@ -111,14 +111,9 @@ void change_key(int code) {
 		}
 		else {
 			from=pos-1;
-			printf("from: %i %s\n", from, trans[from] == XK_space? "space": "nospace");
 			for(; from>0 && XK_space == trans[from]; from--);
-			printf("from2: %i\n", from);
 			for(; from>0; from--) if(XK_space == trans[from]) break;
-			printf("from3: %i\n", from);
 			// отправляем бекспейсы, чтобы удалить ввод
-			word[pos] = trans[pos] = 0;
-			printf("send backspaces: %i (%i) for: `%S` -> `%S`\n", pos-from, from, word+from, trans+from);
 			for(int i=from; i<pos; i++) {
 				press_key(XK_BackSpace);
 			}
