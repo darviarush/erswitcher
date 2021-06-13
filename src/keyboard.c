@@ -115,7 +115,7 @@ void send_key(KeySym ks, int is_press) {
 	XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
     XSync(d, False);
 
-    XFlush(d);
+    //XFlush(d);
     if(delay) usleep(delay/2);
 }
 
@@ -143,6 +143,7 @@ void send_mods(int mods, int is_press) {
         if(code) {
           XTestFakeKeyEvent(d, code, is_press, CurrentTime);
           XSync(d, False);
+          if(delay) usleep(delay/2);
           break;
         }
       }

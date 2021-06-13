@@ -220,12 +220,19 @@ int main() {
 //exit(0);
 
 
+    unsigned int state1, state2 = 0;
 	char buf1[32], buf2[32];
 	char *saved=buf1, *keys=buf2;
    	XQueryKeymap(d, saved);
 
    	while (1) {
-   		XQueryKeymap(d, keys);
+        // сбросим ввод, коль нажата мышка
+        state1 = get_input_state();
+        state1 &= Button1MotionMask | Button2MotionMask | Button3MotionMask | Button4MotionMask | Button5MotionMask;
+        if(state1 != state2) pos = 0;
+        state2 = state1;
+
+        XQueryKeymap(d, keys);
       	for(int i=0; i<KEYBOARD_SIZE; i++) {
       		if(BIT(keys, i)!=BIT(saved, i)) {
       			if(BIT(keys, i)!=0) { // клавиша нажата
@@ -233,7 +240,7 @@ int main() {
       			} else {	// клавиша отжата
 
       			}
-      		} 
+      		}
       	}
 
       	char* char_ptr=saved;
