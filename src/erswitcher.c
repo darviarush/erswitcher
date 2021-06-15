@@ -125,8 +125,8 @@ void change_key(int code) {
 		}
 		else {
 			from=pos-1;
-			for(; from>0 && XK_space == trans[from]; from--);
-			for(; from>0; from--) if(XK_space == trans[from]) break;
+			for(; from>0 && iswspace(trans[from]); from--);
+			for(; from>0; from--) if(iswspace(trans[from])) break;
 			// отправляем бекспейсы, чтобы удалить ввод
 			for(int i=from; i<pos; i++) {
 				press_key(XK_BackSpace);
