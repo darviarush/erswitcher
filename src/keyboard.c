@@ -225,6 +225,17 @@ void init_keyboard(Display* d) {
 	XkbFreeNames(kb, XkbGroupNamesMask, 0);
 }
 
+
+#define TYPE_BEGIN		int active_mods[KEYBOARD_SIZE];		\
+		int nactive_mods = get_active_mods(active_mods); 	\
+		clear_active_mods(active_mods, nactive_mods);		\
+		int active_group = get_group();						\
+		int active_state = get_mods();
+
+#define TYPE_END	set_group(active_group);					\
+					set_active_mods(active_mods, nactive_mods);	\
+					if(active_state & LockMask) press_key(XK_Caps_Lock);
+
 // эмулирует ввод текста в utf8
 // контролирующие клавиши вводятся в фигурных скобках {Caps_Lock}{Ctrl+X}
 // для ввода фигурных скобок используется
@@ -236,4 +247,24 @@ void type(char* s) {
 
     set_group(current_group);
     //set_mods(current_mods);
+}
+
+// набирает на клаве текст в utf8
+void keyboard_write(char* s) {
+	TYPE_BEGIN;
+	mbstate_t ps = {0};
+	wchar_t dest[4];
+	const char* src = s;
+	int res;
+	while((res = mbsrtowcs(dest, &src, 1, &ps))>0) {
+		press_key(xkb_utf32_to_keysym(((wint_t*) dest)[0]));
+	}
+	TYPE_END;
+}
+
+// набирает на клаве текст в utf32
+void keyboard_write32(wint_t* s) {
+	TYPE_BEGIN;
+	while(*s) press_key(xkb_utf32_to_keysym(*s++));
+	TYPE_END;
 }

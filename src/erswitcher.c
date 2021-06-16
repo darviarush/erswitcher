@@ -169,7 +169,7 @@ void change_key(int code) {
 	}
 
 	// Если это переход на другую строку, то начинаем ввод с начала
-	KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, 0};
+	KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, XK_Return, 0};
 	if(in_sym(ks_pause, is_control)) {
 		printf("is control!\n");
 		pos = 0;
