@@ -176,32 +176,31 @@ int get_active_mods(int *keys) {
 }
 
 void clear_active_mods(int* keys, int nkeys) {
-	unsigned int state = get_input_state();
 	for(int i = 0; i<nkeys; i++) {
 		XTestFakeKeyEvent(d, keys[i], 0, CurrentTime);
         XSync(d, False);
+        //if(delay) usleep(delay / 2);
 	}
 
+	unsigned int state = get_input_state();
 	if(state & LockMask) press_key(XK_Caps_Lock);
 
-	XSync(d, False);
+	//XSync(d, False);
 }
 
 void set_active_mods(int* keys, int nkeys) {
-	unsigned int state = get_input_state();
-    printf("state: %i\n", state);
 	for(int i = 0; i<nkeys; i++) {
-		printf("set_active_mods %i\n", i);
 		XTestFakeKeyEvent(d, keys[i], 1, CurrentTime);
         XSync(d, False);
+        //if(delay) usleep(delay / 2);
 	}
 
+	unsigned int state = get_input_state();
 	if(state & LockMask) {
-        printf("capslock\n");
 		press_key(XK_Caps_Lock);
 	}
 
-	XSync(d, False);
+	//XSync(d, False);
 }
 
 // инициализирует названия клавиатуры

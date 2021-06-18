@@ -1,0 +1,18 @@
+[Unit]
+Description=En-Ru Switcher
+
+[Service]
+Type=idle
+PIDFile=/var/run/erswitcher.pid
+WorkingDirectory=/
+
+User=dart
+Group=dart
+
+ExecStart=/home/dart/__/erswitcher/erswitcher
+#ExecStop=/home/dart/__/erswitcher/erswitcher
+#ExecReload=
+TimeoutSec=5
+
+[Install]
+WantedBy=graphical.target

@@ -201,6 +201,11 @@ int main() {
         return 1;
 	}
 
+	// FILE* f = fopen("/home/dart/1.log", "wb");
+	// if(!f) { fprintf(stderr, "Not open log file!\n"); exit(1); }
+	// fprintf(f, "%lx\n", (unsigned long)d);
+	// fclose(f);
+
 	char* display = XDisplayName(NULL);
 
 	printf("display: %s\n", display);
@@ -215,10 +220,6 @@ int main() {
 	current_win = get_current_window();
 	pos = 0;
 	keysym_init();
-
-//press_key(XK_Caps_Lock);
-//exit(0);
-
 
     unsigned int state1, state2 = 0;
 	char buf1[32], buf2[32];
