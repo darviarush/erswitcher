@@ -49,13 +49,14 @@ static int null_X_error(Display *d, XErrorEvent *err) {
 Display *d;					// текущий дисплей
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 
+// буфера
 static wint_t word_buf[BUF_SIZE];
 wint_t *word = word_buf;
 static wint_t trans_buf[BUF_SIZE];
 wint_t *trans = trans_buf;
 int pos = 0;
 
-void change_key(int code) {
+void change_key(int code, char* keys) {
 	printf("change_key! code=%d\n", code); fflush(stdout);
 
 	XkbStateRec state;
@@ -113,15 +114,23 @@ void change_key(int code) {
 
 	// нажата Pause - переводим
 	if(ks_pause == XK_Pause) {
+		// сохраняем состояние
 		int active_mods[KEYBOARD_SIZE];
 		int nactive_mods = get_active_mods(active_mods);
-		clear_active_mods(active_mods, nactive_mods);
+		//clear_active_mods(active_mods, nactive_mods);
+		// отжимаем модификаторы
+		for(int i = 0; i<nactive_mods; i++) press(active_mods[i], 0);
+
+		// снимаем Капс-лок (он не входит в модификаторы)
+        if(state.mods & LockMask) {
+            press_key(XK_Caps_Lock);
+        }
 
 		int from = 0;
 
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
-			if(!copy_selection()) return;
+			if(!copy_selection()) goto END_TRANS;
 		}
 		else {
 			from=pos-1;
@@ -142,7 +151,7 @@ void change_key(int code) {
 			// и меняем раскладку и буфера
 			set_group(trans_group);
 			swap_buf();
-			return;
+			goto END_TRANS;
 		}
 
 		// вводим ввод, но в альтернативной раскладке
@@ -153,12 +162,27 @@ void change_key(int code) {
 		// меняем буфера местами
 		swap_buf();
 
+		
+		END_TRANS:
+
 		// восстанавливаем модификаторы
 		set_group(state.group);
-		set_active_mods(active_mods, nactive_mods);
+
+		char active_keys[32];
+		XQueryKeymap(d, active_keys);
+      	for(int i=0; i<nactive_mods; i++) {
+      		int code = active_mods[i];
+      		// клавиша не была отжата пока происходил ввод
+      		if(BIT(keys, code)==BIT(active_keys, code)) {
+      			press(code, 1);
+      		}
+      	}
+
+		//set_active_mods(active_mods, nactive_mods);
 
         // восстанавливаем Капс-лок (он не входит в модификаторы)
-        if(state.mods & LockMask) {
+        int mods = get_mods();
+        if(state.mods & LockMask && !(mods & LockMask)) {
             press_key(XK_Caps_Lock);
         }
 
@@ -237,7 +261,7 @@ int main() {
       	for(int i=0; i<KEYBOARD_SIZE; i++) {
       		if(BIT(keys, i)!=BIT(saved, i)) {
       			if(BIT(keys, i)!=0) { // клавиша нажата
-      				change_key(i);
+      				change_key(i, keys);
       			} else {	// клавиша отжата
 
       			}

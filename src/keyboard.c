@@ -100,6 +100,12 @@ int get_mods() {
 // }
 
 // Эмулирует нажатие и отжатие клавиши
+void press(int code, int is_press) {
+	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
+    XSync(d, False);
+}
+
+// Эмулирует нажатие и отжатие клавиши
 void press_key(KeySym ks) {
 	send_key(ks, 1);
 	send_key(ks, 0);
@@ -111,9 +117,7 @@ void send_key(KeySym ks, int is_press) {
 
 	set_group(key.group);
 	send_mods(key.mods, is_press);
-
-	XTestFakeKeyEvent(d, key.code, is_press, CurrentTime);
-    XSync(d, False);
+	press(key.code, is_press);
 
     //XFlush(d);
     if(delay) usleep(delay/2);
@@ -141,10 +145,9 @@ void send_mods(int mods, int is_press) {
       for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
         int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
         if(code) {
-          XTestFakeKeyEvent(d, code, is_press, CurrentTime);
-          XSync(d, False);
-          if(delay) usleep(delay/2);
-          break;
+			press(code, is_press);
+			//if(delay) usleep(delay/2);
+			break;
         }
       }
     }
@@ -176,20 +179,14 @@ int get_active_mods(int *keys) {
 }
 
 void clear_active_mods(int* keys, int nkeys) {
-	for(int i = 0; i<nkeys; i++) {
-		XTestFakeKeyEvent(d, keys[i], 0, CurrentTime);
-        XSync(d, False);
-	}
+	for(int i = 0; i<nkeys; i++) press(keys[i], 0);
 
 	unsigned int state = get_input_state();
 	if(state & LockMask) press_key(XK_Caps_Lock);
 }
 
 void set_active_mods(int* keys, int nkeys) {
-	for(int i = 0; i<nkeys; i++) {
-		XTestFakeKeyEvent(d, keys[i], 1, CurrentTime);
-        XSync(d, False);
-	}
+	for(int i = 0; i<nkeys; i++) press(keys[i], 1);
 
 	unsigned int state = get_input_state();
 	if(state & LockMask) {

@@ -50,6 +50,9 @@ int get_mods();
 // эмулирует ввод текста
 void type(char* s);
 
+// Эмулирует атомарное нажатие клавиши
+void press(int code, int is_press);
+
 // Эмулирует нажатие и отжатие клавиши
 void press_key(KeySym ks);
 
