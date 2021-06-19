@@ -130,6 +130,9 @@ void change_key(int code, char* keys) {
 
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
+            send_key(XK_Control_L, 1);
+            press_key(XK_c);
+            send_key(XK_Control_L, 0);
 			if(!copy_selection()) goto END_TRANS;
 		}
 		else {
