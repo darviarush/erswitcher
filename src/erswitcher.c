@@ -24,13 +24,14 @@ int in_sym(KeySym symbol, KeySym* symbols) {
 
 void print_mods(int mods) {
 	char s[2] = "";
-	printf("mods: %i", mods);
+	printf("mods: %i - ", mods);
 	if(mods & ShiftMask) { printf("Shift"); s[0]='+';}
 	if(mods & LockMask) { printf("%sCapsLock", s); s[0]='+';}
-	if(mods & Mod1Mask) { printf("%sMod1Mask", s); s[0]='+';}
+	if(mods & ControlMask) { printf("%sCtrl", s); s[0]='+';}
+	if(mods & Mod1Mask) { printf("%sAlt", s); s[0]='+';}
 	if(mods & Mod2Mask) { printf("%sNumLock", s); s[0]='+';}
 	if(mods & Mod3Mask) { printf("%sMod3Mask", s); s[0]='+';}
-	if(mods & Mod4Mask) { printf("%sMod4Mask", s); s[0]='+';}
+	if(mods & Mod4Mask) { printf("%sWinKey", s); s[0]='+';}
 	if(mods & Mod5Mask) { printf("%sMod5Mask", s); s[0]='+';}
 	printf("\n");
 }
@@ -130,7 +131,34 @@ void change_key(int code, char* keys) {
 
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
-			if(!copy_selection()) goto END_TRANS;
+
+			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
+			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
+
+			// send_key(XK_Control_L, 1);
+			// press_key(XK_c);
+			// send_key(XK_Control_L, 0);
+
+			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
+			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
+
+
+			// send_key(XK_Control_L, 1);
+			// press_key(XK_Right);
+			// send_key(XK_Control_L, 0);
+			
+
+			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
+			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
+
+			// XA_PRIMARY, XA_SECONDARY
+			// if(!copy_selection(XA_PRIMARY)) 
+
+			char* s = copy_selection(XA_PRIMARY);
+			int res = to_buffer(&s);
+			// to_buffer удаляет s
+
+			if(!res) goto END_TRANS;
 		}
 		else {
 			from=pos-1;

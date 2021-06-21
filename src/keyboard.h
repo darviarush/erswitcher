@@ -62,6 +62,12 @@ void send_key(KeySym ks, int is_press);
 // сопоставляет символ из другой раскладки
 KeySym translate(KeySym ks);
 
+// переводит символ в верхний регистр
+KeySym upper(KeySym ks);
+
+// переводит символ в нижний регистр
+KeySym lower(KeySym ks);
+
 // устанавливает модификаторы путём ввода клавиш
 void send_mods(int mods, int is_press);
 

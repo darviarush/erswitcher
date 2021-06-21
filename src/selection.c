@@ -1,4 +1,3 @@
-#include <X11/Xatom.h>
 #include <wchar.h>
 #include <stdlib.h>
 
@@ -14,7 +13,7 @@ int utf8len(char* s) {
 }
 
 // копируем в наш буфер выделение
-int copy_selection() {
+char* copy_selection(Atom number_buf) {
 	// Создаём окно
 	int black = BlackPixel(d, DefaultScreen(d));
 	int root = XDefaultRootWindow(d);
@@ -28,9 +27,9 @@ int copy_selection() {
 	Atom utf8_atom = XInternAtom(d, "UTF8_STRING", True);
 	if(!utf8_atom) utf8_atom = XA_STRING;
 	Atom request_target = utf8_atom;
-	Atom selection = XA_PRIMARY;
+	//Atom selection = XA_PRIMARY;
 
-	XConvertSelection(d, selection,
+	XConvertSelection(d, number_buf,
 		request_target, 
 		sel_data_atom, 
 		w,
@@ -51,7 +50,7 @@ int copy_selection() {
 
 		// пришло какое-то другое событие... ну его
 		if(event.type != SelectionNotify) continue;
-		if(event.xselection.selection != selection) continue;
+		if(event.xselection.selection != number_buf) continue;
 
 		// нет выделения
 		if(event.xselection.property == None) break;
@@ -68,9 +67,14 @@ int copy_selection() {
 
 	XDestroyWindow(d, w);
 
+	return s;
+}
+
+int to_buffer(char** s1) {
+	char* s = *s1;
 	if(s == NULL) return 0;
 
-	printf("len: %lu x: %s\n", length, s);
+	//printf("to_buffer: %s\n", s);
 
 	// utf8 переводим в символы юникода, затем в символы x11, после - в сканкоды
 	mbstate_t mbs = {0};
@@ -96,6 +100,6 @@ int copy_selection() {
     }
 
 	XFree(s);
-
+	*s1 = NULL;
 	return 1;
 }

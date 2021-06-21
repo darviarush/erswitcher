@@ -5,8 +5,11 @@
  * Копирование текста
  */
 
-// копируем в наш буфер выделение
-int copy_selection();
+#include <X11/Xatom.h>
 
+// копируем в наш буфер выделение
+char* copy_selection(Atom number_buf);
+// в буфер
+int to_buffer(char** s);
 
 #endif

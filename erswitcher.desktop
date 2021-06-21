@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=ENRUSwitcher
+Exec=/bin/bash -c "/home/dart/__/erswitcher/erswitcher > /home/dart/erswitcher.log"
+Type=Application
+X-GNOME-Autostart-enabled=true

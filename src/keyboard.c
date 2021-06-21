@@ -56,15 +56,36 @@ KeySym translate(KeySym ks) {
 		key.group == group_en? group_ru:
 		key.group;
 
-	KeySym toks = keyboard[group][key.mods? 1: 0][key.code];
-	if(toks == NoSymbol) return ks;
-	return toks;
+	KeySym to_ks = keyboard[group][key.mods? 1: 0][key.code];
+	if(to_ks == NoSymbol) return ks;
+	return to_ks;
+}
+
+// void XConvertCase(KeySym keysym, KeySym *lower_return, KeySym *upper_return);
+// переводит символ в верхний регистр
+KeySym upper(KeySym ks) {
+	if(!get_key(ks)) return NoSymbol;
+
+	KeySym to_ks = keyboard[key.group][1][key.code];
+	if(to_ks == NoSymbol) return ks;
+	return to_ks;
+}
+
+// переводит символ в нижний регистр
+KeySym lower(KeySym ks) {
+	if(!get_key(ks)) return NoSymbol;
+
+	KeySym to_ks = keyboard[key.group][0][key.code];
+	if(to_ks == NoSymbol) return ks;
+	return to_ks;
 }
 
 // Переключает раскладку
 void set_group(int group) {
+	if(get_group() == group) return;	
     XkbLockGroup(d, XkbUseCoreKbd, group);
     get_group();	// без этого вызова в силу переключение не вступит
+    printf("set_group: %i\n", group);
 }
 
 // возвращает текущую раскладку
@@ -101,6 +122,7 @@ int get_mods() {
 
 // Эмулирует нажатие и отжатие клавиши
 void press(int code, int is_press) {
+	printf("   press: %i %s\n", code, is_press? "PRESS": "RELEASE");
 	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
     XSync(d, False);
 }
@@ -113,13 +135,19 @@ void press_key(KeySym ks) {
 
 // Эмулирует нажатие или отжатие клавиши
 void send_key(KeySym ks, int is_press) {
-	if(!get_key(ks)) return;
+	const char *s = XKeysymToString(ks);
+
+	if(!get_key(ks)) {
+		printf("send_key: No Key `%s`!\n", s);
+		return;
+	}
 
 	set_group(key.group);
 	send_mods(key.mods, is_press);
+	printf("send_key: %s %s\n", s, is_press? "PRESS": "RELEASE");
 	press(key.code, is_press);
 
-    //XFlush(d);
+    XFlush(d);
     if(delay) usleep(delay/2);
 }
 
@@ -216,15 +244,17 @@ void init_keyboard(Display* d) {
 }
 
 
-#define TYPE_BEGIN		int active_mods[KEYBOARD_SIZE];		\
+#define TYPE_BEGIN		\
+		int active_mods[KEYBOARD_SIZE];		\
 		int nactive_mods = get_active_mods(active_mods); 	\
 		clear_active_mods(active_mods, nactive_mods);		\
 		int active_group = get_group();						\
 		int active_state = get_mods();
 
-#define TYPE_END	set_group(active_group);					\
-					set_active_mods(active_mods, nactive_mods);	\
-					if(active_state & LockMask) press_key(XK_Caps_Lock);
+#define TYPE_END	\
+		set_group(active_group);					\
+		set_active_mods(active_mods, nactive_mods);	\
+		if(active_state & LockMask) press_key(XK_Caps_Lock);
 
 // эмулирует ввод текста в utf8
 // контролирующие клавиши вводятся в фигурных скобках {Caps_Lock}{Ctrl+X}
