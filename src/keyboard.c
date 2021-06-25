@@ -37,8 +37,8 @@ void keysym_init() {
 // устанавливает key
 int get_key(KeySym ks) {
 	for(int group = 0; group < groups; ++group)
-	for(int code = 0; code < KEYBOARD_SIZE; ++code) 
-	for(int shift = 0; shift < 2; ++shift) {
+	for(int code = 0; code < KEYBOARD_SIZE; code++) 
+	for(int shift = 0; shift < 2; shift++) {
 		if(keyboard[group][shift][code] != ks) continue;
 		key.code = code;
 		key.group = group;

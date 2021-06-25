@@ -1,5 +1,11 @@
 [Desktop Entry]
-Name=ENRUSwitcher
-Exec=/bin/bash -c "/home/dart/__/erswitcher/erswitcher > /home/dart/erswitcher.log"
 Type=Application
+Name=EN-RU Switcher
+Comment=
+GenericName[ru]=Транслитератор ввода с клавиатуры
+Comment[ru]=Транслитератор символов с русского на английский
+Exec=/home/dart/__/erswitcher/erswitcher
+Icon=/home/dart/__/erswitcher/erswitcher.png
+Terminal=false
+Categories=Keyboard;
 X-GNOME-Autostart-enabled=true
