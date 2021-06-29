@@ -423,6 +423,7 @@ void add_to_buffer(int code) {
 }
 
 int from_space() {
+	if(pos == 0) return 0;
 	int from=pos-1;
 	for(; from>0 && iswspace(word[from]); from--);
 	for(; from>0; from--) if(iswspace(word[from])) break;
@@ -441,7 +442,9 @@ void print_translate_buffer(int from, KeySym(*translate_fn)(KeySym)) {
 	for(int i=from; i<pos; i++) {
 		KeySym ks = translate_fn(xkb_utf32_to_keysym(word[i]));
 		press_key(ks);
-		word[i] = xkb_keysym_to_utf32(ks);
+		wint_t cs = xkb_keysym_to_utf32(ks);
+		printf("%i: %C -> %C\n", i, word[i], cs);
+		word[i] = cs;
 	}
 	
 	recover_active_mods();
