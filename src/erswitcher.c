@@ -31,7 +31,7 @@ void print_mods(int mods) {
 	if(mods & Mod1Mask) { printf("%sAlt", s); s[0]='+';}
 	if(mods & Mod2Mask) { printf("%sNumLock", s); s[0]='+';}
 	if(mods & Mod3Mask) { printf("%sMod3Mask", s); s[0]='+';}
-	if(mods & Mod4Mask) { printf("%sWinKey", s); s[0]='+';}
+	if(mods & Mod4Mask) { printf("%sSuper", s); s[0]='+';}
 	if(mods & Mod5Mask) { printf("%sMod5Mask", s); s[0]='+';}
 	printf("\n");
 }
@@ -57,6 +57,15 @@ static wint_t trans_buf[BUF_SIZE];
 wint_t *trans = trans_buf;
 int pos = 0;
 
+// // Записываем символ в буфер с его раскладкой клавиатуры
+// void to_buffer () {
+	// if(pos >= BUF_SIZE) pos = 0;
+	// trans[pos] = cs_trans;
+	// word[pos++] = cs;
+	// trans[pos] = word[pos] = 0;
+	// printf("press! %S -> %S\n", word, trans);
+// }
+
 void change_key(int code, char* keys) {
 	printf("change_key! code=%d\n", code); fflush(stdout);
 
@@ -64,7 +73,6 @@ void change_key(int code, char* keys) {
 	XkbGetState(d, XkbUseCoreKbd, &state);
 	//print_state(&state);
 	//print_mods(state.mods);
-
 	// Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
 	if(state.mods & ~(ShiftMask|LockMask|Mod2Mask)) {
 		return;
@@ -131,32 +139,9 @@ void change_key(int code, char* keys) {
 
 		// нажата Shift+Pause - переводим выделенный фрагмент
 		if(state.mods & ShiftMask) {
-
-			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
-			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
-
-			// send_key(XK_Control_L, 1);
-			// press_key(XK_c);
-			// send_key(XK_Control_L, 0);
-
-			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
-			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
-
-
-			// send_key(XK_Control_L, 1);
-			// press_key(XK_Right);
-			// send_key(XK_Control_L, 0);
-			
-
-			// printf("primary: %s\n", copy_selection(XA_PRIMARY));
-			// printf("secondary: %s\n", copy_selection(XA_SECONDARY));
-
-			// XA_PRIMARY, XA_SECONDARY
-			// if(!copy_selection(XA_PRIMARY)) 
-
 			char* s = copy_selection(XA_PRIMARY);
 			int res = to_buffer(&s);
-			// to_buffer удаляет s
+			// to_buffer очищает память выделенную для s через XFree
 
 			if(!res) goto END_TRANS;
 		}

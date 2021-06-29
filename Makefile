@@ -1,4 +1,4 @@
-.PHONY: start clean install
+.PHONY: start clean install s
 
 OBJECTS = $(patsubst src/%.c,o/%.o,$(wildcard src/*.c))
 CLIBS = -lX11 -lxkbcommon -lXtst
@@ -24,3 +24,10 @@ install:
 	cp erswitcher ~/.local/bin
 	if [ ! -e ~/.xinitrc ]; then cp /etc/X11/xinit/xinitrc ~/.xinitrc; fi
 	grep "exec ~/.local/bin/erswitcher &" ~/.xinitrc > /dev/null || echo "exec ~/.local/bin/erswitcher &" >> ~/.xinitrc
+
+
+ers: erswitcher.c
+	gcc $(CFLAGS) $(CLIBS) -o ers erswitcher.c
+
+s: ers
+	./ers
