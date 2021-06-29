@@ -313,7 +313,7 @@ int active_use = 0;
 // возвращчет количество найденных клавиш-модификаторов
 void clear_active_mods() {
 	if(active_use) {
-		fprintf(stderr, "Вложенный clear_active_mods\n");
+		fprintf(stderr, "ABORT: Вложенный clear_active_mods\n");
 		exit(1);
 	}
 	active_use++;
@@ -361,6 +361,8 @@ void recover_active_mods() {
 	if(active_mods & LockMask && !(mods & LockMask)) {
 		press_key(XK_Caps_Lock);
 	}
+	
+	active_use--;
 }
 
 int get_shift_level(int mods) {
@@ -396,7 +398,7 @@ void add_to_buffer(int code) {
     XkbGetState(d, XkbUseCoreKbd, &state);
 
 	// Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
-	if(state.mods & ~(LockMask|Mod2Mask)) {
+	if(state.mods & ~(ShiftMask|LockMask|NumMask)) {
 		return;
 	}
 
@@ -419,7 +421,8 @@ void add_to_buffer(int code) {
 	// Записываем символ в буфер с его раскладкой клавиатуры
 	if(pos >= BUF_SIZE) pos = 0;
 	word[pos++] = cs;
-	printf("press! %S\n", word);
+	word[pos] = 0;
+	printf("add_to_buffer: %S\n", word);
 }
 
 int from_space() {
@@ -430,10 +433,15 @@ int from_space() {
 	return from;
 }
 
-void print_translate_buffer(int from, KeySym(*translate_fn)(KeySym)) {
+typedef KeySym(translate_fn_t)(KeySym);
+void print_translate_buffer(int from, int backspace, translate_fn_t* translate_fn) {
+	word[pos] = 0;
+	printf("print_translate_buffer: %S\n", word+from);
+
 	clear_active_mods();
 	
 	// отправляем бекспейсы, чтобы удалить ввод
+	if(backspace)
 	for(int i=from; i<pos; i++) {
 		press_key(XK_BackSpace);
 	}
@@ -446,7 +454,7 @@ void print_translate_buffer(int from, KeySym(*translate_fn)(KeySym)) {
 		printf("%i: %C -> %C\n", i, word[i], cs);
 		word[i] = cs;
 	}
-	
+
 	recover_active_mods();
 	
 	// меняем group раскладку
@@ -558,27 +566,27 @@ void change_key(int code) {
 		if(pos != 0) --pos;
 	}
 	else if(ks == XK_Pause && mods == 0) {
-		print_translate_buffer(from_space(), translate);
+		print_translate_buffer(from_space(), 1, translate);
 	}
 	else if(ks == XK_Pause && mods == ControlMask) {
-		print_translate_buffer(0, translate);
+		print_translate_buffer(0, 1, translate);
 	}
 	else if(ks == XK_Pause && mods == ShiftMask) {
 		char* s = copy_selection(XA_PRIMARY);
 		to_buffer(&s);
 		// to_buffer очищает память выделенную для s через XFree
-		print_translate_buffer(0, translate);
+		print_translate_buffer(0, 0, translate);
 	}
 	else if(ks == XK_Pause && mods == AltMask) {
-		print_translate_buffer(from_space(), invertcase);
+		print_translate_buffer(from_space(), 1, invertcase);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ControlMask)) {
-		print_translate_buffer(0, invertcase);
+		print_translate_buffer(0, 1, invertcase);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ShiftMask)) {
 		char* s = copy_selection(XA_PRIMARY);
 		to_buffer(&s);
-		print_translate_buffer(0, invertcase);
+		print_translate_buffer(0, 0, invertcase);
 	}
 	else {
 		// заносим в буфер
