@@ -591,8 +591,7 @@ void change_key(int code) {
 	printf("\n");
 	fflush(stdout);
     // нажата комбинация? выполняем действие
-    //int dues = get_dues(state.group, state.mods, ks);
-	int mods = state.mods & ~(LockMask|Mod2Mask);
+	int mods = state.mods & ~(LockMask|NumMask);
 	
 	if(ks == XK_BackSpace && mods == 0) {
 		if(pos != 0) --pos;
