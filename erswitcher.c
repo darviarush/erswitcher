@@ -1,3 +1,5 @@
+
+
 #include <locale.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -12,11 +14,12 @@
 #include <wctype.h>
 #include <wchar.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 
 /**
 
-sym - префикс для функций обрабатывающих KeySym 
+sym - префикс для функций обрабатывающих KeySym
 
  */
 
@@ -37,6 +40,10 @@ char keyboard_buf1[32], keyboard_buf2[32];
 char *saved=keyboard_buf1, *keys=keyboard_buf2;
 int pos = 0;
 wint_t word[BUF_SIZE];
+Atom sel_data_atom;
+Atom utf8_atom;
+Atom clipboard_atom;
+
 
 typedef struct {
 	int code;
@@ -206,6 +213,10 @@ void open_display() {
 	XSetErrorHandler(null_X_error);
 
 	XSynchronize(d, True);
+	
+	sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
+	utf8_atom = XInternAtom(d, "UTF8_STRING", True);
+	clipboard_atom = XInternAtom(d, "CLIPBOARD", False);
 }
 
 // возвращает текущее окно
@@ -317,6 +328,10 @@ void clear_active_mods() {
 		exit(1);
 	}
 	active_use++;
+	
+	init_keyboard();
+	keysym_init();
+	
 	active_mods = get_mods();
 	active_group = get_group();
 	
@@ -344,8 +359,11 @@ void clear_active_mods() {
 
 // восстанавливаем модификаторы
 void recover_active_mods() {
-	set_group(active_group);
-
+	
+	// снимаем нажатые модификаторы
+	int mods = get_mods();
+	send_mods(mods, 0);
+	
 	char active_keys[32];
 	XQueryKeymap(d, active_keys);
 	for(int i=0; i<active_len; i++) {
@@ -357,10 +375,11 @@ void recover_active_mods() {
 	}
 	
 	// восстанавливаем Капс-лок (он не входит в модификаторы)
-	int mods = get_mods();
 	if(active_mods & LockMask && !(mods & LockMask)) {
 		press_key(XK_Caps_Lock);
 	}
+	
+	set_group(active_group);
 	
 	active_use--;
 }
@@ -451,19 +470,22 @@ void print_translate_buffer(int from, int backspace, translate_fn_t* translate_f
 		KeySym ks = translate_fn(xkb_utf32_to_keysym(word[i]));
 		press_key(ks);
 		wint_t cs = xkb_keysym_to_utf32(ks);
-		printf("%i: %C -> %C\n", i, word[i], cs);
+		//printf("%i: %C -> %C\n", i, word[i], cs);
 		word[i] = cs;
 	}
 
 	recover_active_mods();
 	
 	// меняем group раскладку
-	int trans_group = active_group == group_en? group_ru: group_en;
-	set_group(trans_group);
+	if(translate_fn == translate) {
+		int trans_group = active_group == group_en? group_ru: group_en;
+		set_group(trans_group);
+	}
 }
 
-// копируем в наш буфер выделение
-char* copy_selection(Atom number_buf) {
+// получаем выделение
+char* get_selection(Atom number_buf) {
+		
 	// Создаём окно
 	int black = BlackPixel(d, DefaultScreen(d));
 	int root = XDefaultRootWindow(d);
@@ -473,11 +495,7 @@ char* copy_selection(Atom number_buf) {
 	XSelectInput(d, w, PropertyChangeMask);
 
 	// запрос на получение выделенной области
-	Atom sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
-	Atom utf8_atom = XInternAtom(d, "UTF8_STRING", True);
-	if(!utf8_atom) utf8_atom = XA_STRING;
-	Atom request_target = utf8_atom;
-	//Atom selection = XA_PRIMARY;
+	Atom request_target = utf8_atom? utf8_atom: XA_STRING;
 
 	XConvertSelection(d, number_buf,
 		request_target, 
@@ -546,6 +564,20 @@ void to_buffer(char** s1) {
 	*s1 = NULL;
 }
 
+void copy_selection() {
+	clear_active_mods();
+	int save = delay;
+	delay = 0;
+	send_key(XK_Control_L, 1);
+	press_key(XK_Insert);
+	send_key(XK_Control_L, 0);
+	delay = save;
+	recover_active_mods();
+
+	char* s = get_selection(clipboard_atom);
+	to_buffer(&s);
+}
+
 void change_key(int code) {
     
 	XkbStateRec state;
@@ -572,20 +604,18 @@ void change_key(int code) {
 		print_translate_buffer(0, 1, translate);
 	}
 	else if(ks == XK_Pause && mods == ShiftMask) {
-		char* s = copy_selection(XA_PRIMARY);
-		to_buffer(&s);
+		copy_selection();
 		// to_buffer очищает память выделенную для s через XFree
 		print_translate_buffer(0, 0, translate);
 	}
-	else if(ks == XK_Pause && mods == AltMask) {
+	else if(ks == XK_Pause && mods == (AltMask|ShiftMask)) {
 		print_translate_buffer(from_space(), 1, invertcase);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ControlMask)) {
 		print_translate_buffer(0, 1, invertcase);
 	}
-	else if(ks == XK_Pause && mods == (AltMask|ShiftMask)) {
-		char* s = copy_selection(XA_PRIMARY);
-		to_buffer(&s);
+	else if(ks == XK_Pause && mods == AltMask) {
+		copy_selection();
 		print_translate_buffer(0, 0, invertcase);
 	}
 	else {
@@ -594,19 +624,91 @@ void change_key(int code) {
     }    
 }
 
-int main() {
+void init_desktop(char* av0) {
+	// FILE* f = fopen("/usr/share/application/erswitcher.desktop", "rb");
+	// if(f) {fclose(f); return;}
+	
+	char* program = realpath(av0, NULL);
+	if(!program) {fprintf(stderr, "WARN: нет пути к программе\n"); return;}
+	
+	#define INIT_DESKTOP_FREE	free(program)
+	
+	const char* home = getenv("HOME");
+	if(!home) {fprintf(stderr, "WARN: нет getenv(HOME)\n");	INIT_DESKTOP_FREE; return;}
+	if(chdir(home)) {fprintf(stderr, "WARN: нет каталога пользователя %s\n", home);	INIT_DESKTOP_FREE; return;}
+		
+	mkdir(".local", 0700);
+	mkdir(".local/share", 0700);
+	mkdir(".local/share/applications", 0700);
+	
+	const char* app = ".local/share/applications/erswitcher.desktop";
+	
+	FILE* f = fopen(app, "wb");
+	if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", home, app);
+	else {
+		fprintf(f,
+			"[Desktop Entry]\n"
+			"Encoding=UTF-8\n"
+			"Terminal=false\n"
+			"Type=Application\n"
+			"Name=EN-RU Switcher\n"
+			"Comment=Transliterator for keyboard input\n"
+			"GenericName[ru]=Русско-английский клавиатурный переключатель\n"
+			"Comment[ru]=Транслитератор ввода с клавиатуры\n"
+			"Exec=%s\n"
+			"X-GNOME-Autostart-enabled=true\n"
+			"Icon=preferences-desktop-keyboard\n"
+			"Categories=Keyboard;Transliterate;Development;System;\n",
+			program
+		);
+		
+		fclose(f);
+	}
+	
+	mkdir(".config", 0700);
+	mkdir(".config/autostart", 0700);
+	
+	const char* autostart = ".config/autostart/erswitcher.desktop";
+	
+	f = fopen(autostart, "wb");
+	if(!f) {fprintf(stderr, "WARN: не могу создать %s/%s\n", home, autostart); INIT_DESKTOP_FREE; return;}
+	
+	fprintf(f,
+		"[Desktop Entry]\n"
+		"Name=EN-RU Switcher\n"
+		"Comment=Transliterator for keyboard input\n"
+		"Exec=%s\n"
+		"Icon=preferences-desktop-keyboard\n"
+		"Terminal=false\n"
+		"Type=Application\n"
+		"Categories=Keyboard;Transliterate;Development;System;\n"
+		"Keywords=keyboard;transliterate;erswitcher;switch\n"
+		"X-GNOME-UsesNotifications=t\n",
+		program
+	);
+	
+	fclose(f);
+	
+	INIT_DESKTOP_FREE;
+}
+
+void check_any_instance() {
+	
+}
+
+int main(int ac, char** av) {
+	
+	if(!ac) fprintf(stderr, "ERROR: а где путь к программе?\n");
+	
 	char* locale = "ru_RU.UTF-8";
 	if(!setlocale(LC_ALL, locale)) {
 		fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
         return 1;
 	}
 
-	// FILE* f = fopen("/home/dart/1.log", "wb");
-	// if(!f) { fprintf(stderr, "Not open log file!\n"); exit(1); }
-	// fprintf(f, "%lx\n", (unsigned long)d);
-	// fclose(f);
-
 	open_display();
+	init_desktop(av[0]);
+	check_any_instance();
 
 	// Начальные установки
 	current_win = get_current_window();
