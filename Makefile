@@ -11,7 +11,7 @@ clean:
 
 install:
 	mkdir -p ~/.local/bin
-	cp erswitcher ~/.local/bin
+	mv -f erswitcher ~/.local/bin/erswitcher
 
 launch:
 	~/.local/bin/erswitcher &> /dev/null &
