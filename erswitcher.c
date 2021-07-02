@@ -1,10 +1,9 @@
-/**************************************************************
- * Приложение: erswitcher - переключатель клавиатурного ввода *
- * Автор: Ярослав О. Косьмина                                 *
- * Лицензия: GPLv3                                            *
- * Местонахождение: https://github.com/darviarush/erswitcher  *
- **************************************************************/
-
+-/**************************************************************
+  * Приложение: erswitcher - переключатель клавиатурного ввода *
+  * Автор: Ярослав О. Косьмина                                 *
+  * Лицензия: GPLv3                                            *
+  * Местонахождение: https://github.com/darviarush/erswitcher  *
+  **************************************************************/
 
 #include <locale.h>
 #include <X11/X.h>
@@ -43,12 +42,17 @@ Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
 
-
 typedef struct {
-	int code;
-	int mods;
-	int group;
+	unsigned code:8;
+	unsigned mods:8;
+	unsigned group:8;
 } unikey_t;
+
+// typedef struct {
+	// int code;
+	// int mods;
+	// int group;
+// } unikey_t;
 
 // ответ для get_key()
 unikey_t key;
@@ -59,6 +63,7 @@ KeySym keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
 int groups = 0;			// Количество раскладок
 int group_ru = -1;		// Номер русской раскладки или -1
 int group_en = -1;		// Номер английской раскладки или -1
+int maybe_group = 0;	// Номер раскладки в которой первой искать сканкод по символу
 
 // инициализирует названия клавиатуры
 static char* Russian = "Russian";
@@ -92,6 +97,15 @@ void keysym_init() {
 // сопоставляет сканкод, раскладку и модификатор символу юникода
 // устанавливает key
 int get_key(KeySym ks) {
+	for(int code = 0; code < KEYBOARD_SIZE; code++) 
+	for(int shift = 0; shift < 2; shift++) {
+		if(keyboard[maybe_group][shift][code] != ks) continue;
+		key.code = code;
+		key.group = maybe_group;
+		key.mods = shift? ShiftMask: 0;
+		return 1;
+	}
+	
 	for(int group = 0; group < groups; ++group)
 	for(int code = 0; code < KEYBOARD_SIZE; code++) 
 	for(int shift = 0; shift < 2; shift++) {
@@ -167,14 +181,14 @@ void print_sym(int mods, KeySym ks) {
 		if(!mask) continue;
 		if(begin) printf("+"); else begin = 1;
 		switch(mask) {
-			case ShiftMask: printf("Shift"); break;
-			case LockMask: printf("CapsLock"); break;
-			case ControlMask: printf("Ctrl"); break;
-			case Mod1Mask: printf("Alt"); break;
-			case Mod2Mask: printf("NumLock"); break;
-			case Mod3Mask: printf("Meta"); break;
-			case Mod4Mask: printf("Super"); break;
-			case Mod5Mask: printf("Hyper"); break;
+			case ShiftMask: printf("⇧Shift"); break;
+			case LockMask: printf("⇪🄰CapsLock"); break;// ⇪🄰
+			case ControlMask: printf("⌃⎈Ctrl"); break;
+			case Mod1Mask: printf("⌥⎇Alt"); break;
+			case Mod2Mask: printf("⇭NumLock"); break; // ⓛ🄸
+			case Mod3Mask: printf("❖Meta"); break;
+			case Mod4Mask: printf("⌘⊞❖Super"); break;
+			case Mod5Mask: printf("✦Hyper"); break;
 			default:
 				printf("Mod%i", i);
 		}
@@ -184,6 +198,19 @@ void print_sym(int mods, KeySym ks) {
 	//wint_t cs = xkb_keysym_to_utf32(ks);
 	//if(cs) printf("%C", cs);
 	//else 
+	switch(ks) {
+		case XK_Escape: printf("⎋"); break;
+		case XK_BackSpace: printf("⌫←"); break;
+		case XK_Delete: printf("⌦"); break;
+		case XK_Return: printf("↵↩⏎⌤⌅⎆"); break;
+		case XK_Tab: printf("↹"); break;
+		case XK_Home: printf("⇱"); break;
+		case XK_End: printf("⇲"); break;
+		case XK_Menu: printf("≣"); break;
+		case XK_Pause: printf("⎉"); break;
+		case XK_Print: printf("⎙"); break;
+		case XK_Multi_key: printf("⎄"); break;
+	}
 	printf("%s", XKeysymToString(ks));
 }
 
@@ -451,22 +478,24 @@ int from_space() {
 	return from;
 }
 
-typedef KeySym(translate_fn_t)(KeySym);
-void print_translate_buffer(int from, int backspace, translate_fn_t* translate_fn) {
+void send_key_multi(KeySym ks, int n) {
+	for(int i=0; i<n; i++) press_key(ks);
+}
+
+void print_translate_buffer(int from, int backspace) {
 	word[pos] = 0;
 	printf("print_translate_buffer: %S\n", word+from);
 
 	clear_active_mods();
+	int trans_group = active_group == group_en? group_ru: group_en;
+	maybe_group = active_group;
 	
 	// отправляем бекспейсы, чтобы удалить ввод
-	if(backspace)
-	for(int i=from; i<pos; i++) {
-		press_key(XK_BackSpace);
-	}
+	if(backspace) send_key_multi(XK_BackSpace, pos-from);
 	
 	// вводим ввод, но в альтернативной раскладке
 	for(int i=from; i<pos; i++) {
-		KeySym ks = translate_fn(xkb_utf32_to_keysym(word[i]));
+		KeySym ks = translate(xkb_utf32_to_keysym(word[i]));
 		press_key(ks);
 		wint_t cs = xkb_keysym_to_utf32(ks);
 		//printf("%i: %C -> %C\n", i, word[i], cs);
@@ -476,10 +505,29 @@ void print_translate_buffer(int from, int backspace, translate_fn_t* translate_f
 	recover_active_mods();
 	
 	// меняем group раскладку
-	if(translate_fn == translate) {
-		int trans_group = active_group == group_en? group_ru: group_en;
-		set_group(trans_group);
+	set_group(trans_group);
+}
+
+void print_invertcase_buffer(int from, int backspace) {
+	word[pos] = 0;
+	printf("print_invertcase_buffer: %S\n", word+from);
+
+	clear_active_mods();
+	maybe_group = active_group;
+	
+	// отправляем бекспейсы, чтобы удалить ввод
+	if(backspace) send_key_multi(XK_BackSpace, pos-from);
+	
+	// вводим ввод, но в альтернативной раскладке
+	for(int i=from; i<pos; i++) {
+		KeySym ks = invertcase(xkb_utf32_to_keysym(word[i]));
+		press_key(ks);
+		wint_t cs = xkb_keysym_to_utf32(ks);
+		//printf("%i: %C -> %C\n", i, word[i], cs);
+		word[i] = cs;
 	}
+
+	recover_active_mods();
 }
 
 // получаем выделение
@@ -596,25 +644,25 @@ void change_key(int code) {
 		if(pos != 0) --pos;
 	}
 	else if(ks == XK_Pause && mods == 0) {
-		print_translate_buffer(from_space(), 1, translate);
+		print_translate_buffer(from_space(), 1);
 	}
 	else if(ks == XK_Pause && mods == ControlMask) {
-		print_translate_buffer(0, 1, translate);
+		print_translate_buffer(0, 1);
 	}
 	else if(ks == XK_Pause && mods == ShiftMask) {
 		copy_selection();
 		// to_buffer очищает память выделенную для s через XFree
-		print_translate_buffer(0, 0, translate);
+		print_translate_buffer(0, 0);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ShiftMask)) {
-		print_translate_buffer(from_space(), 1, invertcase);
+		print_invertcase_buffer(from_space(), 1);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ControlMask)) {
-		print_translate_buffer(0, 1, invertcase);
+		print_invertcase_buffer(0, 1);
 	}
 	else if(ks == XK_Pause && mods == AltMask) {
 		copy_selection();
-		print_translate_buffer(0, 0, invertcase);
+		print_invertcase_buffer(0, 0);
 	}
 	else {
 		// заносим в буфер

@@ -4,7 +4,7 @@
 
 # VERSION
 
-0.0.3—beta
+4
 
 # SYNOPSIS
 

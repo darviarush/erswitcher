@@ -18,3 +18,10 @@ launch:
 
 s: erswitcher
 	./erswitcher
+
+dist:
+	autoscan
+	mcedit configure.scan
+	mv configure.scan configure.in
+	autoconf
+	./configure
