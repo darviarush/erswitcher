@@ -34,7 +34,7 @@ _EN—RU Switcher_ прослушивает клавиатуру и запоми
 ```sh
 $ git clone https://github.com/darviarush/erswitcher.git
 $ cd erswitcher
-$ make && make install && make lauch
+$ make && make install && make launch
 ```
 
 _EN—RU Switcher_ будет скомпилирован, установлен в `~/.local/bin/erswitcher` и запущен из `~/.local/bin` в фоне.
