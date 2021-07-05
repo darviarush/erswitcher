@@ -21,6 +21,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+typedef struct {
+	unsigned code:8;
+	unsigned mods:8;
+	unsigned group:8;
+} unikey_t;
 
 // Установлен ли бит
 #define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
@@ -42,11 +47,6 @@ Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
 
-typedef struct {
-	unsigned code:8;
-	unsigned mods:8;
-	unsigned group:8;
-} unikey_t;
 
 // typedef struct {
 	// int code;
@@ -465,6 +465,7 @@ void add_to_buffer(int code) {
 	
 	// Записываем символ в буфер с его раскладкой клавиатуры
 	if(pos >= BUF_SIZE) pos = 0;
+	//word[pos++] = {code: code, mods: state.mods, group: state};
 	word[pos++] = cs;
 	word[pos] = 0;
 	printf("add_to_buffer: %S\n", word);
