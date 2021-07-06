@@ -63,10 +63,18 @@ int groups = 0;			// Количество раскладок
 int group_ru = -1;		// Номер русской раскладки или -1
 int group_en = -1;		// Номер английской раскладки или -1
 
+// typedef struct {
+	
+// } modkey_t;
+
+// modkey_t keyboard_mods[8];
+
 // инициализирует названия клавиатуры
 static char* Russian = "Russian";
 static char* English = "English";
 void init_keyboard() {
+	
+	// инициализируем раскладки клавиатуры
 	XkbDescRec* kb = XkbAllocKeyboard();
 	if(!kb) return;
 
@@ -82,6 +90,28 @@ void init_keyboard() {
 	}
 
 	XkbFreeNames(kb, XkbGroupNamesMask, 0);
+	
+	// TODO: инициализируем модификаторы
+	// в иксах есть 8 модификаторов. И на них можно назначить разные модифицирующие или лочащиеся клавиши
+	// int i, k = 0;
+	// int min_keycode, max_keycode, keysyms_per_keycode = 0;
+
+    // XDisplayKeycodes (dpy, &min_keycode, &max_keycode);
+    // XGetKeyboardMapping (dpy, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
+	
+	// for (i = 0; i < 8; i++) {
+		// for (int j = 0; j < map->max_keypermod; j++) {
+			// if (map->modifiermap[k]) {
+				// KeySym ks;
+				// int index = 0;
+				// do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
+				// char* nm = XKeysymToString(ks);
+
+				// //fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
+			// }
+			// k++;
+		// }
+    // }
 }
 
 KeySym unikey_to_keysym(unikey_t key) {
@@ -529,6 +559,7 @@ void copy_selection() {
 	recover_active_mods();
 
 	char* s = get_selection(clipboard_atom);
+	maybe_group = active_state.group;
 	to_buffer(&s);
 }
 
@@ -539,7 +570,7 @@ void change_key(int code) {
     KeySym ks = KEY_TO_SYM(key);
     
 	// XkbKeysymToModifiers()
-	printf("change_key %i: ", code);
+	printf("change_key %i (%i) %i: ", code, key.mods, key.group);
 	print_sym(key.mods, ks);
 	printf("\n");
 	fflush(stdout);
