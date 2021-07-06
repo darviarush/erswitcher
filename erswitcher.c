@@ -360,7 +360,6 @@ void add_to_buffer(unikey_t key) {
 	}
 
 	KeySym ks = KEY_TO_SYM(key);
-	wint_t cs = SYM_TO_INT(ks);
 	
 	// Если это переход на другую строку, то начинаем ввод с начала
 	KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, XK_Return, 0};
@@ -368,6 +367,8 @@ void add_to_buffer(unikey_t key) {
 		pos = 0;
 		return;
 	}
+	
+	wint_t cs = SYM_TO_INT(ks);
 	
 	// Если символ не печатный, то пропускаем
 	KeySym is_print[] = {XK_space, XK_underscore, 0};
