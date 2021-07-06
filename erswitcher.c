@@ -236,7 +236,7 @@ void set_group(int group) {
     printf("set_group: %i\n", group);
 }
 
-// эмулирует нажатие или отжатие клавиши
+// Эмулирует нажатие или отжатие клавиши
 void press(int code, int is_press) {
 	printf("   press: %i %s\n", code, is_press? "PRESS": "RELEASE");
 	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
