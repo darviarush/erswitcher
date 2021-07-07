@@ -17,6 +17,7 @@
 #include <xkbcommon/xkbcommon.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <wctype.h>
 #include <wchar.h>
 #include <unistd.h>
@@ -161,6 +162,15 @@ unikey_t keysym_to_unikey(KeySym ks) {
 	return (unikey_t) {code: 0, mods: 0, group: 0};
 }
 
+// маски модификаторов и локов. На некоторых клавиатурах разные модификаторы могут иметь одну и ту же маску. И их нельзя будет различить 
+// int shift_mask = 1 << 0;
+// int lock_mask = 1 << 1;
+// int control_mask = 1 << 2;
+// int alt_mask = 1 << 3;
+// int num_mask = 1 << 4;
+// int meta_mask = 1 << 5;
+// int meta_mask = 1 << 5;
+
 #define AltMask			Mod1Mask
 #define NumMask			Mod2Mask
 #define MetaMask		Mod3Mask
@@ -268,7 +278,10 @@ void set_group(int group) {
 
 // Эмулирует нажатие или отжатие клавиши
 void press(int code, int is_press) {
-	printf("   press: %i %s\n", code, is_press? "PRESS": "RELEASE");
+	unikey_t key = keyboard_state(code);
+	printf("   press: %i ", code);
+	print_sym(key.mods, KEY_TO_SYM(key));
+	printf("%s\n", is_press? "PRESS": "RELEASE");
 	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
     XSync(d, False);
 }
@@ -570,7 +583,14 @@ void change_key(int code) {
     KeySym ks = KEY_TO_SYM(key);
     
 	// XkbKeysymToModifiers()
-	printf("change_key %i (%i) %i: ", code, key.mods, key.group);
+	unsigned int state = get_input_state();
+	printf("change_key %i (", code);
+	for(int i=0; i<32; i++) if(state & (1<<i)) printf("%i", i); else printf(" ");
+	printf(") ");
+	if(key.group == group_en) printf("en");
+	else if(key.group == group_ru) printf("ru");
+	else printf("%i", key.group);
+	printf(": ");
 	print_sym(key.mods, ks);
 	printf("\n");
 	fflush(stdout);
@@ -677,6 +697,31 @@ void init_desktop(char* av0) {
 
 void check_any_instance() {
 	
+}
+
+
+
+void load_config(char* path) {
+	FILE* f = fopen(path, "rb");
+	if(!f) { fprintf(stderr, "WARN: не могу прочитать конфиг `%s`\n", path); return; }
+	
+	char buf[BUF_SIZE];
+	int lineno = 0;
+	while(fgets(buf, BUF_SIZE, f)) {
+		lineno++;
+		char* s = buf;
+		while(isspace(*s)) s++;
+	
+		if(*s == '#' || *s == '\0') continue;
+		
+		char* v = strchr(s, '=');
+		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
+		*v = '\0'; v++;
+		
+		// комбинации клавиш
+		strtok(s, "+");
+	}
+	fclose(f);
 }
 
 int main(int ac, char** av) {
