@@ -53,9 +53,9 @@ _EN—RU Switcher_ будет скомпилирован, установлен �
 
 * gcc
 * make
-* X11
-* xkbcommon
-* Xtst
+* libX11.so
+* libxkbcommon.so
+* libXtst.so
 
 # AUTHOR
 
