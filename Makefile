@@ -14,7 +14,7 @@ install:
 	mv -f erswitcher ~/.local/bin/erswitcher
 
 launch:
-	killall -9 erswitcher
+	killall -9 erswitcher || true
 	~/.local/bin/erswitcher &> /dev/null &
 
 s: erswitcher
