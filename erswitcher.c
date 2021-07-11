@@ -8,6 +8,7 @@
 #include <locale.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
@@ -16,11 +17,28 @@
 #include <xkbcommon/xkbcommon.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <wctype.h>
 #include <wchar.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
+typedef struct {
+	unsigned code:8;
+	unsigned mods:8;
+	unsigned group:8;
+} unikey_t;
+
+#define KEY_TO_SYM(K)		unikey_to_keysym(K)
+#define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
+#define SYM_TO_KEY(K)		keysym_to_unikey(K)
+#define SYM_TO_INT(S)		xkb_keysym_to_utf32(S)
+#define INT_TO_SYM(S)		xkb_utf32_to_keysym(S)
+#define INT_TO_KEY(K)		keysym_to_unikey(xkb_utf32_to_keysym(K))
+
+#define SYM_TO_STR(K)		XKeysymToString(K)
+#define KEY_TO_STR(K)		XKeysymToString(KEY_TO_SYM(K))
+#define INT_TO_STR(K)		XKeysymToString(INT_TO_SYM(K))
 
 // Установлен ли бит
 #define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
@@ -37,38 +55,27 @@ int delay = DELAY;          // задержка
 char keyboard_buf1[32], keyboard_buf2[32];
 char *saved=keyboard_buf1, *keys=keyboard_buf2;
 int pos = 0;
-wint_t word[BUF_SIZE];
+unikey_t word[BUF_SIZE];
 Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
 
-typedef struct {
-	unsigned code:8;
-	unsigned mods:8;
-	unsigned group:8;
-} unikey_t;
-
-// typedef struct {
-	// int code;
-	// int mods;
-	// int group;
-// } unikey_t;
-
-// ответ для get_key()
-unikey_t key;
-
-// набор клавиатур: keyboard[group][shift][scancode] -> utf32
-KeySym keyboard[XkbNumKbdGroups][2][KEYBOARD_SIZE];
-
 int groups = 0;			// Количество раскладок
 int group_ru = -1;		// Номер русской раскладки или -1
 int group_en = -1;		// Номер английской раскладки или -1
-int maybe_group = 0;	// Номер раскладки в которой первой искать сканкод по символу
+
+// typedef struct {
+	
+// } modkey_t;
+
+// modkey_t keyboard_mods[8];
 
 // инициализирует названия клавиатуры
 static char* Russian = "Russian";
 static char* English = "English";
 void init_keyboard() {
+	
+	// инициализируем раскладки клавиатуры
 	XkbDescRec* kb = XkbAllocKeyboard();
 	if(!kb) return;
 
@@ -84,90 +91,85 @@ void init_keyboard() {
 	}
 
 	XkbFreeNames(kb, XkbGroupNamesMask, 0);
+	
+	// TODO: инициализируем модификаторы
+	// в иксах есть 8 модификаторов. И на них можно назначить разные модифицирующие или лочащиеся клавиши
+	// int i, k = 0;
+	// int min_keycode, max_keycode, keysyms_per_keycode = 0;
+
+    // XDisplayKeycodes (dpy, &min_keycode, &max_keycode);
+    // XGetKeyboardMapping (dpy, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
+	
+	// for (i = 0; i < 8; i++) {
+		// for (int j = 0; j < map->max_keypermod; j++) {
+			// if (map->modifiermap[k]) {
+				// KeySym ks;
+				// int index = 0;
+				// do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
+				// char* nm = XKeysymToString(ks);
+
+				// //fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
+			// }
+			// k++;
+		// }
+    // }
 }
 
-// инициализирует массив keyboard
-void keysym_init() {
-	for(int group = 0; group < groups; ++group)
+KeySym unikey_to_keysym(unikey_t key) {
+	KeySym ks = XkbKeycodeToKeysym(d, key.code, key.group, key.mods & ShiftMask? 1: 0);
+	if(ks == NoSymbol) ks = XkbKeycodeToKeysym(d, key.code, group_en, key.mods & ShiftMask? 1: 0);
+	if(key.mods & LockMask) { 
+		KeySym lower, upper;
+		XConvertCase(ks, &lower, &upper);
+		if(key.mods & ShiftMask) ks = lower;
+		else ks = upper;
+	} 
+	return ks;
+}
+
+unikey_t keyboard_state(int code) {
+	XkbStateRec state;
+    XkbGetState(d, XkbUseCoreKbd, &state);
+	return (unikey_t) {code: code, mods: state.mods, group: state.group};
+}
+
+// с какой группы начинать поиск сканкода по символу
+// после поиска maybe_group переключается в группу найденного символа
+int maybe_group = -1;
+
+unikey_t keysym_to_unikey(KeySym ks) {
+	// вначале ищем в текущей раскладке
+	//unikey_t key = keyboard_state(XKeysymToKeycode(d, ks));
+	//if(key.code) return key;
+	
 	for(int code = 0; code < KEYBOARD_SIZE; ++code)
-	for(int shift = 0; shift < 2; ++shift)
-		keyboard[group][shift][code] = XkbKeycodeToKeysym(d, code, group, shift);
-}
-
-// сопоставляет сканкод, раскладку и модификатор символу юникода
-// устанавливает key
-int get_key(KeySym ks) {
-	for(int code = 0; code < KEYBOARD_SIZE; code++) 
-	for(int shift = 0; shift < 2; shift++) {
-		if(keyboard[maybe_group][shift][code] != ks) continue;
-		key.code = code;
-		key.group = maybe_group;
-		key.mods = shift? ShiftMask: 0;
-		return 1;
+	for(int shift = 0; shift < 2; ++shift) {
+		KeySym search_ks = XkbKeycodeToKeysym(d, code, maybe_group, shift);
+		if(ks == search_ks)	return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: maybe_group};
 	}
 	
+	// чтобы не переключать клавиатуру и shift пойдём от обратного:
 	for(int group = 0; group < groups; ++group)
-	for(int code = 0; code < KEYBOARD_SIZE; code++) 
-	for(int shift = 0; shift < 2; shift++) {
-		if(keyboard[group][shift][code] != ks) continue;
-		key.code = code;
-		key.group = group;
-		key.mods = shift? ShiftMask: 0;
-		return 1;
+	for(int code = 0; code < KEYBOARD_SIZE; ++code)
+	for(int shift = 0; shift < 2; ++shift) {
+		KeySym search_ks = XkbKeycodeToKeysym(d, code, group, shift);
+		if(ks == search_ks)	{
+			maybe_group = group;
+			return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: group};
+		}
 	}
-	return 0;
+	
+	return (unikey_t) {code: 0, mods: 0, group: 0};
 }
 
-// сопоставляет символ из другой раскладки
-KeySym translate(KeySym ks) {
-	if(!get_key(ks)) return NoSymbol;
-	int group =
-		key.group == group_ru? group_en:
-		key.group == group_en? group_ru:
-		key.group;
-
-	KeySym to_ks = keyboard[group][key.mods? 1: 0][key.code];
-	if(to_ks == NoSymbol) return ks;
-	return to_ks;
-}
-
-KeySym invertcase(KeySym ks) {
-	if(!get_key(ks)) return NoSymbol;
-
-	KeySym to_ks = keyboard[key.group][key.mods? 0: 1][key.code];
-	if(to_ks == NoSymbol) return ks;
-	return to_ks;
-}
-
-// void XConvertCase(KeySym keysym, KeySym *lower_return, KeySym *upper_return);
-// переводит символ в верхний регистр
-KeySym upper(KeySym ks) {
-	if(!get_key(ks)) return NoSymbol;
-
-	KeySym to_ks = keyboard[key.group][1][key.code];
-	if(to_ks == NoSymbol) return ks;
-	return to_ks;
-}
-
-// переводит символ в нижний регистр
-KeySym lower(KeySym ks) {
-	if(!get_key(ks)) return NoSymbol;
-
-	KeySym to_ks = keyboard[key.group][0][key.code];
-	if(to_ks == NoSymbol) return ks;
-	return to_ks;
-}
-
-// c прошлой проверки состояние клавиатуры изменилось
-int keys_change() {
-    XQueryKeymap(d, keys);
-    for(int i=0; i<KEYBOARD_SIZE; i++) {
-        if(BIT(keys, i)!=BIT(saved, i)) {
-            return 1;
-        }
-    }
-	return 0;
-}
+// маски модификаторов и локов. На некоторых клавиатурах разные модификаторы могут иметь одну и ту же маску. И их нельзя будет различить 
+// int shift_mask = 1 << 0;
+// int lock_mask = 1 << 1;
+// int control_mask = 1 << 2;
+// int alt_mask = 1 << 3;
+// int num_mask = 1 << 4;
+// int meta_mask = 1 << 5;
+// int meta_mask = 1 << 5;
 
 #define AltMask			Mod1Mask
 #define NumMask			Mod2Mask
@@ -266,31 +268,20 @@ unsigned int get_input_state() {
   return mask;
 }
 
-// возвращает текущую раскладку
-int get_group() {
-	XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);
-    return state.group;	
-}
-
-// возвращает модификаторы
-int get_mods() {
-	XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);
-    return state.mods;
-}
-
 // Переключает раскладку
 void set_group(int group) {
-	if(get_group() == group) return;	
+	if(keyboard_state(0).group == group) return;	
     XkbLockGroup(d, XkbUseCoreKbd, group);
-    get_group();	// без этого вызова в силу переключение не вступит
+    keyboard_state(0);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
 }
 
 // Эмулирует нажатие или отжатие клавиши
 void press(int code, int is_press) {
-	printf("   press: %i %s\n", code, is_press? "PRESS": "RELEASE");
+	unikey_t key = keyboard_state(code);
+	printf("   press: %i ", code);
+	print_sym(key.mods, KEY_TO_SYM(key));
+	printf("%s\n", is_press? "PRESS": "RELEASE");
 	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
     XSync(d, False);
 }
@@ -316,17 +307,15 @@ void send_mods(int mods, int is_press) {
 }
 
 // Эмулирует нажатие или отжатие клавиши
-void send_key(KeySym ks, int is_press) {
-	const char *s = XKeysymToString(ks);
-
-	if(!get_key(ks)) {
-		printf("send_key: No Key `%s`!\n", s);
+void send_key(unikey_t key, int is_press) {
+	if(key.code == 0) {
+		printf("send_key: No Key!\n");
 		return;
 	}
 
 	set_group(key.group);
 	send_mods(key.mods, is_press);
-	printf("send_key: %s %s\n", s, is_press? "PRESS": "RELEASE");
+	printf("send_key: %s %s\n", KEY_TO_STR(key), is_press? "PRESS": "RELEASE");
 	press(key.code, is_press);
 
     XFlush(d);
@@ -334,15 +323,14 @@ void send_key(KeySym ks, int is_press) {
 }
 
 // Эмулирует нажатие и отжатие клавиши
-void press_key(KeySym ks) {
-	send_key(ks, 1);
-	send_key(ks, 0);
+void press_key(unikey_t key) {
+	send_key(key, 1);
+	send_key(key, 0);
 }
 
 int active_codes[KEYBOARD_SIZE];
 int active_len;
-int active_group;
-int active_mods;
+unikey_t active_state;
 int active_use = 0;
 
 // Возвращает активные модификаторы клавиатуры
@@ -356,10 +344,8 @@ void clear_active_mods() {
 	active_use++;
 	
 	init_keyboard();
-	keysym_init();
 	
-	active_mods = get_mods();
-	active_group = get_group();
+	active_state = keyboard_state(0);
 	
 	XModifierKeymap *modifiers = XGetModifierMapping(d);
 
@@ -378,8 +364,8 @@ void clear_active_mods() {
 	for(int i = 0; i<active_len; i++) press(active_codes[i], 0);
 
 	// снимаем Капс-лок (он не входит в модификаторы)
-	if(active_mods & LockMask) {
-		press_key(XK_Caps_Lock);
+	if(active_state.mods & LockMask) {
+		press_key(SYM_TO_KEY(XK_Caps_Lock));
 	}
 }
 
@@ -387,8 +373,8 @@ void clear_active_mods() {
 void recover_active_mods() {
 	
 	// снимаем нажатые модификаторы
-	int mods = get_mods();
-	send_mods(mods, 0);
+	unikey_t state = keyboard_state(0);
+	send_mods(state.mods, 0);
 	
 	char active_keys[32];
 	XQueryKeymap(d, active_keys);
@@ -401,54 +387,22 @@ void recover_active_mods() {
 	}
 	
 	// восстанавливаем Капс-лок (он не входит в модификаторы)
-	if(active_mods & LockMask && !(mods & LockMask)) {
-		press_key(XK_Caps_Lock);
+	if(active_state.mods & LockMask && !(state.mods & LockMask)) {
+		press_key(SYM_TO_KEY(XK_Caps_Lock));
 	}
 	
-	set_group(active_group);
+	set_group(active_state.group);
 	
 	active_use--;
 }
 
-int get_shift_level(int mods) {
-    // нажата одна из шифта или капслок
-	return ((mods & (ShiftMask | LockMask))
-		// и не нажаты обе
-		&& !(mods & ShiftMask && mods & LockMask))? 1: 0;
-}
-
-KeySym key_to_sym(int code, int group, int mods) {
-	int shiftLevel = get_shift_level(mods);
-	
-	KeySym ks = keyboard[group][shiftLevel][code];
-	if(ks) return ks;
-    //KeySym ks = XkbKeycodeToKeysym(d, code, group, shiftLevel);
-	
-	for(int i=0; i<XkbNumKbdGroups; i++) {
-		ks = keyboard[i][shiftLevel][code];
-		if(ks) return ks;
-	}
-	
-	shiftLevel = shiftLevel? 0: 1;
-	for(int i=0; i<XkbNumKbdGroups; i++) {
-		ks = keyboard[i][shiftLevel][code];
-		if(ks) return ks;
-	}
-	
-	return ks;
-}
-
-void add_to_buffer(int code) {
-	XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);
-
+void add_to_buffer(unikey_t key) {
 	// Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
-	if(state.mods & ~(ShiftMask|LockMask|NumMask)) {
+	if(key.mods & ~(ShiftMask|LockMask|NumMask)) {
 		return;
 	}
 
-	KeySym ks = key_to_sym(code, state.group, state.mods);
-	wint_t cs = xkb_keysym_to_utf32(ks);
+	KeySym ks = KEY_TO_SYM(key);
 	
 	// Если это переход на другую строку, то начинаем ввод с начала
 	KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, XK_Return, 0};
@@ -456,6 +410,8 @@ void add_to_buffer(int code) {
 		pos = 0;
 		return;
 	}
+	
+	wint_t cs = SYM_TO_INT(ks);
 	
 	// Если символ не печатный, то пропускаем
 	KeySym is_print[] = {XK_space, XK_underscore, 0};
@@ -465,41 +421,38 @@ void add_to_buffer(int code) {
 	
 	// Записываем символ в буфер с его раскладкой клавиатуры
 	if(pos >= BUF_SIZE) pos = 0;
-	word[pos++] = cs;
-	word[pos] = 0;
-	printf("add_to_buffer: %S\n", word);
+	//word[pos++] = {code: code, mods: state.mods, group: state};
+	word[pos++] = key;
+
+	//printf("add_to_buffer: %S\n", word);
 }
 
 int from_space() {
 	if(pos == 0) return 0;
 	int from=pos-1;
-	for(; from>0 && iswspace(word[from]); from--);
-	for(; from>0; from--) if(iswspace(word[from])) break;
+	for(; from>0 && iswspace(KEY_TO_INT(word[from])); from--);
+	for(; from>0; from--) if(iswspace(KEY_TO_INT(word[from]))) break;
 	return from;
 }
 
-void send_key_multi(KeySym ks, int n) {
-	for(int i=0; i<n; i++) press_key(ks);
+void send_key_multi(unikey_t key, int n) {
+	for(int i=0; i<n; i++) press_key(key);
 }
 
 void print_translate_buffer(int from, int backspace) {
-	word[pos] = 0;
-	printf("print_translate_buffer: %S\n", word+from);
+	//word[pos] = 0;
+	//printf("print_translate_buffer: %S\n", word+from);
 
 	clear_active_mods();
-	int trans_group = active_group == group_en? group_ru: group_en;
-	maybe_group = active_group;
+	int trans_group = active_state.group == group_en? group_ru: group_en;
 	
 	// отправляем бекспейсы, чтобы удалить ввод
-	if(backspace) send_key_multi(XK_BackSpace, pos-from);
+	if(backspace) send_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
 	
 	// вводим ввод, но в альтернативной раскладке
 	for(int i=from; i<pos; i++) {
-		KeySym ks = translate(xkb_utf32_to_keysym(word[i]));
-		press_key(ks);
-		wint_t cs = xkb_keysym_to_utf32(ks);
-		//printf("%i: %C -> %C\n", i, word[i], cs);
-		word[i] = cs;
+		word[i].group = word[i].group == group_en? group_ru: word[i].group == group_ru? group_en: word[i].group;
+		press_key(word[i]);
 	}
 
 	recover_active_mods();
@@ -509,22 +462,18 @@ void print_translate_buffer(int from, int backspace) {
 }
 
 void print_invertcase_buffer(int from, int backspace) {
-	word[pos] = 0;
-	printf("print_invertcase_buffer: %S\n", word+from);
+	//word[pos] = 0;
+	//printf("print_invertcase_buffer: %S\n", word+from);
 
 	clear_active_mods();
-	maybe_group = active_group;
 	
 	// отправляем бекспейсы, чтобы удалить ввод
-	if(backspace) send_key_multi(XK_BackSpace, pos-from);
+	if(backspace) send_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
 	
 	// вводим ввод, но в альтернативной раскладке
 	for(int i=from; i<pos; i++) {
-		KeySym ks = invertcase(xkb_utf32_to_keysym(word[i]));
-		press_key(ks);
-		wint_t cs = xkb_keysym_to_utf32(ks);
-		//printf("%i: %C -> %C\n", i, word[i], cs);
-		word[i] = cs;
+		word[i].mods = word[i].mods & ShiftMask? word[i].mods & ~ShiftMask: word[i].mods | ShiftMask;
+		press_key(word[i]);
 	}
 
 	recover_active_mods();
@@ -604,7 +553,7 @@ void to_buffer(char** s1) {
         int res = mbstowcs(ws, s+i, 1);
         if(res != 1) break;
 
-		word[pos++] = ws[0];
+		word[pos++] = INT_TO_KEY(ws[0]);
     }
 
 	XFree(s);
@@ -615,30 +564,38 @@ void copy_selection() {
 	clear_active_mods();
 	int save = delay;
 	delay = 0;
-	send_key(XK_Control_L, 1);
-	press_key(XK_Insert);
-	send_key(XK_Control_L, 0);
+	unikey_t control_left = SYM_TO_KEY(XK_Control_L);
+	send_key(control_left, 1);
+	press_key(SYM_TO_KEY(XK_Insert));
+	send_key(control_left, 0);
 	delay = save;
 	recover_active_mods();
 
 	char* s = get_selection(clipboard_atom);
+	maybe_group = active_state.group;
 	to_buffer(&s);
 }
 
 void change_key(int code) {
     
-	XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);
+	unikey_t key = keyboard_state(code);
 
-    KeySym ks = key_to_sym(code, group_en, 0);
+    KeySym ks = KEY_TO_SYM(key);
     
 	// XkbKeysymToModifiers()
-	printf("change_key %i: ", code);
-	print_sym(state.mods, key_to_sym(code, state.group, state.mods));
+	unsigned int state = get_input_state();
+	printf("change_key %i (", code);
+	for(int i=0; i<32; i++) if(state & (1<<i)) printf("%i", i); else printf(" ");
+	printf(") ");
+	if(key.group == group_en) printf("en");
+	else if(key.group == group_ru) printf("ru");
+	else printf("%i", key.group);
+	printf(": ");
+	print_sym(key.mods, ks);
 	printf("\n");
 	fflush(stdout);
     // нажата комбинация? выполняем действие
-	int mods = state.mods & ~(LockMask|NumMask);
+	int mods = key.mods & ~(LockMask|NumMask);
 	
 	if(ks == XK_BackSpace && mods == 0) {
 		if(pos != 0) --pos;
@@ -649,12 +606,12 @@ void change_key(int code) {
 	else if(ks == XK_Pause && mods == ControlMask) {
 		print_translate_buffer(0, 1);
 	}
-	else if(ks == XK_Pause && mods == ShiftMask) {
+	else if(ks == XK_Break && mods == ShiftMask) {
 		copy_selection();
 		// to_buffer очищает память выделенную для s через XFree
 		print_translate_buffer(0, 0);
 	}
-	else if(ks == XK_Pause && mods == (AltMask|ShiftMask)) {
+	else if(ks == XK_Break && mods == (AltMask|ShiftMask)) {
 		print_invertcase_buffer(from_space(), 1);
 	}
 	else if(ks == XK_Pause && mods == (AltMask|ControlMask)) {
@@ -666,7 +623,7 @@ void change_key(int code) {
 	}
 	else {
 		// заносим в буфер
-        add_to_buffer(code);
+        add_to_buffer(key);
     }    
 }
 
@@ -742,6 +699,31 @@ void check_any_instance() {
 	
 }
 
+
+
+void load_config(char* path) {
+	FILE* f = fopen(path, "rb");
+	if(!f) { fprintf(stderr, "WARN: не могу прочитать конфиг `%s`\n", path); return; }
+	
+	char buf[BUF_SIZE];
+	int lineno = 0;
+	while(fgets(buf, BUF_SIZE, f)) {
+		lineno++;
+		char* s = buf;
+		while(isspace(*s)) s++;
+	
+		if(*s == '#' || *s == '\0') continue;
+		
+		char* v = strchr(s, '=');
+		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
+		*v = '\0'; v++;
+		
+		// комбинации клавиш
+		strtok(s, "+");
+	}
+	fclose(f);
+}
+
 int main(int ac, char** av) {
 	
 	if(!ac) fprintf(stderr, "ERROR: а где путь к программе?\n");
@@ -760,7 +742,6 @@ int main(int ac, char** av) {
 	current_win = get_current_window();
 	pos = 0;
 	init_keyboard();
-	keysym_init();
 
     unsigned int state1, state2 = 0;
    	XQueryKeymap(d, saved);
