@@ -272,7 +272,8 @@ unsigned int get_input_state() {
 void set_group(int group) {
 	if(keyboard_state(0).group == group) return;	
     XkbLockGroup(d, XkbUseCoreKbd, group);
-    keyboard_state(0);	// без этого вызова в силу переключение не вступит
+    XkbStateRec state;
+    XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
 }
 
@@ -435,8 +436,28 @@ int from_space() {
 	return from;
 }
 
-void send_key_multi(unikey_t key, int n) {
+void press_key_multi(unikey_t key, int n) {
 	for(int i=0; i<n; i++) press_key(key);
+}
+
+void sendkeys(char* s) { // печатает с клавиатуры строку в utf8
+	clear_active_mods();
+	
+	mbstate_t mbs = {0};
+	for(size_t charlen, i = 0;
+        (charlen = mbrlen(s+i, MB_CUR_MAX, &mbs)) != 0
+        && charlen > 0
+        && i < BUF_SIZE;
+        i += charlen
+    ) {
+        wchar_t ws[4];
+        int res = mbstowcs(ws, s+i, 1);
+        if(res != 1) break;
+
+		press_key(INT_TO_KEY(ws[0]));
+    }
+
+	recover_active_mods();
 }
 
 void print_translate_buffer(int from, int backspace) {
@@ -447,7 +468,7 @@ void print_translate_buffer(int from, int backspace) {
 	int trans_group = active_state.group == group_en? group_ru: group_en;
 	
 	// отправляем бекспейсы, чтобы удалить ввод
-	if(backspace) send_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
+	if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
 	
 	// вводим ввод, но в альтернативной раскладке
 	for(int i=from; i<pos; i++) {
@@ -468,7 +489,7 @@ void print_invertcase_buffer(int from, int backspace) {
 	clear_active_mods();
 	
 	// отправляем бекспейсы, чтобы удалить ввод
-	if(backspace) send_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
+	if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
 	
 	// вводим ввод, но в альтернативной раскладке
 	for(int i=from; i<pos; i++) {
@@ -597,7 +618,10 @@ void change_key(int code) {
     // нажата комбинация? выполняем действие
 	int mods = key.mods & ~(LockMask|NumMask);
 	
-	if(ks == XK_BackSpace && mods == 0) {
+	if(ks == XK_Pause && mods == SuperMask) {
+		sendkeys("Готово.");
+	}
+	else if(ks == XK_BackSpace && mods == 0) {
 		if(pos != 0) --pos;
 	}
 	else if(ks == XK_Pause && mods == 0) {
@@ -699,11 +723,31 @@ void check_any_instance() {
 	
 }
 
-
-
 void load_config(char* path) {
 	FILE* f = fopen(path, "rb");
-	if(!f) { fprintf(stderr, "WARN: не могу прочитать конфиг `%s`\n", path); return; }
+	if(!f) {
+		f = fopen(path, "wb");
+		if(!f) {
+			fprintf(stderr, "WARN: не могу создать конфиг `%s`\n", path);
+			return;
+		}
+		
+		fprintf(f, 
+			"[translate]\n"
+			"Pause=word\n"
+			"Control+Pause=text\n"
+			"Shift+Break=selected\n"
+			"[invertcase]\n"
+			"Alt+Shift+Break=word\n"
+			"Alt+Control+Pause=text\n"
+			"Alt+Pause=selected\n"
+			"[template]\n"
+			"Control+F2=Готово.\n"
+		);
+		
+		fclose(f);
+		return;
+	}
 	
 	char buf[BUF_SIZE];
 	int lineno = 0;
@@ -719,7 +763,12 @@ void load_config(char* path) {
 		*v = '\0'; v++;
 		
 		// комбинации клавиш
-		strtok(s, "+");
+		char* x = strtok(s, "+");
+		while (x != NULL) {
+			//KeySym ks = XStringToKeysym(x);
+			
+			x = strtok(s, "+");
+		};
 	}
 	fclose(f);
 }
