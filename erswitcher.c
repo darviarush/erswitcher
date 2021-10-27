@@ -7,24 +7,26 @@
 
 #define _GNU_SOURCE
 
-#include <locale.h>
 #include <X11/X.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
-#include <X11/keysym.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/extensions/XKB.h>
 #include <X11/extensions/XTest.h>
-#include <xkbcommon/xkbcommon.h>
-#include <string.h>
-#include <stdlib.h>
+#include <X11/keysym.h>
 #include <ctype.h>
-#include <wctype.h>
-#include <wchar.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include <locale.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <wchar.h>
+#include <wctype.h>
+#include <xkbcommon/xkbcommon.h>
 
 //@category Клавиши
 
@@ -67,6 +69,7 @@ char keyboard_buf1[32], keyboard_buf2[32];			// состояния клавиа�
 char *saved=keyboard_buf1, *keys=keyboard_buf2;		// для обмена состояний
 int pos = 0;				// позиция в буфере символов
 unikey_t word[BUF_SIZE];	// буфер символов
+int keys_pressed;		// нажато клавишь
 
 //@category Комбинации -> Функции
 
@@ -80,13 +83,17 @@ typedef struct {
 keyfn_t* keyfn = NULL;
 int keyfn_size = 0;
 int keyfn_max_size = 0;
+int keyfn_active = -1;
 
 //@category Раскладки
 
 Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
-Atom target_property;
+Atom targets_atom;
+
+int selection_chunk_size; // максимально возможный размер данных для передачи через буфер обмена
+	
 
 int groups = 0;			// Количество раскладок
 int group_ru = -1;		// Номер русской раскладки или -1
@@ -273,7 +280,10 @@ void open_display() {
 	sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
 	utf8_atom = XInternAtom(d, "UTF8_STRING", True);
 	clipboard_atom = XInternAtom(d, "CLIPBOARD", False);
-	target_property = XInternAtom(d, "COORDS", False);
+	targets_atom = XInternAtom(d, "TARGETS", False);
+	
+	selection_chunk_size = XExtendedMaxRequestSize(d) / 4;
+	if(!selection_chunk_size) selection_chunk_size = XMaxRequestSize(d) / 4;
 }
 
 // возвращает текущее окно
@@ -311,7 +321,7 @@ void press(int code, int is_press) {
 	unikey_t key = keyboard_state(code);
 	printf("   press: %i ", code);
 	print_sym(key.mods, KEY_TO_SYM(key));
-	printf("%s\n", is_press? "PRESS": "RELEASE");
+	printf(" %s\n", is_press? "PRESS": "RELEASE");
 	XTestFakeKeyEvent(d, code, is_press, CurrentTime);
     XSync(d, False);
 }
@@ -469,7 +479,7 @@ void press_key_multi(unikey_t key, int n) {
 	for(int i=0; i<n; i++) press_key(key);
 }
 
-// TODO: зажатие управляющих клавишь {^Control}abc{/Control} и {Ctrl+Alt+a}
+// TODO: зажатие управляющих клавишь {\Control+Alt}abc{/Control} и {Ctrl+Alt+a}
 void sendkeys(char* s) { // печатает с клавиатуры строку в utf8
 	clear_active_mods();
 	
@@ -483,6 +493,8 @@ void sendkeys(char* s) { // печатает с клавиатуры строк�
         wchar_t ws[4];
         int res = mbstowcs(ws, s+i, 1);
         if(res != 1) break;
+
+		//if(ws[0] == '{')
 
 		press_key(INT_TO_KEY(ws[0]));
     }
@@ -530,98 +542,137 @@ void print_invertcase_buffer(int from, int backspace) {
 	recover_active_mods();
 }
 
-void clear_selection(Atom selection) {
-  XSetSelectionOwner(d, selection, None, CurrentTime);
-  XSync(d, False);
+
+void
+send_no(Display *dpy, XSelectionRequestEvent *sev)
+{
+    XSelectionEvent ssev;
+    char *an;
+
+    an = XGetAtomName(dpy, sev->target);
+    printf("Denying request of type '%s'\n", an);
+    if (an)
+        XFree(an);
+
+    /* All of these should match the values of the request. */
+    ssev.type = SelectionNotify;
+    ssev.requestor = sev->requestor;
+    ssev.selection = sev->selection;
+    ssev.target = sev->target;
+    ssev.property = None;  /* signifies "nope" */
+    ssev.time = sev->time;
+
+    XSendEvent(dpy, sev->requestor, True, NoEventMask, (XEvent *)&ssev);
+}
+#include <time.h>
+void
+send_utf8(Display *dpy, XSelectionRequestEvent *sev, Atom utf8)
+{
+    XSelectionEvent ssev;
+    time_t now_tm;
+    char *now, *an;
+
+    now_tm = time(NULL);
+    now = ctime(&now_tm);
+
+    an = XGetAtomName(dpy, sev->property);
+    printf("Sending data to window 0x%lx, property '%s'\n", sev->requestor, an);
+    if (an)
+        XFree(an);
+
+    XChangeProperty(dpy, sev->requestor, sev->property, utf8, 8, PropModeReplace,
+                    (unsigned char *)now, strlen(now));
+
+    ssev.type = SelectionNotify;
+    ssev.requestor = sev->requestor;
+    ssev.selection = sev->selection;
+    ssev.target = sev->target;
+    ssev.property = sev->property;
+    ssev.time = sev->time;
+
+    XSendEvent(dpy, sev->requestor, True, NoEventMask, (XEvent *)&ssev);
 }
 
-void set_selection(Atom selection, char* s) {
+void set_selection(Atom number_buf, char* s) {
 	XEvent event;
 
 	// Создаём окно
-	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), 0, 0, 1, 1, 0, 0, 0);
+	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
 
 	// подписываемся на события окна
 	XSelectInput(d, w, PropertyChangeMask);
 
-	// делаем окно владельцем системного буфера
-	XSetSelectionOwner(d, selection, w, CurrentTime);
+	// делаем окно владельцем системного буфера. После этого будет возбуждено событие SelectionRequest
+	XSetSelectionOwner(d, number_buf, w, CurrentTime);
 
-	if(XGetSelectionOwner(d, selection) != w) {
-		fprintf(stderr, "Не удалось окно сделать владельцем буфера\n");
-		return;
-	}
+	// if(XGetSelectionOwner(d, number_buf) != w) {
+		// fprintf(stderr, "Не удалось окно сделать владельцем буфера\n");
+		// goto EXIT;
+	// }
+	
+	
+	int len = strlen(s);
+	len=len;
+	
 
 	for(;;) {
-		XFlush (d);
 		XNextEvent(d, &event);
 
 		switch(event.type) {
 		case SelectionClear:
-			if (event.xselectionclear.selection == selection) return;
-			break;
+			fprintf(stderr, "Утрачено право собственности на системный буфер.\n");
+			goto EXIT;
 		case SelectionRequest: // можно передавать
-			if (event.xselectionrequest.selection != selection) break;
-
-			// запрос на отправку строки
-			Atom request_target = utf8_atom? utf8_atom: XA_STRING;
-			int len = strlen(s);
+		
+			fprintf(stderr, "SelectionRequest\n");
+		
+			XSelectionRequestEvent* sev = (XSelectionRequestEvent*) &event.xselectionrequest;
 			
-			XChangeProperty(d, w, target_property, request_target, 8, PropModeReplace, (unsigned char *) s, len);
-			
-			// проверяем, что изменения вступили в силу
-			unsigned long ret_remaining, ret_length;
-			Atom ret_atom;
-			int ret_format;
-			unsigned char* data = NULL;
-			int ret = XGetWindowProperty(d, w, target_property,
-				0L, len, False, AnyPropertyType, &ret_atom, 
-				&ret_format, &ret_length, &ret_remaining, &data);
-			if(ret != Success) {
-				fprintf(stderr, "XGetWindowProperty failed\n");
-				return;
-			}
-			//fprintf(stderr, "XGetWindowProperty %s vs %s\n", data, s);
-			
-			XEvent res;
-			res.xselection.property = event.xselectionrequest.property; //target_property;
-			res.xselection.type = SelectionNotify;
-			res.xselection.display = event.xselectionrequest.display;
-			res.xselection.requestor = event.xselectionrequest.requestor;
-			res.xselection.selection = event.xselectionrequest.selection;
-			res.xselection.target = request_target; //event.xselectionrequest.target;
-			res.xselection.time = CurrentTime; //event.xselectionrequest.time;
-			//res.send_event = True;
-			
-			ret = XSendEvent(d, event.xselectionrequest.requestor, 0, 0, &res);
-			XFlush(d);
-			break;
-		case PropertyNotify:
-			fprintf(stderr, "PropertyNotify\n");
-			break;
-		default:
+			if (sev->target != utf8_atom || sev->property == None) {
+				char* t1 = XGetAtomName(d, sev->target);
+				char* p1 = XGetAtomName(d, sev->property);
+				fprintf(stderr, "sev->target=%s sev->property=%s\n", t1, p1);
+				send_no(d, sev);
+			} else
+				send_utf8(d, sev, utf8_atom);
 			break;
 		}
 	}
 	
+	EXIT:
 	XDestroyWindow(d, w);
+}
+
+void clear_selection(Atom number_buf) {
+  XSetSelectionOwner(d, number_buf, None, CurrentTime);
+  XSync(d, False);
 }
 
 // получаем содержимое системного буфера
 char* get_selection(Atom number_buf) {
-		
+	
+	Window owner = XGetSelectionOwner(d, number_buf);
+    if (owner == None) {
+		char* name_buf = XGetAtomName(d, number_buf);
+        printf("Буфер %s не поддерживается владельцем\n", name_buf);
+		if(name_buf) XFree(name_buf);
+        return NULL;
+    }
+    printf("0x%lX\n", owner);
+	
 	// Создаём окно
 	// int black = BlackPixel(d, DefaultScreen(d));
 	// int root = XDefaultRootWindow(d);
 	// Window w = XCreateSimpleWindow(d, root, 0, 0, 1, 1, 0, black, black);
-	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), 0, 0, 1, 1, 0, 0, 0);
+	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
 
 	// подписываемся на события окна
 	XSelectInput(d, w, PropertyChangeMask);
 
-	// запрос на получение выделенной области
+	// подготовка формата в котором запрашиваем: utf8 или просто текст
 	Atom request_target = utf8_atom? utf8_atom: XA_STRING;
 
+	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
 		request_target, 
 		sel_data_atom, 
@@ -652,9 +703,12 @@ char* get_selection(Atom number_buf) {
 
 		// считываем
 		XGetWindowProperty(event.xselection.display,
-			    event.xselection.requestor,
-			    event.xselection.property, 0L, 1000000,
-			    False, (Atom) AnyPropertyType, &target,
+			    event.xselection.requestor, // window
+			    event.xselection.property, 	// некое значение
+				0L, 
+				1000000,	// максимальный размер, который мы готовы принять
+			    False, (Atom) AnyPropertyType, 
+				&target, 	// тип возвращаемого значения: INCR - передача по частям
 			    &format, &length, &bytesafter, (unsigned char**) &s);
 
 		break;
@@ -709,6 +763,114 @@ void copy_selection() {
 	to_buffer(&s);
 }
 
+// нажимаем комбинацию
+void shift_insert() {
+	clear_active_mods();
+	int save = delay;
+	//delay = 0;
+	unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
+	send_key(shift_left, 1);
+	press_key(SYM_TO_KEY(XK_Insert));
+	send_key(shift_left, 0);
+	delay = save;
+	recover_active_mods();
+	maybe_group = active_state.group;
+}
+
+// вставляем из буфера обмена строку в стороннее приложение
+void paste_selection(char* s) {
+	// Создаём окно
+	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
+	// подписываемся на события окна
+	XSelectInput(d, w, PropertyChangeMask);
+	// делаем окно владельцем данных для обмена. 
+	// После этого будет возбуждено событие SelectionRequest
+	XSetSelectionOwner(d, clipboard_atom, w, CurrentTime);
+	XFlush(d);
+	
+	// вставка
+	int len = strlen(s);
+	
+	// подготовка формата в котором отдаём: utf8 или просто текст
+	Atom request_target = utf8_atom? utf8_atom: XA_STRING;
+	
+	int sended = 0;
+	int pressed = 0;
+	pressed=pressed;
+	sended=sended;
+	
+	int sloop = 3;
+	for(int dloop = 0; dloop < sloop || sloop == -1; dloop++)
+	for(;;) {
+		XEvent event;
+		XNextEvent(d, &event);
+
+		fprintf(stderr, "event.type=%i SelectionClear=%i SelectionRequest=%i\n", event.type, SelectionClear, SelectionRequest);
+
+		if(event.type == SelectionClear) {
+			fprintf(stderr, "Утрачено право собственности на буфер обмена.\n");
+			goto EXIT;
+		}
+
+		if(event.type != SelectionRequest) continue;
+
+		fprintf(stderr, "SelectionRequest %i / %i ", dloop, sloop);
+	
+		// клиент хочет, чтобы ему сообщили в каком формате будут данные
+		if (event.xselectionrequest.target == targets_atom) {
+			Atom types[2] = { targets_atom, request_target };
+
+			XChangeProperty(d,
+					event.xselectionrequest.requestor,
+					event.xselectionrequest.property,
+					XA_ATOM,
+					32, PropModeReplace, (unsigned char *) types,
+					(int) (sizeof(types) / sizeof(Atom))
+			);
+			
+			fprintf(stderr, "отправляем targets\n");
+		}
+		else if(len > selection_chunk_size) {
+			fprintf(stderr, "Размер данных для буфера обмена превышает размер куска для отправки: %u vs %u. А протокол INCR не реализован\n", len, selection_chunk_size);
+			goto EXIT;
+		}
+		else {
+			// отправляем строку
+			XChangeProperty(d,
+					event.xselectionrequest.requestor,
+					event.xselectionrequest.property,
+					request_target, 8, PropModeReplace, (unsigned char *) s, (int) len);
+			fprintf(stderr, "отправляем s\n");
+			
+			sended = 1;
+		}
+		
+		XEvent res;
+		res.xselection.property = event.xselectionrequest.property;
+		res.xselection.type = SelectionNotify;
+		res.xselection.display = event.xselectionrequest.display;
+		res.xselection.requestor = event.xselectionrequest.requestor;
+		res.xselection.selection = event.xselectionrequest.selection;
+		res.xselection.target = event.xselectionrequest.target;
+		res.xselection.time = event.xselectionrequest.time;
+
+		/* send the response event */
+		XSendEvent(d, event.xselectionrequest.requestor, 0, 0, &res);
+		XFlush(d);
+		
+		// if(sended && !pressed) {
+			// shift_insert();
+			// pressed++;
+		// }
+		break;
+	}
+	
+	shift_insert();
+	
+	EXIT:
+	XDestroyWindow(d, w);
+}
+
 void change_key(int code) {
     
 	unikey_t key = keyboard_state(code);
@@ -733,7 +895,8 @@ void change_key(int code) {
 	// ищем соответствие среди функций	
 	for(int i=0; i<keyfn_size; i++) {
 		if(keyfn[i].key.mods == mods && keyfn[i].key.code == code) {
-			keyfn[i].fn(keyfn[i].arg);
+			//keyfn[i].fn(keyfn[i].arg);
+			keyfn_active = i;
 			return;
 		}
 	}
@@ -833,26 +996,30 @@ void run_command(char* s) {
 }
 
 void insert_text(char* s) {
-	// сохраняем буфер
-	char* buffer = get_selection(clipboard_atom);
 	
-	// заменяем буфер
-	//set_selection(clipboard_atom, s);
-	s=s;
-	unikey_t shift_left = SYM_TO_KEY(XK_Control_L);
-	send_key(shift_left, 1);
-	press_key(SYM_TO_KEY(XK_V));
-	send_key(shift_left, 0);
+	paste_selection(s);
 	
-	// // вставляем s
-	// unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
-	// send_key(shift_left, 1);
+	// // сохраняем буфер
+	// char* buffer = get_selection(clipboard_atom);
+	// printf("clipboard: %s\n", buffer);
+	
+	// // заменяем буфер
+	// set_selection(clipboard_atom, s);
+	// s=s;
+	// unikey_t manage = SYM_TO_KEY(XK_Shift_L);
+	// send_key(manage, 1);
 	// press_key(SYM_TO_KEY(XK_Insert));
-	// send_key(shift_left, 0);
+	// send_key(manage, 0);
+
+	// // // вставляем s
+	// // unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
+	// // send_key(shift_left, 1);
+	// // press_key(SYM_TO_KEY(XK_Insert));
+	// // send_key(shift_left, 0);
 	
-	// // восстанавливаем буфер
-	// set_selection(clipboard_atom, buffer);
-	XFree(buffer);
+	// // // восстанавливаем буфер
+	// // set_selection(clipboard_atom, buffer);
+	// XFree(buffer);
 }
 
 void word_translate(char*) { print_translate_buffer(from_space(), 1); }
@@ -1032,13 +1199,19 @@ int main(int ac, char** av) {
 			current_win = w;
 		}
 
+		// опрашиваем клавиатуру
         XQueryKeymap(d, keys);
+		keys_pressed = 0;
+		for(int i=0; i<KEYBOARD_SIZE; i++) if(BIT(keys, i)!=0) keys_pressed++;
       	for(int i=0; i<KEYBOARD_SIZE; i++) {
       		if(BIT(keys, i)!=BIT(saved, i)) {
       			if(BIT(keys, i)!=0) { // клавиша нажата
       				change_key(i);
       			} else {	// клавиша отжата
-
+					if(keys_pressed == 0 && keyfn_active != -1) {
+						keyfn[keyfn_active].fn(keyfn[keyfn_active].arg);
+						keyfn_active = -1;
+					}
       			}
       		}
       	}
@@ -1046,6 +1219,10 @@ int main(int ac, char** av) {
       	char* char_ptr=saved;
       	saved=keys;
       	keys=char_ptr;
+
+		// крошим зомбиков
+		int status;
+		waitpid(-1, &status, WNOHANG);
 
       	usleep(delay);
    	}
