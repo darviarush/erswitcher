@@ -63,6 +63,7 @@ typedef struct {
 
 
 Display *d;					// текущий дисплей
+Window w;					// окно приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 int delay = DELAY;          // задержка между программными нажатиями клавишь
 char keyboard_buf1[32], keyboard_buf2[32];			// состояния клавиатуры: предыдущее и текущее. Каждый бит соотвествует клавише на клавиатуре: нажата/отжата
@@ -284,6 +285,11 @@ void open_display() {
 	
 	selection_chunk_size = XExtendedMaxRequestSize(d) / 4;
 	if(!selection_chunk_size) selection_chunk_size = XMaxRequestSize(d) / 4;
+	
+	// Создаём окно
+	w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
+	// подписываемся на события окна
+	XSelectInput(d, w, PropertyChangeMask);
 }
 
 // возвращает текущее окно
@@ -779,10 +785,6 @@ void shift_insert() {
 
 // вставляем из буфера обмена строку в стороннее приложение
 void paste_selection(char* s) {
-	// Создаём окно
-	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
-	// подписываемся на события окна
-	XSelectInput(d, w, PropertyChangeMask);
 	// делаем окно владельцем данных для обмена. 
 	// После этого будет возбуждено событие SelectionRequest
 	XSetSelectionOwner(d, clipboard_atom, w, CurrentTime);
@@ -1034,6 +1036,7 @@ void selection_invertcase(char*) { copy_selection(); print_invertcase_buffer(0, 
 void load_config(int) {
 	fprintf(stderr, "Конфигурация применена\n");
 	
+	for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
 	free(keyfn); keyfn = NULL; keyfn_max_size = keyfn_size = 0;
 	
 	char* path;
@@ -1201,11 +1204,16 @@ int main(int ac, char** av) {
 
 		// опрашиваем клавиатуру
         XQueryKeymap(d, keys);
-		keys_pressed = 0;
-		for(int i=0; i<KEYBOARD_SIZE; i++) if(BIT(keys, i)!=0) keys_pressed++;
+		keys_pressed = -1;
       	for(int i=0; i<KEYBOARD_SIZE; i++) {
-      		if(BIT(keys, i)!=BIT(saved, i)) {
-      			if(BIT(keys, i)!=0) { // клавиша нажата
+			
+			if(keys_pressed < 0) {
+				keys_pressed = 0;
+				for(int i=0; i<KEYBOARD_SIZE; i++) if(BIT(keys, i) != 0) keys_pressed++;
+			}
+			
+      		if(BIT(keys, i) != BIT(saved, i)) {
+      			if(BIT(keys, i) != 0) { // клавиша нажата
       				change_key(i);
       			} else {	// клавиша отжата
 					if(keys_pressed == 0 && keyfn_active != -1) {
@@ -1214,6 +1222,7 @@ int main(int ac, char** av) {
 					}
       			}
       		}
+			
       	}
 
       	char* char_ptr=saved;
@@ -1224,6 +1233,14 @@ int main(int ac, char** av) {
 		int status;
 		waitpid(-1, &status, WNOHANG);
 
+		// обрабатываем события окна, пока они есть
+		while(XPending(d)) {
+			XEvent event;
+			XNextEvent(d, &event);
+			
+		}
+
+		// задержка
       	usleep(delay);
    	}
 
