@@ -133,13 +133,16 @@ Display *d;					// текущий дисплей
 Window w;					// окно этого приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 int selection_chunk_size; 	// максимально возможный размер данных для передачи через буфер обмена
-char* clipboard_s = "";		// буфер обмена
+char* clipboard_s = NULL;		// буфер обмена
 int clipboard_len = 0;		// длина буфера обмена
+char* selection_retrive = NULL; // буфер обмена для получения данных
 
 Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
 Atom targets_atom;
+
+void event_delay(int delay);
 
 //@category Комбинации -> Функции
 
@@ -609,66 +612,26 @@ char* get_selection(Atom number_buf) {
 	Window owner = XGetSelectionOwner(d, number_buf);
     if (owner == None) {
 		char* name_buf = XGetAtomName(d, number_buf);
-        printf("Буфер %s не поддерживается владельцем\n", name_buf);
+        fprintf(stderr, "Буфер %s не поддерживается владельцем\n", name_buf);
 		if(name_buf) XFree(name_buf);
         return NULL;
     }
-    printf("0x%lX\n", owner);
+    if(DEBUG) fprintf(stderr, "owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");
 
-	// Создаём окно
-	Window w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
-
-	// подписываемся на события окна
-	XSelectInput(d, w, PropertyChangeMask);
-
-	// подготовка формата в котором запрашиваем: utf8 или просто текст
-	Atom request_target = utf8_atom? utf8_atom: XA_STRING;
+	//if(w == owner) return ;
 
 	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
-		request_target,
+		utf8_atom,
 		sel_data_atom,
 		w,
 	    CurrentTime
 	);
 	XSync(d, False);
 
-	// строка которую получим
-	char* s = NULL;
-	int format;	// в этом формате
-	unsigned long bytesafter, length;
-	Atom target;
+	event_delay(delay);
 
-	// получаем событие
-	while(1) {
-		XEvent event;
-		XNextEvent(d, &event);
-
-		// пришло какое-то другое событие... ну его
-		if(event.type != SelectionNotify) continue;
-
-		// хочет работать с другим системным буфером - гуд-бай
-		if(event.xselection.selection != number_buf) continue;
-
-		// нет выделения
-		if(event.xselection.property == None) break;
-
-		// считываем
-		XGetWindowProperty(event.xselection.display,
-			    event.xselection.requestor, // window
-			    event.xselection.property, 	// некое значение
-				0L,
-				1000000,	// максимальный размер, который мы готовы принять
-			    False, (Atom) AnyPropertyType,
-				&target, 	// тип возвращаемого значения: INCR - передача по частям
-			    &format, &length, &bytesafter, (unsigned char**) &s);
-
-		break;
-	}
-
-	XDestroyWindow(d, w);
-
-	return s;
+	return selection_retrive;
 }
 
 // переписываем строку в буфер ввода
@@ -710,7 +673,7 @@ void copy_selection() {
 	delay = save;
 	recover_active_mods();
 
-	sleep(delay*2);
+	usleep(delay);
 
 	char* s = get_selection(clipboard_atom);
 	maybe_group = active_state.group;
@@ -754,6 +717,28 @@ void event_next() {
 	if(DEBUG) fprintf(stderr, "event_next %i, ", event.type);
 
 	switch(event.type) {
+		case SelectionNotify:
+			// нет выделения
+			if(event.xselection.property == None) {
+				fprintf(stderr, "Нет выделения\n");
+				break;
+			}
+			
+			int format;	// формат строки
+			unsigned long bytesafter, length;
+			Atom target;
+			
+			// считываем
+			XGetWindowProperty(event.xselection.display,
+			    event.xselection.requestor, // window
+			    event.xselection.property, 	// некое значение
+				0L,
+				1000000,	// максимальный размер, который мы готовы принять
+			    False, (Atom) AnyPropertyType,
+				&target, 	// тип возвращаемого значения: INCR - передача по частям
+			    &format, &length, &bytesafter, 
+				(unsigned char**) &selection_retrive);
+		break;
 		case SelectionClear:
 			fprintf(stderr, "Утрачено право собственности на буфер обмена.\n");
 		break;
@@ -763,7 +748,7 @@ void event_next() {
 
 			// клиент хочет, чтобы ему сообщили в каком формате будут данные
 			if (event.xselectionrequest.target == targets_atom) {
-				Atom types[3] = { targets_atom, utf8_atom, XA_STRING };
+				Atom types[3] = { targets_atom, utf8_atom };
 
 				XChangeProperty(d,
 						event.xselectionrequest.requestor,
@@ -935,7 +920,7 @@ void init_desktop(char* av0) {
 void check_any_instance() {
 	// TODO: килять другой экземпляр процесса, если он есть программно
 	// char* s = NULL;
-	// asprintf(&s, "ps aux | grep erswitcher | awk '{print $2}' | grep -v '^%i$' | xargs killall -9", getpid());
+	// asprintf(&s, "ps aux | grep erswitcher | awk '{print $2}' | grep -v '^%i$' | xargs kill -9", getpid());
 	// int rc = system(s);
 	// if(rc) fprintf(stderr, "%s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
 }
