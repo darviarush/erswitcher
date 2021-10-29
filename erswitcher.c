@@ -133,8 +133,8 @@ Display *d;					// текущий дисплей
 Window w;					// окно этого приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 int selection_chunk_size; 	// максимально возможный размер данных для передачи через буфер обмена
-char* clipboard_s = NULL;		// буфер обмена
-int clipboard_len = 0;		// длина буфера обмена
+char* clipboard_s = NULL;		// буфер обмена для отправки данных
+int clipboard_len = 0;			// длина буфера обмена для отправки данных
 char* selection_retrive = NULL; // буфер обмена для получения данных
 
 Atom sel_data_atom;
@@ -142,7 +142,7 @@ Atom utf8_atom;
 Atom clipboard_atom;
 Atom targets_atom;
 
-void event_delay(int delay);
+void event_delay(double delay);
 
 //@category Комбинации -> Функции
 
@@ -157,6 +157,10 @@ keyfn_t* keyfn = NULL;
 int keyfn_size = 0;
 int keyfn_max_size = 0;
 int keyfn_active = -1;
+
+int compose_map_size = 0;
+wint_t *compose_map_keys = NULL;
+wint_t *compose_map_values = NULL;
 
 //@category Раскладки
 
@@ -360,15 +364,13 @@ Window get_current_window() {
 
 // возвращает модификатры с кнопками мыши
 unsigned int get_input_state() {
-  Window root, dummy;
-  int root_x, root_y, win_x, win_y;
-  unsigned int mask;
-  root = DefaultRootWindow(d);
-
-  XQueryPointer(d, root, &dummy, &dummy,
-                &root_x, &root_y, &win_x, &win_y, &mask);
-
-  return mask;
+	Window root, dummy;
+	int root_x, root_y, win_x, win_y;
+	unsigned int mask;
+	root = DefaultRootWindow(d);
+	XQueryPointer(d, root, &dummy, &dummy,
+				&root_x, &root_y, &win_x, &win_y, &mask);
+	return mask;
 }
 
 // Переключает раскладку
@@ -629,7 +631,7 @@ char* get_selection(Atom number_buf) {
 	);
 	XSync(d, False);
 
-	event_delay(delay);
+	event_delay(delay / 1000000);
 
 	return selection_retrive;
 }
@@ -723,11 +725,11 @@ void event_next() {
 				fprintf(stderr, "Нет выделения\n");
 				break;
 			}
-			
+
 			int format;	// формат строки
 			unsigned long bytesafter, length;
 			Atom target;
-			
+
 			// считываем
 			XGetWindowProperty(event.xselection.display,
 			    event.xselection.requestor, // window
@@ -736,7 +738,7 @@ void event_next() {
 				1000000,	// максимальный размер, который мы готовы принять
 			    False, (Atom) AnyPropertyType,
 				&target, 	// тип возвращаемого значения: INCR - передача по частям
-			    &format, &length, &bytesafter, 
+			    &format, &length, &bytesafter,
 				(unsigned char**) &selection_retrive);
 		break;
 		case SelectionClear:
@@ -797,10 +799,10 @@ void event_next() {
 
 }
 
-void event_delay(int microseconds) {
+void event_delay(double seconds) {
 	// задержка, но коль пришли события иксов - сразу выходим
 	int fd_display = ConnectionNumber(d);
-	struct timeval tv = { 0, microseconds };
+	struct timeval tv = { (int) seconds, (int) ((seconds - (int) seconds) * 1000000) };
 	fd_set readset;
 	FD_ZERO(&readset);
 	FD_SET(fd_display, &readset);
@@ -811,9 +813,7 @@ void event_delay(int microseconds) {
 }
 
 void change_key(int code) {
-
 	unikey_t key = keyboard_state(code);
-
     KeySym ks = KEY_TO_SYM(key);
 
 	// XkbKeysymToModifiers()
@@ -849,6 +849,13 @@ void change_key(int code) {
     }
 }
 
+int goto_home() {
+	const char* home = getenv("HOME");
+	if(!home) {fprintf(stderr, "WARN: нет getenv(HOME)\n");	return 0;}
+	if(chdir(home)) {fprintf(stderr, "WARN: не могу перейти в каталог пользователя %s\n", home); return 0;}
+	return 1;
+}
+
 void init_desktop(char* av0) {
 	// FILE* f = fopen("/usr/share/application/erswitcher.desktop", "rb");
 	// if(f) {fclose(f); return;}
@@ -858,9 +865,7 @@ void init_desktop(char* av0) {
 
 	#define INIT_DESKTOP_FREE	free(program)
 
-	const char* home = getenv("HOME");
-	if(!home) {fprintf(stderr, "WARN: нет getenv(HOME)\n");	INIT_DESKTOP_FREE; return;}
-	if(chdir(home)) {fprintf(stderr, "WARN: нет каталога пользователя %s\n", home);	INIT_DESKTOP_FREE; return;}
+	if(!goto_home()) { INIT_DESKTOP_FREE; return; }
 
 	mkdir(".local", 0700);
 	mkdir(".local/share", 0700);
@@ -869,7 +874,7 @@ void init_desktop(char* av0) {
 	const char* app = ".local/share/applications/erswitcher.desktop";
 
 	FILE* f = fopen(app, "wb");
-	if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", home, app);
+	if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), app);
 	else {
 		fprintf(f,
 			"[Desktop Entry]\n"
@@ -896,7 +901,7 @@ void init_desktop(char* av0) {
 	const char* autostart = ".config/autostart/erswitcher.desktop";
 
 	f = fopen(autostart, "wb");
-	if(!f) {fprintf(stderr, "WARN: не могу создать %s/%s\n", home, autostart); INIT_DESKTOP_FREE; return;}
+	if(!f) {fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart); INIT_DESKTOP_FREE; return;}
 
 	fprintf(f,
 		"[Desktop Entry]\n"
@@ -936,8 +941,26 @@ void run_command(char* s) {
 
 void insert_from_clipboard(char* s) {
 	set_clipboard(s);
-	event_delay(delay * 2);
+	event_delay(delay / 1000000 * 2);
 	shift_insert();
+}
+
+void compose(char*) {
+	if(pos == 0) return;
+	
+	wint_t cs = KEY_TO_INT(word[pos-1]);
+	wint_t to = 0;
+	for(int i=0; i<compose_map_size; i++) {
+		if(compose_map_keys[i] == cs) {
+			to = compose_map_values[i];
+			break;
+		}
+	}
+	
+	if(to == 0) return;
+	
+	press_key(SYM_TO_KEY(XK_BackSpace));
+	press_key(INT_TO_KEY(to));
 }
 
 void word_translate(char*) { print_translate_buffer(from_space(), 1); }
@@ -950,10 +973,15 @@ void selection_invertcase(char*) { copy_selection(); print_invertcase_buffer(0, 
 
 
 void load_config(int) {
-	fprintf(stderr, "Конфигурация применена\n");
+	if(DEBUG) fprintf(stderr, "Конфигурация применяется ...\n");
+
+	clipboard_s = NULL;
+	clipboard_len = 0;
 
 	for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
 	free(keyfn); keyfn = NULL; keyfn_max_size = keyfn_size = 0;
+
+	if(!goto_home()) return;
 
 	char* path;
 	asprintf(&path, "%s/.config/erswitcher.conf", getenv("HOME"));
@@ -988,6 +1016,7 @@ void load_config(int) {
 			"#   клавиатуре                                                      #\n"
 			"#####################################################################\n"
 			"\n"
+			"[functions]\n"
 			"# Транслитерация последнего введённого слова\n"
 			"Pause=word translate\n"
 			"# Транслитерация последнего ввода\n"
@@ -1000,30 +1029,37 @@ void load_config(int) {
 			"Alt+Control+Pause=text invertcase\n"
 			"# Изменение регистра последнего введённого слова\n"
 			"Alt+Pause=selected invertcase\n"
+			"# Транслитерация последнего введённого символа в дополнительные символы\n"
+			"KP_Begin=compose\n"
+			"Scroll_Lock=compose\n"
 			"\n"
-			"# Дополнительные символы украинского и белорусского алфавитов\n"
-			"Super+s=^і\n"
-			"Super+Shift+S=^І\n"
-			"Super+b=^і\n"
-			"Super+Shift+B=^І\n"
-			"Super+less=^ґ\n"
-			"Super+Shift+greater=^Ґ\n"
-			"Super+u=^ґ\n"
-			"Super+Shift+U=^Ґ\n"
-			"Super+bracketright=^ї\n"
-			"Super+Shift+braceright=^Ї\n"
-			"Super+apostrophe=^є\n"
-			"Super+Shift+quotedbl=^Є\n"
-			"Super+o=^ў\n"
-			"Super+Shift+O=^Ў\n"
-			"Super+grave=^’\n"
-			"Super+Shift+asciitilde=^₴\n"
+			"[compose]\n"
+			"# Замены - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
+			"# Дополнительные символы кириллицы для украинского и белорусского алфавитов\n"
+			"ы=і\n"
+			"Ы=І\n"
+			"ъ=ї\n"
+			"Ъ=Ї\n"
+			"щ=ў\n"
+			"Щ=Ў\n"
+			"э=є\n"
+			"Э=Є\n"
+			"г=ґ\n"
+			"Г=Ґ\n"
+			"ё=’\n"
+			"Ё=₴\n"			
 			"\n"
-			"# Шаблоны\n"
-			"Super+Pause=:Готово.\n"
+			"[sendkeys]\n"
+			"# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
+			"Super+Pause=Готово.\n"
 			"\n"
-			"# Команды\n"
-			"Alt+Control+Shift+Break=| kate ~/.config/erswitcher.conf && killall -HUP erswitcher\n"
+			"[snippets]\n"
+			"# Сниппеты - вводятся через буфер обмена (clipboard), могут содержать любые символы\n"
+			"Super+Shift+Break=\n"
+			"\n"
+			"[commands]\n"
+			"# Команды операционной системы. Выполняются в оболочке шелла\n"
+			"Alt+Control+Shift+Break=kate ~/.config/erswitcher.conf && killall -HUP erswitcher\n"
 		);
 
 		fclose(f);
@@ -1035,15 +1071,27 @@ void load_config(int) {
 		}
 	}
 
-	char buf[BUF_SIZE];
+	#define LINE_BUF_SIZE	(1024*1024)
+
+	char buf[LINE_BUF_SIZE];
 	int lineno = 0;
+	int no_section = 0; // сигнализирует о том, что секция не распознана
+	
+	
 	NEXT_LINE:
-	while(fgets(buf, BUF_SIZE, f)) {
+	while(fgets(buf, LINE_BUF_SIZE, f)) {
 		lineno++;
+		
 		char* s = buf;
 		while(isspace(*s)) s++;
 
 		if(*s == '#' || *s == '\0') continue;
+
+		if(*s == '[') { // это секция. Сверяемся со списком
+			if(EQ(s, "[functions]"))
+		}
+		
+		if(no_section) continue;
 
 		char* v = strchr(s, '=');
 		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
@@ -1058,10 +1106,12 @@ void load_config(int) {
 		while (x != NULL) {
 			if(key_set_flag) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: несколько клавишь-немодификаторов подряд (как %s в %s). Пропущено\n", path, lineno, x, s); goto NEXT_LINE; }
 
-			if(EQ(x, "Alt")) mods |= AltMask;
-			else if(EQ(x, "Control")) mods |= ControlMask;
-			else if(EQ(x, "Super")) mods |= SuperMask;
-			else if(EQ(x, "Shift")) mods |= ShiftMask;
+			if(EQ(x, "Shift")) mods |= ShiftMask;
+			else if(EQ(x, "Control") || EQ(x, "Ctrl")) mods |= ControlMask;
+			else if(EQ(x, "Alt") || EQ(x, "Option")) mods |= AltMask;
+			else if(EQ(x, "Meta")) mods |= MetaMask;
+			else if(EQ(x, "Super") || EQ(x, "Win") || EQ(x, "Command")) mods |= SuperMask;
+			else if(EQ(x, "Hyper")) mods |= HyperMask;
 			else {
 				key = STR_TO_KEY(x);
 				if(key.code == 0) { fprintf(stderr, "WARN: %s:%i: не распознан символ %s. Пропущено\n", path, lineno, x); goto NEXT_LINE; }
@@ -1096,20 +1146,31 @@ void load_config(int) {
 		else if(EQ(v, "word invertcase")) fn = word_invertcase;
 		else if(EQ(v, "text invertcase")) fn = text_invertcase;
 		else if(EQ(v, "selected invertcase")) fn = selection_invertcase;
+		
+		else if(EQ(v, "compose")) fn = compose;
 
 		else { fprintf(stderr, "WARN: %s:%i: нет функции %s. Пропущено\n", path, lineno, v); continue; }
 
 		// выделяем память под массив, если нужно
 		if(keyfn_size == keyfn_max_size) {
 			keyfn_max_size += KEYFN_NEXT_ALLOC;
-			keyfn = realloc(keyfn, keyfn_max_size);
+			keyfn = realloc(keyfn, keyfn_max_size * sizeof(keyfn_t));
 		}
 
 		keyfn[keyfn_size++] = (keyfn_t) {key: key, fn: fn, arg: arg};
+		if(DEBUG) {
+			keyfn_t *k = keyfn+keyfn_size-1;
+			printf("------------------------------\n");
+			KeySym ks = KEY_TO_SYM(k->key);
+			print_sym(k->key.mods, ks);
+			printf(" = %s\n", k->arg);
+			fflush(stdout);
+		}
 	}
 
 	free(path);
 	fclose(f);
+	if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
 }
 
 int main(int ac, char** av) {
@@ -1141,7 +1202,9 @@ int main(int ac, char** av) {
     unsigned int state1, state2 = 0;
    	XQueryKeymap(d, saved);
 
+
    	while(1) {
+
         // сбросим ввод, коль нажата мышка
         state1 = get_input_state();
         state1 &= Button1MotionMask | Button2MotionMask | Button3MotionMask | Button4MotionMask | Button5MotionMask;
@@ -1189,7 +1252,7 @@ int main(int ac, char** av) {
 		// сработают таймеры, чьё время пришло
 		timers_apply();
 
-		event_delay(delay);
+		event_delay(delay / 1000000);
    	}
 
    	return 0;
