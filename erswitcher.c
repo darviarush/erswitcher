@@ -733,22 +733,22 @@ void to_buffer(char** s1) {
 	*s1 = NULL;
 }
 
-// копируем выделенное и заменяем им буфер ввода
-void copy_selection() {
+// нажимаем комбинацию Shift+Insert (вставка)
+void control_insert() {
 	clear_active_mods();
-	int save = delay;
-	delay = 0;
 	unikey_t control_left = SYM_TO_KEY(XK_Control_L);
 	send_key(control_left, 1);
 	press_key(SYM_TO_KEY(XK_Insert));
 	send_key(control_left, 0);
-	delay = save;
 	recover_active_mods();
-
-	usleep(delay);
-
-	char* s = get_selection(clipboard_atom);
 	maybe_group = active_state.group;
+}
+
+
+// копируем выделенное и заменяем им буфер ввода
+void copy_selection() {
+	control_insert();
+	char* s = get_selection(clipboard_atom);
 	to_buffer(&s);
 }
 
@@ -781,7 +781,7 @@ void set_clipboard(char* s) {
 
 	Window owner = XGetSelectionOwner(d, clipboard_atom);
 
-	fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
+	if(DEBUG) fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
 }
 
 void event_next() {
@@ -1079,14 +1079,6 @@ void load_config(int) {
 			"# Автор: Ярослав О. Косьмина                                        #\n"
 			"# Сайт:  https://github.com/darviarush/erswitcher                   #\n"
 			"#                                                                   #\n"
-			"# комбинация=:текст - будет введён этот текст с клавиатуры          #\n"
-			"#   (допускаются символы которые есть в раскладках клавиатуры)      #\n"
-			"# комбинация=^текст - будет введён этот текст через буфер обмена    #\n"
-			"#   (допускаются любые символы)                                     #\n"
-			"# комбинация=|текст - будет выполнена команда (выражение шелла)     #\n"
-			"#   (например: Alt+Shift+Control+F1=opera ya.ru - откроет страницу  #\n"
-			"#     ya.ru в опере, при нажатии на эту комбинацию клавишь)         #\n"
-			"#                                                                   #\n"
 			"# Комбинации клавишь указываются в английской раскладке             #\n"
 			"#   и действуют во всех раскладках                                  #\n"
 			"# Названия символов взяты из Иксов. Посмотреть их можно запустив    #\n"
@@ -1292,10 +1284,9 @@ int main(int ac, char** av) {
         return 1;
 	}
 
-	init_desktop(av[0]);
-	
 	if(!goto_home()) return 1;
 
+	init_desktop(av[0]);
 	open_display();
 	check_any_instance();
 	memset(timers, 0, sizeof timers);	// инициализируем таймеры
