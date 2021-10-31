@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Terminal=false
+Type=Application
+Name=EN-RU Switcher
+Comment=Transliterator for keyboard input
+GenericName[ru]=Русско-английский клавиатурный переключатель
+Comment[ru]=Транслитератор ввода с клавиатуры
+Exec=/mnt/ext/__/erswitcher/erswitcher
+X-GNOME-Autostart-enabled=true
+Icon=preferences-desktop-keyboard
+Categories=Keyboard;Transliterate;Development;System;

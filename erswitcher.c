@@ -87,46 +87,6 @@ typedef struct {
 mytimer_t timers[MAX_TIMERS];
 int timers_size = 0;
 
-int after(double interval, void(*fn)()) {
-	int i;
-	for(i=0; i<MAX_TIMERS; i++) {
-		if(timers[i].fn == NULL) break;
-	}
-
-	if(i==MAX_TIMERS) {
-		fprintf(stderr, "Очередь таймеров переполнена. Установка таймера не удалась\n");
-		return -1;
-	}
-
-	timers[i].fn = fn;
-
-	struct timeval curtime;
-	gettimeofday(&curtime, 0);
-	timers[i].time = curtime.tv_sec + curtime.tv_usec / 1000000 + interval;
-
-	if(timers_size <= i) timers_size = i+1;
-
-	return i;
-}
-
-void timers_apply() {
-	struct timeval curtime;
-	gettimeofday(&curtime, 0);
-	double now = curtime.tv_sec + curtime.tv_usec / 1000000;
-
-	int i; int last = 0;
-	for(i=0; i<timers_size; i++) {
-		if(timers[i].fn == NULL) continue;
-		if(timers[i].time < now) {
-			if(DEBUG) fprintf(stderr, "fn by timer %p\n", timers[i].fn);
-			timers[i].fn();
-			timers[i].fn = NULL;
-		} else last = i;
-	}
-
-	timers_size = last+1;
-}
-
 //@category Иксы
 
 Display *d;					// текущий дисплей
@@ -158,9 +118,17 @@ int keyfn_size = 0;
 int keyfn_max_size = 0;
 int keyfn_active = -1;
 
+#define COMPOSE_KEY_MAX		20
+#define COMPOSE_VAL_MAX		COMPOSE_KEY_MAX * 6
+typedef struct {
+	wint_t word[COMPOSE_KEY_MAX];
+	int pos;
+	char* to;
+} compose_t;
+
 int compose_map_size = 0;
-wint_t *compose_map_keys = NULL;
-wint_t *compose_map_values = NULL;
+int compose_map_max_size = 0;
+compose_t* compose_map = NULL;
 
 //@category Раскладки
 
@@ -172,11 +140,16 @@ int group_en = -1;		// Номер английской раскладки или
 // после поиска maybe_group переключается в группу найденного символа
 int maybe_group = -1;
 
+void set_group(int group);
+unikey_t keyboard_state(int code);
+void clear_active_mods();
+void recover_active_mods();
+
 // инициализирует названия клавиатуры
 static char* Russian = "Russian";
 static char* English = "English";
 void init_keyboard() {
-
+	
 	// инициализируем раскладки клавиатуры
 	XkbDescRec* kb = XkbAllocKeyboard();
 	if(!kb) return;
@@ -185,14 +158,50 @@ void init_keyboard() {
 	if(XkbGetNames(d, XkbGroupNamesMask, kb) != Success) return;
 
 	Atom* gs = kb->names->groups;
-	for(groups = 0; groups < XkbNumKbdGroups && gs[groups] != 0;) {
+	// groups < XkbNumKbdGroups &&
+	for(groups = 0; gs[groups] != 0;) {
 		char* kb_name = XGetAtomName(d, gs[groups]);
 		if(strncmp(kb_name, Russian, strlen(Russian)) == 0) group_ru = groups;
 		if(strncmp(kb_name, English, strlen(English)) == 0) group_en = groups;
+		XFree(kb_name);
 		groups++;
 	}
 
-	XkbFreeNames(kb, XkbGroupNamesMask, 0);
+	// mkdir(".cache", 0744);
+	// char* path = ".cache/erswitcher.keyboard.csv";
+	// FILE* f = fopen(path, "wb");
+	// if(!f) {
+		// fprintf(stderr, "Не открыть для записи %s\n", path);
+		// goto EXIT_INIT_KB;
+	// }
+
+	// malloc();
+
+	// unikey_t state = keyboard_state(0);
+	// clear_active_mods();
+
+	// fprintf(f, "\n");
+	// fprintf(f, "%i;Раскладка;%s\n", group, kb_name);
+	// fprintf(f, "\n");
+	// fprintf(f, "Сканкод;Символ;Символ с shift\n");
+	// for(int code = 0; code < KEYBOARD_SIZE; ++code) {
+		// fprintf(f, "%i;", code);
+		// for(int group = 0; group<groups; group++) {
+			// set_group(group);
+			// char* kb_name = XGetAtomName(d, gs[group]);
+			// fprintf(f, "%i;%s;", group, kb_name);
+			// XFree(kb_name);
+			
+		// }
+		
+			// //unikey_t key = {code: code, mods: shift? ShiftMask: 0, group: group};
+		// KeySym ks = XKeycodeToKeysym(d, code);
+		// KeySym ks2 = XKeycodeToKeysym(d, code);
+		// fprintf(f, "%i;%s;%s", code, SYM_TO_STR(ks), SYM_TO_STR(ks2));
+	// }
+
+	// recover_active_mods();
+	// fclose(f);
 
 	// TODO: инициализируем модификаторы
 	// в иксах есть 8 модификаторов. И на них можно назначить разные модифицирующие или лочащиеся клавиши
@@ -215,6 +224,9 @@ void init_keyboard() {
 			// k++;
 		// }
     // }
+	
+	//EXIT_INIT_KB:
+	XkbFreeNames(kb, XkbGroupNamesMask, 0);
 }
 
 KeySym unikey_to_keysym(unikey_t key) {
@@ -319,6 +331,50 @@ int in_sym(KeySym symbol, KeySym* symbols) {
 	while(*symbols) if(symbol == *symbols++) return 1;
 	return 0;
 }
+
+//@category Задержки
+
+int after(double interval, void(*fn)()) {
+	int i;
+	for(i=0; i<MAX_TIMERS; i++) {
+		if(timers[i].fn == NULL) break;
+	}
+
+	if(i==MAX_TIMERS) {
+		fprintf(stderr, "Очередь таймеров переполнена. Установка таймера не удалась\n");
+		return -1;
+	}
+
+	timers[i].fn = fn;
+
+	struct timeval curtime;
+	gettimeofday(&curtime, 0);
+	timers[i].time = curtime.tv_sec + curtime.tv_usec / 1000000 + interval;
+
+	if(timers_size <= i) timers_size = i+1;
+
+	return i;
+}
+
+void timers_apply() {
+	struct timeval curtime;
+	gettimeofday(&curtime, 0);
+	double now = curtime.tv_sec + curtime.tv_usec / 1000000;
+
+	int i; int last = 0;
+	for(i=0; i<timers_size; i++) {
+		if(timers[i].fn == NULL) continue;
+		if(timers[i].time < now) {
+			if(DEBUG) fprintf(stderr, "fn by timer %p\n", timers[i].fn);
+			timers[i].fn();
+			timers[i].fn = NULL;
+		} else last = i;
+	}
+
+	timers_size = last+1;
+}
+
+//@category Иксы
 
 // Обработка ошибок
 int xerror = 0;
@@ -439,7 +495,7 @@ int active_len;
 unikey_t active_state;
 int active_use = 0;
 
-// Возвращает активные модификаторы клавиатуры
+// Очищает активные модификаторы клавиатуры
 // keys - массив клавиш KEYBOARD_SIZE = 32*8
 // возвращчет количество найденных клавиш-модификаторов
 void clear_active_mods() {
@@ -473,6 +529,11 @@ void clear_active_mods() {
 	if(active_state.mods & LockMask) {
 		press_key(SYM_TO_KEY(XK_Caps_Lock));
 	}
+	
+	// снимаем Нам-лок (он не входит в модификаторы)
+	if(active_state.mods & NumMask) {
+		press_key(SYM_TO_KEY(XK_Num_Lock));
+	}	
 }
 
 // восстанавливаем модификаторы
@@ -495,6 +556,11 @@ void recover_active_mods() {
 	// восстанавливаем Капс-лок (он не входит в модификаторы)
 	if(active_state.mods & LockMask && !(state.mods & LockMask)) {
 		press_key(SYM_TO_KEY(XK_Caps_Lock));
+	}
+	
+	// восстанавливаем Num-лок (он не входит в модификаторы)
+	if(active_state.mods & NumMask && !(state.mods & NumMask)) {
+		press_key(SYM_TO_KEY(XK_Num_Lock));
 	}
 
 	set_group(active_state.group);
@@ -545,24 +611,28 @@ void press_key_multi(unikey_t key, int n) {
 	for(int i=0; i<n; i++) press_key(key);
 }
 
+#define FOR_UTF8(S)			\
+	mbstate_t mbs_UTF8 = {0}; 	\
+	for(size_t charlen_UTF8, i_UTF8 = 0;	\
+        (charlen_UTF8 = mbrlen(S+i_UTF8, MB_CUR_MAX, &mbs_UTF8)) != 0	\
+        && charlen_UTF8 > 0;			\
+        i_UTF8 += charlen_UTF8			\
+    )
+	
+#define STEP_UTF8(S, W)		\
+		wchar_t ws_UTF8[4];		\
+        int res_UTF8 = mbstowcs(ws_UTF8, S+i_UTF8, 1);		\
+        if(res_UTF8 != 1) break; \
+		wint_t W = ws_UTF8[0];
+
 // TODO: зажатие управляющих клавишь {\Control+Alt}abc{/Control} и {Ctrl+Alt+a}
 void sendkeys(char* s) { // печатает с клавиатуры строку в utf8
 	clear_active_mods();
 
-	mbstate_t mbs = {0};
-	for(size_t charlen, i = 0;
-        (charlen = mbrlen(s+i, MB_CUR_MAX, &mbs)) != 0
-        && charlen > 0
-        && i < BUF_SIZE;
-        i += charlen
-    ) {
-        wchar_t ws[4];
-        int res = mbstowcs(ws, s+i, 1);
-        if(res != 1) break;
+	FOR_UTF8(s) {
+        STEP_UTF8(s, x);
 
-		//if(ws[0] == '{')
-
-		press_key(INT_TO_KEY(ws[0]));
+		press_key(INT_TO_KEY(x));
     }
 
 	recover_active_mods();
@@ -709,7 +779,9 @@ void set_clipboard(char* s) {
 	XSetSelectionOwner(d, clipboard_atom, w, CurrentTime);
 	XFlush(d);
 
-	fprintf(stderr, "set_clipboard %s\n", s);
+	Window owner = XGetSelectionOwner(d, clipboard_atom);
+
+	fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
 }
 
 void event_next() {
@@ -853,6 +925,7 @@ int goto_home() {
 	const char* home = getenv("HOME");
 	if(!home) {fprintf(stderr, "WARN: нет getenv(HOME)\n");	return 0;}
 	if(chdir(home)) {fprintf(stderr, "WARN: не могу перейти в каталог пользователя %s\n", home); return 0;}
+	setenv("PWD", home, 1);
 	return 1;
 }
 
@@ -864,8 +937,6 @@ void init_desktop(char* av0) {
 	if(!program) {fprintf(stderr, "WARN: нет пути к программе\n"); return;}
 
 	#define INIT_DESKTOP_FREE	free(program)
-
-	if(!goto_home()) { INIT_DESKTOP_FREE; return; }
 
 	mkdir(".local", 0700);
 	mkdir(".local/share", 0700);
@@ -941,26 +1012,33 @@ void run_command(char* s) {
 
 void insert_from_clipboard(char* s) {
 	set_clipboard(s);
-	event_delay(delay / 1000000 * 2);
+	event_delay(delay / 1000000);
 	shift_insert();
 }
 
 void compose(char*) {
 	if(pos == 0) return;
 	
-	wint_t cs = KEY_TO_INT(word[pos-1]);
-	wint_t to = 0;
+	char* to = NULL;
+	int remove_sym;
 	for(int i=0; i<compose_map_size; i++) {
-		if(compose_map_keys[i] == cs) {
-			to = compose_map_values[i];
+		int k, n;
+		for(k = pos-1, n = compose_map[i].pos - 1; k >= 0 && n >= 0; k--, n--) {
+			if(compose_map[i].word[n] != KEY_TO_INT(word[k])) break;
+		}
+		
+		if(n == -1) {
+			to = compose_map[i].to;
+			remove_sym = compose_map[i].pos;
 			break;
 		}
+		
 	}
 	
-	if(to == 0) return;
+	if(to == NULL) return;
 	
-	press_key(SYM_TO_KEY(XK_BackSpace));
-	press_key(INT_TO_KEY(to));
+	press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
+	insert_from_clipboard(to);
 }
 
 void word_translate(char*) { print_translate_buffer(from_space(), 1); }
@@ -980,11 +1058,11 @@ void load_config(int) {
 
 	for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
 	free(keyfn); keyfn = NULL; keyfn_max_size = keyfn_size = 0;
+	
+	for(int k = 0; k<compose_map_size; k++) free(compose_map[k].to);
+	free(compose_map); compose_map = NULL; compose_map_max_size = compose_map_size = 0;
 
-	if(!goto_home()) return;
-
-	char* path;
-	asprintf(&path, "%s/.config/erswitcher.conf", getenv("HOME"));
+	char* path = ".config/erswitcher.conf";
 
 	FILE* f = fopen(path, "rb");
 	if(!f) {
@@ -1055,7 +1133,7 @@ void load_config(int) {
 			"\n"
 			"[snippets]\n"
 			"# Сниппеты - вводятся через буфер обмена (clipboard), могут содержать любые символы\n"
-			"Super+Shift+Break=\n"
+			"Super+Shift+Break=Готово.\n"
 			"\n"
 			"[commands]\n"
 			"# Команды операционной системы. Выполняются в оболочке шелла\n"
@@ -1075,8 +1153,9 @@ void load_config(int) {
 
 	char buf[LINE_BUF_SIZE];
 	int lineno = 0;
-	int no_section = 0; // сигнализирует о том, что секция не распознана
 	
+	#define SEC_FUNCTIONS 	((void (*)(char*)) -1)
+	void (*fn)(char*) = NULL;	
 	
 	NEXT_LINE:
 	while(fgets(buf, LINE_BUF_SIZE, f)) {
@@ -1087,15 +1166,54 @@ void load_config(int) {
 
 		if(*s == '#' || *s == '\0') continue;
 
+		// удаляем пробелы в конце строки или только \n
+		char* z = s;
+		while(*z) z++;
+		if(*s!='[' && fn != SEC_FUNCTIONS) { if(z[-1] == '\n') z--; } else { while(isspace(z[-1])) z--; }
+		*z = '\0';
+
+
 		if(*s == '[') { // это секция. Сверяемся со списком
-			if(EQ(s, "[functions]"))
+			if(EQ(s, "[functions]")) fn = SEC_FUNCTIONS;
+			else if(EQ(s, "[compose]")) fn = compose;
+			else if(EQ(s, "[sendkeys]")) fn = sendkeys;
+			else if(EQ(s, "[snippets]")) fn = insert_from_clipboard;
+			else if(EQ(s, "[commands]")) fn = run_command;
+			else {
+				fprintf(stderr, "WARN: %s:%i: не распознана секция %s. Пропущена\n", path, lineno, s);
+				fn = NULL;
+			}
+			continue;
 		}
 		
-		if(no_section) continue;
+		if(fn == NULL) continue;
 
 		char* v = strchr(s, '=');
 		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
 		*v = '\0'; v++;
+
+		if(fn == compose) {
+			// выделяем память под массив, если нужно
+			if(compose_map_size >= compose_map_max_size) {
+				compose_map_max_size += KEYFN_NEXT_ALLOC;
+				compose_map = realloc(compose_map, compose_map_max_size * sizeof(compose_t));
+			}
+			
+			wint_t* w = compose_map[compose_map_size].word;
+			int i = 0;
+			
+			FOR_UTF8(s) {
+				STEP_UTF8(s, x);
+				
+				if(i >= COMPOSE_KEY_MAX) {fprintf(stderr, "WARN: %s:%i: строка слишком длинная \"%s\" > %i. Пропущенo\n", path, lineno, s, COMPOSE_KEY_MAX); goto NEXT_LINE;}
+				
+				w[i++] = x;
+			}
+			
+			compose_map[compose_map_size].pos = i;
+			compose_map[compose_map_size++].to = strdup(v);
+			continue;
+		}
 
 		// определяем комбинацию клавиш
 		unikey_t key = {0,0,0};
@@ -1125,29 +1243,21 @@ void load_config(int) {
 
 		if(!key_set_flag) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет клавиши-немодификатора (в выражении %s). Пропущено\n", path, lineno, s); continue; }
 
-		// удаляем пробелы в конце строки или только \n
-		char* z = v;
-		while(*z) z++;
-		if(*v == '^' || *v == ':') { if(z[-1] == '\n') z--; } else { while(isspace(z[-1])) z--; }
-		*z = '\0';
-
 		// определяем функцию
-		void (*fn)(char*);
 		char* arg = NULL;
+		void (*fn1)(char*);
 
-		if(*v == '^') {	fn = insert_from_clipboard; arg = strdup(v+1); }
-		else if(*v == ':') { fn = sendkeys; arg = strdup(v+1); }
-		else if(*v == '|') { fn = run_command; arg = strdup(v+1); }
+		if(fn != SEC_FUNCTIONS) { arg = strdup(v); fn1 = fn; }
 
-		else if(EQ(v, "word translate")) fn = word_translate;
-		else if(EQ(v, "text translate")) fn = text_translate;
-		else if(EQ(v, "selected translate")) fn = selection_translate;
+		else if(EQ(v, "word translate")) fn1 = word_translate;
+		else if(EQ(v, "text translate")) fn1 = text_translate;
+		else if(EQ(v, "selected translate")) fn1 = selection_translate;
 
-		else if(EQ(v, "word invertcase")) fn = word_invertcase;
-		else if(EQ(v, "text invertcase")) fn = text_invertcase;
-		else if(EQ(v, "selected invertcase")) fn = selection_invertcase;
+		else if(EQ(v, "word invertcase")) fn1 = word_invertcase;
+		else if(EQ(v, "text invertcase")) fn1 = text_invertcase;
+		else if(EQ(v, "selected invertcase")) fn1 = selection_invertcase;
 		
-		else if(EQ(v, "compose")) fn = compose;
+		else if(EQ(v, "compose")) fn1 = compose;
 
 		else { fprintf(stderr, "WARN: %s:%i: нет функции %s. Пропущено\n", path, lineno, v); continue; }
 
@@ -1157,7 +1267,7 @@ void load_config(int) {
 			keyfn = realloc(keyfn, keyfn_max_size * sizeof(keyfn_t));
 		}
 
-		keyfn[keyfn_size++] = (keyfn_t) {key: key, fn: fn, arg: arg};
+		keyfn[keyfn_size++] = (keyfn_t) {key: key, fn: fn1, arg: arg};
 		if(DEBUG) {
 			keyfn_t *k = keyfn+keyfn_size-1;
 			printf("------------------------------\n");
@@ -1168,7 +1278,6 @@ void load_config(int) {
 		}
 	}
 
-	free(path);
 	fclose(f);
 	if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
 }
@@ -1183,8 +1292,11 @@ int main(int ac, char** av) {
         return 1;
 	}
 
-	open_display();
 	init_desktop(av[0]);
+	
+	if(!goto_home()) return 1;
+
+	open_display();
 	check_any_instance();
 	memset(timers, 0, sizeof timers);	// инициализируем таймеры
 
