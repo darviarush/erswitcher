@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=EN-RU Switcher
 Comment=Transliterator for keyboard input
-Exec=/mnt/ext/__/erswitcher/erswitcher
+Exec=/home/dart/.local/bin/erswitcher
 Icon=preferences-desktop-keyboard
 Terminal=false
 Type=Application
