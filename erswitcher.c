@@ -908,14 +908,17 @@ void event_next() {
 		case SelectionRequest:
 			// подготовка формата в котором отдаём: utf8 или просто текст
 			//Atom request_target = utf8_atom? utf8_atom: XA_STRING;
+			
+			Window win = event.xselectionrequest.requestor;
+			Atom pty = event.xselectionrequest.property;
 
 			// клиент хочет, чтобы ему сообщили в каком формате будут данные
 			if (event.xselectionrequest.target == targets_atom) {
 				Atom types[3] = { targets_atom, utf8_atom };
 
 				XChangeProperty(d,
-						event.xselectionrequest.requestor,
-						event.xselectionrequest.property,
+						win,
+						pty,
 						XA_ATOM,
 						32, PropModeReplace, (unsigned char *) types,
 						(int) (sizeof(types) / sizeof(Atom))
@@ -927,18 +930,16 @@ void event_next() {
 				char* an = XGetAtomName(d, event.xselectionrequest.target);
 				if(DEBUG) fprintf(stderr, "Запрошен clipboard в формате '%s'\n", an);
 				if(an) XFree(an);
-				event.xselectionrequest.property = None;
+				pty = None;
 				break;
 			}
 			else if(clipboard_len > selection_chunk_size) {
-				// TODO: реализовать протокол INCR
-				if(DEBUG) fprintf(stderr, "Размер данных для буфера обмена превышает размер куска для отправки: %u vs %u. А протокол INCR не реализован\n", clipboard_len, selection_chunk_size);
+				XChangeProperty(d, win, pty, inc, 32, PropModeReplace, 0, 0);
+				XSelectInput(d, win, PropertyChangeMask);
 			}
 			else {
 				// отправляем строку
-				XChangeProperty(d,
-						event.xselectionrequest.requestor,
-						event.xselectionrequest.property,
+				XChangeProperty(d, win,	pty,
 						event.xselectionrequest.target, 8, PropModeReplace,
 						(unsigned char *) clipboard_s, (int) clipboard_len);
 				if(DEBUG) fprintf(stderr, "отправляем clipboard_s: `%s`\n", clipboard_s);
