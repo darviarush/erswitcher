@@ -483,13 +483,13 @@ void send_key(unikey_t key, int is_press) {
 		return;
 	}
 
-	set_group(key.group);
 	send_mods(key.mods, is_press);
+	set_group(key.group);
 	printf("send_key: %s %s\n", KEY_TO_STR(key), is_press? "PRESS": "RELEASE");
 	press(key.code, is_press);
 
     XFlush(d);
-    if(delay) usleep(delay/2);
+    if(delay) usleep(delay);
 }
 
 // Эмулирует нажатие и отжатие клавиши
@@ -638,9 +638,9 @@ void sendkeys(char* s) { // печатает с клавиатуры строк�
 	clear_active_mods();
 
 	FOR_UTF8(s) {
-        STEP_UTF8(s, x);
+        STEP_UTF8(s, ws);
 
-		press_key(INT_TO_KEY(x));
+		press_key(INT_TO_KEY(ws));
     }
 
 	recover_active_mods();
@@ -744,7 +744,7 @@ char* get_selection(Atom number_buf) {
     if(DEBUG) fprintf(stderr, "owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");
 
 	// если владелец буфера мы же, то и отдаём что есть
-	if(w == owner) return selection_retrive;
+	if(w == owner) return clipboard_s;
 
 	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
@@ -771,7 +771,6 @@ void to_buffer(char* s) {
 	FOR_UTF8(s) {
         STEP_UTF8(s, ws);
 		if(pos >= BUF_SIZE) break;
-		//printf("- `%lc`\n", ws); fflush(stdout);
 		word[pos++] = INT_TO_KEY(ws);
     }
 }
@@ -885,7 +884,7 @@ void event_next() {
 				
 			if(incr_is) {
 				memcpy(selection_retrive + selection_retrive_length, result, length);
-				selection_retrive_length += length;
+				selection_retrive[selection_retrive_length += length] = '\0';
 				
 				if(bytesafter == 0) incr_is = False;
 			} else {
@@ -896,9 +895,9 @@ void event_next() {
 				
 				if(selection_retrive) free(selection_retrive);
 				
-				selection_retrive = (char*) malloc(length + bytesafter);
+				selection_retrive = (char*) malloc(length + bytesafter + 1);
 				memcpy(selection_retrive, result, length);
-				selection_retrive_length = length;
+				selection_retrive[selection_retrive_length = length] = '\0';
 			}
 			
 			if(result) XFree(result);
@@ -1093,7 +1092,7 @@ void run_command(char* s) {
 
 void insert_from_clipboard(char* s) {
 	set_clipboard(s);
-	event_delay(delay / 1000000);
+	event_delay(1);
 	shift_insert();
 }
 
@@ -1185,7 +1184,8 @@ void load_config(int) {
 			"Scroll_Lock=compose\n"
 			"\n"
 			"[compose]\n"
-			"# Замены - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
+			"# Замены (мнемоники) - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
+			"\n"
 			"# Дополнительные символы кириллицы для украинского и белорусского алфавитов\n"
 			"ы=і\n"
 			"Ы=І\n"
@@ -1198,7 +1198,31 @@ void load_config(int) {
 			"г=ґ\n"
 			"Г=Ґ\n"
 			"ё=’\n"
-			"Ё=₴\n"			
+			"Ё=₴\n"
+			"\n"
+			"# Кавычки\n"
+			"//=«\n"
+			"\\\\=»\n"
+			",,=„\n"
+			"..=”\n"
+			",=‘\n"
+			".=’\n"
+			"# Тире - длинное, среднее и цифровое\n"
+			"--=—\n"
+			"-,=–\n"
+			"-.=‒\n"
+			"# Пунктуация\n"
+			"...=…\n"
+			"# Утопающий и кричащий о помощи смайлик\n"
+			"хелп=‿︵‿ヽ(°□° )ノ︵‿︵\n"
+			"# Лежащий на боку и наблюдающий за чем-то смайлик\n"
+			"вау=∠( ᐛ 」∠)＿\n"
+			"# Ветер унёс зонтик бедняги во время дождя\n"
+			"нет=｀、ヽ(ノ＞＜)ノ ｀、ヽ｀☂ヽ\n"
+			"# Медвед\n"
+			"миш=ʕ ᵔᴥᵔ ʔ\n"
+			"# Пожималкин\n"
+			"хз=¯\\_(ツ)_/¯\n"
 			"\n"
 			"[sendkeys]\n"
 			"# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
