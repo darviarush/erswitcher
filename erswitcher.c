@@ -95,12 +95,19 @@ Window current_win;			// окно устанавливается при ввод
 int selection_chunk_size; 	// максимально возможный размер данных для передачи через буфер обмена
 char* clipboard_s = NULL;		// буфер обмена для отправки данных
 int clipboard_len = 0;			// длина буфера обмена для отправки данных
+
 char* selection_retrive = NULL; // буфер обмена для получения данных
+int selection_retrive_length = 0;
+
+int incr_is = False;
+Atom incr_propid;
+Window incr_window;
 
 Atom sel_data_atom;
 Atom utf8_atom;
 Atom clipboard_atom;
 Atom targets_atom;
+Atom incr_atom;
 
 void event_delay(double delay);
 
@@ -397,9 +404,10 @@ void open_display() {
 	XSynchronize(d, True);
 
 	sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
-	utf8_atom = XInternAtom(d, "UTF8_STRING", True);
+	utf8_atom = XInternAtom(d, "UTF8_STRING", False);
 	clipboard_atom = XInternAtom(d, "CLIPBOARD", False);
 	targets_atom = XInternAtom(d, "TARGETS", False);
+	incr_atom = XInternAtom(d, "INCR", False);
 
 	selection_chunk_size = XExtendedMaxRequestSize(d) / 4;
 	if(!selection_chunk_size) selection_chunk_size = XMaxRequestSize(d) / 4;
@@ -678,7 +686,52 @@ void print_invertcase_buffer(int from, int backspace) {
 	recover_active_mods();
 }
 
-// получаем содержимое системного буфера
+char* get_event_type(int n) {
+	if(n < 2 || n > LASTEvent) return NULL;
+	
+	char* names[] = {NULL, NULL,
+		"KeyPress",
+		"KeyRelease",
+		"ButtonPress",
+		"ButtonRelease",
+		"MotionNotify",
+		"EnterNotify",
+		"LeaveNotify",
+		"FocusIn",
+		"FocusOut",
+		"KeymapNotify",
+		"Expose",
+		"GraphicsExpose",
+		"NoExpose",
+		"VisibilityNotify",
+		"CreateNotify",
+		"DestroyNotify",
+		"UnmapNotify",
+		"MapNotify",
+		"MapRequest",
+		"ReparentNotify",
+		"ConfigureNotify",
+		"ConfigureRequest",
+		"GravityNotify",
+		"ResizeRequest",
+		"CirculateNotify",
+		"CirculateRequest",
+		"PropertyNotify",
+		"SelectionClear",
+		"SelectionRequest",
+		"SelectionNotify",
+		"ColormapNotify",
+		"ClientMessage",
+		"MappingNotify",
+		"GenericEvent",
+		"LASTEvent",
+	};
+
+	return names[n];
+}
+
+
+// получаем содержимое буфера обмена в utf8
 char* get_selection(Atom number_buf) {
 
 	Window owner = XGetSelectionOwner(d, number_buf);
@@ -690,7 +743,8 @@ char* get_selection(Atom number_buf) {
     }
     if(DEBUG) fprintf(stderr, "owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");
 
-	//if(w == owner) return ;
+	// если владелец буфера мы же, то и отдаём что есть
+	if(w == owner) return selection_retrive;
 
 	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
@@ -701,39 +755,28 @@ char* get_selection(Atom number_buf) {
 	);
 	XSync(d, False);
 
-	event_delay(delay / 1000000);
+	event_delay(1);
+
+	if(DEBUG) fprintf(stderr, "get_selection=%s\n", selection_retrive);
 
 	return selection_retrive;
 }
 
 // переписываем строку в буфер ввода
-void to_buffer(char** s1) {
-	char* s = *s1;
+void to_buffer(char* s) {
 	pos = 0;
 	if(s == NULL) return;
 
-	//printf("to_buffer: %s\n", s);
-
 	// utf8 переводим в символы юникода, затем в символы x11, после - в сканкоды
-	mbstate_t mbs = {0};
-	for(size_t charlen, i = 0;
-        (charlen = mbrlen(s+i, MB_CUR_MAX, &mbs)) != 0
-        && charlen > 0
-        && i < BUF_SIZE;
-        i += charlen
-    ) {
-        wchar_t ws[4];
-        int res = mbstowcs(ws, s+i, 1);
-        if(res != 1) break;
-
-		word[pos++] = INT_TO_KEY(ws[0]);
+	FOR_UTF8(s) {
+        STEP_UTF8(s, ws);
+		if(pos >= BUF_SIZE) break;
+		//printf("- `%lc`\n", ws); fflush(stdout);
+		word[pos++] = INT_TO_KEY(ws);
     }
-
-	XFree(s);
-	*s1 = NULL;
 }
 
-// нажимаем комбинацию Shift+Insert (вставка)
+// нажимаем комбинацию Control+Insert (выделение добавить в буфер обмена (clipboard))
 void control_insert() {
 	clear_active_mods();
 	unikey_t control_left = SYM_TO_KEY(XK_Control_L);
@@ -749,7 +792,7 @@ void control_insert() {
 void copy_selection() {
 	control_insert();
 	char* s = get_selection(clipboard_atom);
-	to_buffer(&s);
+	to_buffer(s);
 }
 
 // нажимаем комбинацию Shift+Insert (вставка)
@@ -788,30 +831,77 @@ void event_next() {
 	XEvent event;
 	XNextEvent(d, &event);
 
-	if(DEBUG) fprintf(stderr, "event_next %i, ", event.type);
+	if(DEBUG) fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
 
 	switch(event.type) {
-		case SelectionNotify:
+		case SelectionNotify: // получить данные из буфера обмена
 			// нет выделения
 			if(event.xselection.property == None) {
 				fprintf(stderr, "Нет выделения\n");
 				break;
 			}
+			if(event.xselection.selection != clipboard_atom) {
+				fprintf(stderr, "Какой-то другой буфер запрошен\n");
+				break;
+			}
 
+			if(incr_is) {
+				if(incr_window != event.xselection.requestor) {
+					fprintf(stderr, "Не совпал incr_window\n");
+					break;
+				}
+				if(incr_propid != event.xselection.property) {
+					fprintf(stderr, "Не совпал incr_propid\n");
+					break;
+				}
+				if(event.xproperty.state != PropertyNewValue) {
+					fprintf(stderr, "Не совпал PropertyNewValue\n");
+					break;
+				}
+			} else {
+				incr_propid = event.xselection.property;
+				incr_window = event.xselection.requestor;
+			}
+			
 			int format;	// формат строки
 			unsigned long bytesafter, length;
 			Atom target;
+			char* result = NULL;
 
 			// считываем
 			XGetWindowProperty(event.xselection.display,
-			    event.xselection.requestor, // window
-			    event.xselection.property, 	// некое значение
+			    incr_window, 	// window
+			    incr_propid, 	// некое значение
 				0L,
-				1000000,	// максимальный размер, который мы готовы принять
-			    False, (Atom) AnyPropertyType,
+				1024*1024*64,	// максимальный размер, который мы готовы принять
+			    incr_is, (Atom) AnyPropertyType,
 				&target, 	// тип возвращаемого значения: INCR - передача по частям
 			    &format, &length, &bytesafter,
-				(unsigned char**) &selection_retrive);
+				(unsigned char**) &result);
+				
+			char* target_name = XGetAtomName(d, target);
+			printf("selection: s=`%s` len=%lu after=%lu target=%s\n", result, length, bytesafter, target_name); fflush(stdout);
+			if(target_name) XFree(target_name);
+				
+			if(incr_is) {
+				memcpy(selection_retrive + selection_retrive_length, result, length);
+				selection_retrive_length += length;
+				
+				if(bytesafter == 0) incr_is = False;
+			} else {
+			
+				if(target == incr_atom) {
+					incr_is = True;
+				}
+				
+				if(selection_retrive) free(selection_retrive);
+				
+				selection_retrive = (char*) malloc(length + bytesafter);
+				memcpy(selection_retrive, result, length);
+				selection_retrive_length = length;
+			}
+			
+			if(result) XFree(result);
 		break;
 		case SelectionClear:
 			fprintf(stderr, "Утрачено право собственности на буфер обмена.\n");
@@ -929,14 +1019,7 @@ int goto_home() {
 	return 1;
 }
 
-void init_desktop(char* av0) {
-	// FILE* f = fopen("/usr/share/application/erswitcher.desktop", "rb");
-	// if(f) {fclose(f); return;}
-
-	char* program = realpath(av0, NULL);
-	if(!program) {fprintf(stderr, "WARN: нет пути к программе\n"); return;}
-
-	#define INIT_DESKTOP_FREE	free(program)
+void init_desktop(char* program) {
 
 	mkdir(".local", 0700);
 	mkdir(".local/share", 0700);
@@ -972,7 +1055,7 @@ void init_desktop(char* av0) {
 	const char* autostart = ".config/autostart/erswitcher.desktop";
 
 	f = fopen(autostart, "wb");
-	if(!f) {fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart); INIT_DESKTOP_FREE; return;}
+	if(!f) {fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart); return;}
 
 	fprintf(f,
 		"[Desktop Entry]\n"
@@ -989,8 +1072,6 @@ void init_desktop(char* av0) {
 	);
 
 	fclose(f);
-
-	INIT_DESKTOP_FREE;
 }
 
 void check_any_instance() {
@@ -1284,9 +1365,14 @@ int main(int ac, char** av) {
         return 1;
 	}
 
+	char* program = realpath(av[0], NULL);
+	if(!program) {fprintf(stderr, "WARN: не найден реальный путь к программе %s\n", av[0]); return 1;}
+
 	if(!goto_home()) return 1;
 
-	init_desktop(av[0]);
+	init_desktop(program);	// меняет директорию на дир. пользователя
+	free(program);
+	
 	open_display();
 	check_any_instance();
 	memset(timers, 0, sizeof timers);	// инициализируем таймеры
