@@ -6,8 +6,11 @@ CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
 erswitcher: erswitcher.c
 		gcc $(CFLAGS) $(CLIBS) -o erswitcher erswitcher.c
 
+keyboard: keyboard.c
+		gcc $(CFLAGS) $(CLIBS) -o keyboard keyboard.c
+
 clean:
-		rm -fr erswitcher
+		rm -fr erswitcher keyboard
 
 install:
 		mkdir -p ~/.local/bin
@@ -18,6 +21,9 @@ launch: kill
 
 s: erswitcher
 		./erswitcher
+
+k: keyboard
+		./keyboard
 
 kill:
 		killall -9 erswitcher || true

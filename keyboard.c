@@ -1,5 +1,5 @@
 /**************************************************************
- * Приложение: keyboard - печатает сканкоды                   *
+ * Приложение: keyboard - печатает сканкоды yf                   *
  * Автор: Ярослав О. Косьмина                                 *
  * Лицензия: GPLv3                                            *
  * Местонахождение: https://github.com/darviarush/erswitcher  *
@@ -7,6 +7,9 @@
 
 #include <X11/X.h>
 #include <X11/XKBlib.h>
+#include <xkbcommon/xkbcommon.h>
+#include <stdio.h>
+#include <wchar.h>
 
 // Установлен ли бит
 #define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
@@ -45,32 +48,34 @@ int main() {
 		fprintf(stderr, "XkbGetNames свалился\n");
 		return 1;
 	}
-	
-	
 
 	Atom* gs = kb->names->groups;
-	// groups < XkbNumKbdGroups &&
+	// group < XkbNumKbdGroups &&
 		
 	for(int k=0; k<KEYBOARD_SIZE; k++) {
 		
-		printf("%i;", k);
+		printf("%i", k);
 		
-		for(int group = 0; gs[groups] != 0; group++) {
+		for(int group = 0; gs[group] != 0; group++) {
 			char* kb_name = XGetAtomName(d, gs[group]);
-			
-			KeySym ks = XkbKeycodeToKeysym(d, k, group, 0);
-			KeySym kss = XkbKeycodeToKeysym(d, k, group, 1);
+
+			printf(";%i;%s", group, kb_name);
+
+			for(int shift = 0; shift <= 1; shift++) {
+				KeySym ks = XkbKeycodeToKeysym(d, k, group, shift);
 		
-			printf("%s;%s;%s", kb_name, XKeysymToString(ks), XKeysymToString(kss));
+				wint_t cs = xkb_keysym_to_utf32(ks);
+				printf(";%C;%s;%i;%C",
+					shift? L'^': L'_',
+					XKeysymToString(ks), 
+					cs,
+					cs == L'\n' || cs == L'\r' || cs == L';' || cs == L'"'? L'-': cs);
+			}
 			XFree(kb_name);
 		}
 		
 		printf("\n");
 	}
-		
-		
-	
-	
 	
 	return 0;
 }

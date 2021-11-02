@@ -73,8 +73,9 @@ int keys_pressed;			// нажато клавишь
 
 //@category Задержки
 
+// TODO: задержку указывать в конфиге
 // дефолтная задержка
-#define DELAY 		    12000
+#define DELAY 		    10000
 
 int delay = DELAY;          // задержка между программными нажатиями клавишь в микросекундах
 
@@ -1347,6 +1348,8 @@ void load_config(int) {
 			"-->=⟶\n"
 			"<-=←\n"
 			"<--=⟵\n"
+			"t=// TODO: \n"
+			"T=# TODO: \n"
 			"\n"
 			"[sendkeys]\n"
 			"# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
@@ -1409,6 +1412,11 @@ void load_config(int) {
 		
 		if(fn == NULL) continue;
 
+		// TODO: \= и другие символы \n, \x{12}
+		// TODO: key=value на несколько строк
+		// TODO: возврат курсора на указанную позицию - необходимо для сниппетов
+		// TODO: выделение в нутрь сниппетов
+		
 		char* v = strchr(s, '=');
 		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
 		*v = '\0'; v++;
@@ -1502,7 +1510,7 @@ void load_config(int) {
 
 	fclose(f);
 	
-	// TODO: сортируем мнемоники по убыванию их длины
+	// сортируем мнемоники по убыванию их длины
 	int compose_map_cmp(const void* a, const void *b) {
 		return ((compose_t*) b)->pos - ((compose_t*) a)->pos;
 	}
