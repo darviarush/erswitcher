@@ -5,7 +5,7 @@
  * Местонахождение: https://github.com/darviarush/erswitcher  *
  **************************************************************/
 
-#define _GNU_SOURCE
+//#define _GNU_SOURCE
 
 #include <X11/X.h>
 #include <X11/XKBlib.h>
@@ -74,7 +74,7 @@ int keys_pressed;			// нажато клавишь
 //@category Задержки
 
 // дефолтная задержка
-#define DELAY 		    10000
+#define DELAY 		    12000
 
 int delay = DELAY;          // задержка между программными нажатиями клавишь в микросекундах
 
@@ -94,22 +94,31 @@ Window w;					// окно этого приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
 int selection_chunk_size; 	// максимально возможный размер данных для передачи через буфер обмена
 char* clipboard_s = NULL;		// буфер обмена для отправки данных
+char* clipboard_pos = NULL;		// позиция в буфере обмена при отправке данных частями (INCR)
 int clipboard_len = 0;			// длина буфера обмена для отправки данных
+Atom clipboard_target;			// тип данных в буфере обмена для отправки данных
 
 char* selection_retrive = NULL; // буфер обмена для получения данных
 int selection_retrive_length = 0;
 
-int incr_is = False;
-Atom incr_propid;
-Window incr_window;
+void (*on_get_selection)(char*,int,Atom) = NULL;		// обработчик завершения считывания буфера
+void (*on_copy_selection)(int,int) = NULL;	// обработчик завершения копирования буфера обмена в буфер ввода
 
-Atom sel_data_atom;
-Atom utf8_atom;
-Atom clipboard_atom;
-Atom targets_atom;
-Atom incr_atom;
+int incr_is = False;	// передача буфера обмена частями
+Atom incr_propid;		// что передаём (например, utf8_atom)
+Window incr_window;		// какое окно нам передаёт данные
 
-void event_delay(double delay);
+Atom sel_data_atom;		// указывается в запросе на выборку
+Atom utf8_atom;			// запросы на чтение/запись буфера обмена - данные преобразовать в utf8
+Atom clipboard_atom;	// идентификатор буфера обмена clipboard
+Atom targets_atom;		// запрос на формат данных
+Atom incr_atom;			// передача буфера обмена частями
+
+// для шагов ввода через буфер
+char* insert_from_clipboard_data;
+char* insert_from_clipboard_save_data;
+int insert_from_clipboard_save_len;
+Atom insert_from_clipboard_save_target;
 
 //@category Комбинации -> Функции
 
@@ -731,41 +740,38 @@ char* get_event_type(int n) {
 }
 
 
-// получаем содержимое буфера обмена в utf8
-char* get_selection(Atom number_buf) {
+// заказываем получить содержимое буфера обмена в utf8
+// после получения произойдёт вызов обработчика on_get_selection
+void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,int,Atom)) {
 
 	Window owner = XGetSelectionOwner(d, number_buf);
     if (owner == None) {
 		char* name_buf = XGetAtomName(d, number_buf);
         fprintf(stderr, "Буфер %s не поддерживается владельцем\n", name_buf);
 		if(name_buf) XFree(name_buf);
-        return NULL;
+        return;
     }
-    if(DEBUG) fprintf(stderr, "owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");
+    if(DEBUG) { printf("get_selection: owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");fflush(stdout); }
 
 	// если владелец буфера мы же, то и отдаём что есть
-	if(w == owner) return clipboard_s;
+	//if(w == owner) return clipboard_s;
 
 	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
-		utf8_atom,
+		response_format_atom, //utf8_atom,
 		sel_data_atom,
 		w,
 	    CurrentTime
 	);
 	XSync(d, False);
 
-	event_delay(1);
-
-	if(DEBUG) fprintf(stderr, "get_selection=%s\n", selection_retrive);
-
-	return selection_retrive;
+	on_get_selection = fn;
+	fprintf(stderr, "set on_get_selection by addr %p <- %p\n", &on_get_selection, on_get_selection);
 }
 
 // переписываем строку в буфер ввода
 void to_buffer(char* s) {
 	pos = 0;
-	if(s == NULL) return;
 
 	// utf8 переводим в символы юникода, затем в символы x11, после - в сканкоды
 	FOR_UTF8(s) {
@@ -786,12 +792,16 @@ void control_insert() {
 	maybe_group = active_state.group;
 }
 
-
 // копируем выделенное и заменяем им буфер ввода
-void copy_selection() {
-	control_insert();
-	char* s = get_selection(clipboard_atom);
+void copy_selection_next(char* s, int, Atom) {
 	to_buffer(s);
+	free(s);
+	on_copy_selection(0, 0);
+}
+void copy_selection(void (*fn)(int, int)) {
+	on_copy_selection = fn;
+	control_insert();
+	get_selection(clipboard_atom, utf8_atom, copy_selection_next);
 }
 
 // нажимаем комбинацию Shift+Insert (вставка)
@@ -809,12 +819,13 @@ void shift_insert() {
 }
 
 // устанавливаем в clipboard строку для передачи другим приложениям
-void set_clipboard(char* s) {
+void set_clipboard(char* s, int len, Atom target) {
 	clipboard_s = s;
-	clipboard_len = strlen(s);
+	clipboard_len = len;
+	clipboard_target = target;
 
 	if(clipboard_len > selection_chunk_size)
-		fprintf(stderr, "WARN: Размер данных для буфера обмена превышает размер куска для отправки: %u > %u. А протокол INCR не реализован\n", clipboard_len, selection_chunk_size);
+		fprintf(stderr, "WARN: Размер данных для буфера обмена превышает размер куска для отправки: %u > %u. Передача будет осуществляться по протоколу INCR\n", clipboard_len, selection_chunk_size);
 
 	// делаем окно нашего приложения владельцем данных для обмена.
 	// После этого будет возбуждено событие SelectionRequest
@@ -834,27 +845,37 @@ void event_next() {
 
 	switch(event.type) {
 		case SelectionNotify: // получить данные из буфера обмена
-			// нет выделения
-			if(event.xselection.property == None) {
-				fprintf(stderr, "Нет выделения\n");
+			if(event.xselection.selection != clipboard_atom) {
+				fprintf(stderr, "SelectionNotify: Какой-то другой буфер запрошен\n");
 				break;
 			}
-			if(event.xselection.selection != clipboard_atom) {
-				fprintf(stderr, "Какой-то другой буфер запрошен\n");
+			// нет выделения
+			if(event.xselection.property == None) {
+				fprintf(stderr, "SelectionNotify: Нет выделения\n");
+				
+				if(on_get_selection) {
+					void(*fn)(char*,int,Atom) = on_get_selection;
+					on_get_selection = NULL;
+					fn(NULL, 0, None);
+				}
+				if(selection_retrive) {
+					free(selection_retrive);
+					selection_retrive = NULL;
+				}
 				break;
 			}
 
 			if(incr_is) {
 				if(incr_window != event.xselection.requestor) {
-					fprintf(stderr, "Не совпал incr_window\n");
+					fprintf(stderr, "SelectionNotify: Не совпал incr_window\n");
 					break;
 				}
 				if(incr_propid != event.xselection.property) {
-					fprintf(stderr, "Не совпал incr_propid\n");
+					fprintf(stderr, "SelectionNotify: Не совпал incr_propid\n");
 					break;
 				}
 				if(event.xproperty.state != PropertyNewValue) {
-					fprintf(stderr, "Не совпал PropertyNewValue\n");
+					fprintf(stderr, "SelectionNotify: Не совпал PropertyNewValue\n");
 					break;
 				}
 			} else {
@@ -879,42 +900,60 @@ void event_next() {
 				(unsigned char**) &result);
 				
 			char* target_name = XGetAtomName(d, target);
-			printf("selection: s=`%s` len=%lu after=%lu target=%s\n", result, length, bytesafter, target_name); fflush(stdout);
+			printf("read selection: s=`%s` len=%lu after=%lu target=%s\n", result, length, bytesafter, target_name); fflush(stdout);
 			if(target_name) XFree(target_name);
 				
-			if(incr_is) {
+			// завершаем
+			void send_on_get_selection() {
+				fprintf(stderr, "send_on_get_selection\n");
+				if(on_get_selection) {
+					void(*fn)(char*,int,Atom) = on_get_selection;
+					on_get_selection = NULL;
+					fn(selection_retrive, selection_retrive_length, target);
+				} else {
+					fprintf(stderr, "Нет on_get_selection!\n");
+					free(selection_retrive);
+				}
+				selection_retrive = NULL;
+			}
+			
+			if(incr_is) {	// мы в цикле INCR
 				memcpy(selection_retrive + selection_retrive_length, result, length);
 				selection_retrive[selection_retrive_length += length] = '\0';
 				
-				if(bytesafter == 0) incr_is = False;
-			} else {
-			
-				if(target == incr_atom) {
-					incr_is = True;
+				if(bytesafter == 0) {
+					incr_is = False;
+					
+					send_on_get_selection();
 				}
-				
+			} else {		// стандартно
+			
 				if(selection_retrive) free(selection_retrive);
 				
 				selection_retrive = (char*) malloc(length + bytesafter + 1);
 				memcpy(selection_retrive, result, length);
 				selection_retrive[selection_retrive_length = length] = '\0';
+				
+				if(target == incr_atom) incr_is = True;
+				else {
+					send_on_get_selection();
+				}
 			}
 			
 			if(result) XFree(result);
 		break;
 		case SelectionClear:
-			fprintf(stderr, "Утрачено право собственности на буфер обмена.\n");
+			fprintf(stderr, "SelectionClear: Утрачено право собственности на буфер обмена.\n");
 		break;
 		case SelectionRequest:
-			// подготовка формата в котором отдаём: utf8 или просто текст
-			//Atom request_target = utf8_atom? utf8_atom: XA_STRING;
 			
 			Window win = event.xselectionrequest.requestor;
 			Atom pty = event.xselectionrequest.property;
+			Atom target_sel = event.xselectionrequest.target;
 
 			// клиент хочет, чтобы ему сообщили в каком формате будут данные
-			if (event.xselectionrequest.target == targets_atom) {
-				Atom types[3] = { targets_atom, utf8_atom };
+			if (target_sel == targets_atom) {
+				Atom types[] = { clipboard_target, targets_atom };
 
 				XChangeProperty(d,
 						win,
@@ -926,36 +965,58 @@ void event_next() {
 
 				if(DEBUG) fprintf(stderr, "отправляем targets\n");
 			}
-			else if(event.xselectionrequest.target != utf8_atom || event.xselectionrequest.property == None) {
-				char* an = XGetAtomName(d, event.xselectionrequest.target);
+			else if(target_sel != clipboard_target || pty == None) {
+				char* an = XGetAtomName(d, target_sel);
 				if(DEBUG) fprintf(stderr, "Запрошен clipboard в формате '%s'\n", an);
 				if(an) XFree(an);
 				pty = None;
 				break;
 			}
 			else if(clipboard_len > selection_chunk_size) {
-				XChangeProperty(d, win, pty, inc, 32, PropModeReplace, 0, 0);
+				// придётся отправлять по протоколу INCR, так как данные слишком велики
+				XChangeProperty(d, win, pty, incr_atom, 32, PropModeReplace, 0, 0);
 				XSelectInput(d, win, PropertyChangeMask);
+				
+				clipboard_pos = clipboard_s;
 			}
 			else {
 				// отправляем строку
 				XChangeProperty(d, win,	pty,
-						event.xselectionrequest.target, 8, PropModeReplace,
+						target_sel, 8, PropModeReplace,
 						(unsigned char *) clipboard_s, (int) clipboard_len);
-				if(DEBUG) fprintf(stderr, "отправляем clipboard_s: `%s`\n", clipboard_s);
+				if(DEBUG) { printf("отправляем clipboard_s: `%s` len=%i\n", clipboard_s, clipboard_len); fflush(stdout); }
 			}
 
 			XEvent res;
 			res.xselection.type = SelectionNotify;
-			res.xselection.property = event.xselectionrequest.property;
 			res.xselection.display = event.xselectionrequest.display;
-			res.xselection.requestor = event.xselectionrequest.requestor;
+			res.xselection.requestor = win;
+			res.xselection.property = pty;
 			res.xselection.selection = event.xselectionrequest.selection;
-			res.xselection.target = event.xselectionrequest.target;
+			res.xselection.target = target_sel;
 			res.xselection.time = event.xselectionrequest.time;
 
 			XSendEvent(d, event.xselectionrequest.requestor, 0, 0, &res);
 			XFlush(d);
+		break;
+		case PropertyNotify:	// протокол INCR: отправка по частям
+			if(event.xproperty.state == PropertyDelete) {
+				Window win = event.xselectionrequest.requestor;
+				Atom pty = event.xselectionrequest.property;
+				Atom target_notify = event.xselectionrequest.target;
+				
+				int len = clipboard_pos+selection_chunk_size < clipboard_s+clipboard_len?
+					selection_chunk_size:
+					clipboard_s+clipboard_len-clipboard_pos;
+				
+				XChangeProperty(d, win, pty, target_notify, 8, PropModeReplace, 
+					len==0? NULL: (unsigned char*) clipboard_pos, 
+					len);
+				XFlush(d);
+				
+				clipboard_pos += len;
+				//if(clipboard_pos == clipboard_s+clipboard_len) // конец
+			}
 		break;
 	}
 
@@ -1091,24 +1152,70 @@ void run_command(char* s) {
 	}
 }
 
-void insert_from_clipboard(char* s) {
-	set_clipboard(s);
-	event_delay(1);
+void insert_from_clipboard_step3() {
+	fprintf(stderr, "insert_from_clipboard_step3: reset buffer len=%i\n", insert_from_clipboard_save_len);
+	set_clipboard(insert_from_clipboard_save_data,
+                  insert_from_clipboard_save_len,
+                  insert_from_clipboard_save_target);
+}
+void insert_from_clipboard_step2(char* s, int len, Atom target) {
+	fprintf(stderr, "insert_from_clipboard_step2: save buffer len=%i\n", len);
+	insert_from_clipboard_save_data = s;
+	insert_from_clipboard_save_len = len;
+	insert_from_clipboard_save_target = target;
+	
+	set_clipboard(insert_from_clipboard_data, 
+                  strlen(insert_from_clipboard_data),
+                  utf8_atom);	// начинаем раздавать
+	
+	insert_from_clipboard_data = NULL;
+	 
 	shift_insert();
+	after(0.31, insert_from_clipboard_step3);
+}
+void insert_from_clipboard_step1(char* s, int len, Atom target) {
+	fprintf(stderr, "insert_from_clipboard_step1: targets len=%i\n", len);
+	if(target == None) { insert_from_clipboard_step2(NULL, 0, None); return; }
+	
+	Atom* targets = (Atom*) s;
+	int size = len / sizeof(Atom);
+	
+	if(DEBUG) {
+		printf("\nTargets: sizeof(Atom)=%li size=%i\n", sizeof(Atom), size); 
+		for(int i=0; i<size; i++) {
+			char* target_name = XGetAtomName(d, targets[i]);
+			printf("%i) %lu - %s\n", i, targets[i], target_name); 
+			XFree(target_name);
+		}
+		printf("\n");
+		fflush(stdout);
+	}
+
+	Atom mytarget = None;
+	for(int i=0; i<size; i++) {
+		if(targets[i] != targets_atom) { mytarget = targets[i]; break; };
+	}
+	free(s);
+	if(mytarget != None) get_selection(clipboard_atom, mytarget, insert_from_clipboard_step2);
+	else insert_from_clipboard_step2(NULL, 0, None);
+}
+void insert_from_clipboard(char* s) {
+	insert_from_clipboard_data = s;
+	get_selection(clipboard_atom, targets_atom, insert_from_clipboard_step1);
 }
 
 void compose(char*) {
 	if(pos == 0) return;
 	
 	char* to = NULL;
-	int remove_sym;
+	int remove_sym = 0;
 	for(int i=0; i<compose_map_size; i++) {
 		int k, n;
 		for(k = pos-1, n = compose_map[i].pos - 1; k >= 0 && n >= 0; k--, n--) {
 			if(compose_map[i].word[n] != KEY_TO_INT(word[k])) break;
 		}
 		
-		if(n == -1) {
+		if(n == -1) {	// дошли до конца
 			to = compose_map[i].to;
 			remove_sym = compose_map[i].pos;
 			break;
@@ -1116,7 +1223,9 @@ void compose(char*) {
 		
 	}
 	
-	if(to == NULL) return;
+	if(to == NULL) { fprintf(stderr, "compose: Ничего не найдено!\n"); return; }
+	
+	if(DEBUG) { printf("compose -> %s\n", to); fflush(stdout); }
 	
 	press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
 	insert_from_clipboard(to);
@@ -1124,11 +1233,11 @@ void compose(char*) {
 
 void word_translate(char*) { print_translate_buffer(from_space(), 1); }
 void text_translate(char*) { print_translate_buffer(0, 1); }
-void selection_translate(char*) { copy_selection(); print_translate_buffer(0, 0); }
+void selection_translate(char*) { copy_selection(print_translate_buffer); }
 
 void word_invertcase(char*) { print_invertcase_buffer(from_space(), 1); }
 void text_invertcase(char*) { print_invertcase_buffer(0, 1); }
-void selection_invertcase(char*) { copy_selection(); print_invertcase_buffer(0, 0); }
+void selection_invertcase(char*) { copy_selection(print_invertcase_buffer); }
 
 
 void load_config(int) {
@@ -1136,6 +1245,7 @@ void load_config(int) {
 
 	clipboard_s = NULL;
 	clipboard_len = 0;
+	clipboard_target = utf8_atom;
 
 	for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
 	free(keyfn); keyfn = NULL; keyfn_max_size = keyfn_size = 0;
@@ -1224,6 +1334,19 @@ void load_config(int) {
 			"миш=ʕ ᵔᴥᵔ ʔ\n"
 			"# Пожималкин\n"
 			"хз=¯\\_(ツ)_/¯\n"
+			"# Смайлы\n"
+			")=ヅ\n"
+			";)=ゾ\n"
+			":)=ジ\n"
+			"# Математические символы и стрелочки\n"
+			"+-=±\n"
+			"++=∑\n"
+			"<<=≤\n"
+			">>=≥\n"
+			"->=→\n"
+			"-->=⟶\n"
+			"<-=←\n"
+			"<--=⟵\n"
 			"\n"
 			"[sendkeys]\n"
 			"# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
@@ -1290,6 +1413,7 @@ void load_config(int) {
 		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
 		*v = '\0'; v++;
 
+		// это мнемоника
 		if(fn == compose) {
 			// выделяем память под массив, если нужно
 			if(compose_map_size >= compose_map_max_size) {
@@ -1301,11 +1425,11 @@ void load_config(int) {
 			int i = 0;
 			
 			FOR_UTF8(s) {
-				STEP_UTF8(s, x);
+				STEP_UTF8(s, ws);
 				
 				if(i >= COMPOSE_KEY_MAX) {fprintf(stderr, "WARN: %s:%i: строка слишком длинная \"%s\" > %i. Пропущенo\n", path, lineno, s, COMPOSE_KEY_MAX); goto NEXT_LINE;}
 				
-				w[i++] = x;
+				w[i++] = ws;
 			}
 			
 			compose_map[compose_map_size].pos = i;
@@ -1377,6 +1501,13 @@ void load_config(int) {
 	}
 
 	fclose(f);
+	
+	// TODO: сортируем мнемоники по убыванию их длины
+	int compose_map_cmp(const void* a, const void *b) {
+		return ((compose_t*) b)->pos - ((compose_t*) a)->pos;
+	}
+	qsort(compose_map, compose_map_size, sizeof(compose_t), compose_map_cmp);
+	
 	if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
 }
 
