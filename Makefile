@@ -23,7 +23,7 @@ s: erswitcher
 		./erswitcher
 
 k: keyboard
-		./keyboard
+		./keyboard > keyboard.csv
 
 kill:
 		killall -9 erswitcher || true
