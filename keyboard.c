@@ -1,13 +1,14 @@
-/**************************************************************
- * Приложение: keyboard - печатает сканкоды yf                   *
- * Автор: Ярослав О. Косьмина                                 *
- * Лицензия: GPLv3                                            *
- * Местонахождение: https://github.com/darviarush/erswitcher  *
- **************************************************************/
+/*****************************************************************
+ * Приложение: keyboard - печатает сканкоды раскладок клавиатуры *
+ * Автор: Ярослав О. Косьмина                                    *
+ * Лицензия: GPLv3                                               *
+ * Местонахождение: https://github.com/darviarush/erswitcher     *
+ *****************************************************************/
 
 #include <X11/X.h>
 #include <X11/XKBlib.h>
 #include <xkbcommon/xkbcommon.h>
+#include <locale.h>
 #include <stdio.h>
 #include <wchar.h>
 
@@ -28,6 +29,12 @@ static int null_X_error(Display *d, XErrorEvent *err) {
 }
 
 int main() {
+
+	char* locale = "ru_RU.UTF-8";
+	if(!setlocale(LC_ALL, locale)) {
+		fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
+        return 1;
+	}
 
 	Display *d = XOpenDisplay(NULL);
 	if(!d) { fprintf(stderr, "Not open display!\n"); return 1; }
@@ -65,8 +72,8 @@ int main() {
 				KeySym ks = XkbKeycodeToKeysym(d, k, group, shift);
 		
 				wint_t cs = xkb_keysym_to_utf32(ks);
-				printf(";%C;%s;%i;%C",
-					shift? L'^': L'_',
+				printf(";%c;%s;%i;%C",
+					shift? '^': '_',
 					XKeysymToString(ks), 
 					cs,
 					cs == L'\n' || cs == L'\r' || cs == L';' || cs == L'"'? L'-': cs);
