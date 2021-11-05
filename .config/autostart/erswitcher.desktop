@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=EN-RU Switcher
+Comment=Transliterator for keyboard input
+Exec=/home/dart/.local/bin/erswitcher
+Icon=preferences-desktop-keyboard
+Terminal=false
+Type=Application
+Categories=Keyboard;Transliterate;Development;System;
+Keywords=keyboard;transliterate;erswitcher;switch
+X-GNOME-UsesNotifications=t

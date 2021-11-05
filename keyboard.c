@@ -28,6 +28,7 @@ int sign(xkb_keysym_t ks) {
 		case XK_Return: cs = L'↩'; break;
 		case XK_KP_Enter: cs = L'↵'; break;
 		case XK_Tab: cs = L'↹'; break;
+        case XK_ISO_Left_Tab: cs = L'⭿'; break;
 		case XK_Home: cs = L'⇱'; break;
 		case XK_KP_Home: cs = L'⇱'; break;
 		case XK_End: cs = L'⇲'; break;
@@ -36,7 +37,7 @@ int sign(xkb_keysym_t ks) {
 		case XK_Pause: cs = L'⎉'; break;
 		case XK_Print: cs = L'⎙'; break;
 		case XK_Multi_key: cs = L'⎄'; break;
-		
+
 		case XK_Up: cs = L'↑'; break;
 		case XK_KP_Up: cs = L'↑'; break;
 		
@@ -52,7 +53,9 @@ int sign(xkb_keysym_t ks) {
 		case XK_Shift_L: cs = L'⇧'; break;
 		case XK_Shift_R: cs = L'⇧'; break;
 		case XK_Caps_Lock: cs = L'⇪'; break;// ⇪🄰🄰
-		case XK_Shift_Lock: cs = L'⇪'; break;// ⇪🄰🄰
+		case XK_Shift_Lock: cs = L'🄰'; break;// ⇪🄰🄰
+ 		case XK_ISO_Next_Group: cs = L'🌍'; break; // 🗺🌎🌏🌍 🗾-Япония
+        case XK_Mode_switch: cs = L'🗺'; break;
 		case XK_Control_L: cs = L'⌃'; break;
 		case XK_Control_R: cs = L'⎈'; break;
 		case XK_Alt_L: cs = L'⌥'; break;
@@ -60,7 +63,7 @@ int sign(xkb_keysym_t ks) {
 		case XK_Num_Lock: cs = L'⇭'; break; // ⓛ🄸
 		case XK_Meta_L: cs = L'⌘'; break;
 		case XK_Meta_R: cs = L'⌘'; break;
-		case XK_Super_L: cs = L'⊞'; break;
+		case XK_Super_L: cs = L'❖'; break; // ⊞
 		case XK_Super_R: cs = L'❖'; break;
 		case XK_Hyper_L: cs = L'✦'; break;
 		case XK_Hyper_R: cs = L'✦'; break;

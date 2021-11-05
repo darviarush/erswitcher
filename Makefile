@@ -1,13 +1,10 @@
-.PHONY: clean install launch s
+.PHONY: clean install launch s k
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
 
 erswitcher: erswitcher.c
 		gcc $(CFLAGS) $(CLIBS) -o erswitcher erswitcher.c
-
-keyboard: keyboard.c
-		gcc $(CFLAGS) $(CLIBS) -o keyboard keyboard.c
 
 clean:
 		rm -fr erswitcher keyboard
@@ -22,9 +19,6 @@ launch: kill
 s: erswitcher
 		./erswitcher
 
-k: keyboard
-		./keyboard > keyboard.csv
-
 kill:
 		killall -9 erswitcher || true
 
@@ -34,3 +28,10 @@ dist:
 		mv configure.scan configure.in
 		autoconf
 		./configure
+
+keyboard: keyboard.c
+		gcc $(CFLAGS) $(CLIBS) -o keyboard keyboard.c
+
+k: keyboard
+		./keyboard > keyboard.csv
+
