@@ -22,7 +22,7 @@ int sign(xkb_keysym_t ks) {
 	
 	switch(ks) {
 		case XK_Escape: cs = L'⎋'; break;
-		case XK_BackSpace: cs = L'↤'; break;
+		case XK_BackSpace: cs = L'↤'; break; // ⌫⌧⌨⌬
 		case XK_Delete: cs = L'⌦'; break;
 		case XK_KP_Delete: cs = L'⌦'; break;
 		case XK_Return: cs = L'↩'; break;
@@ -34,29 +34,34 @@ int sign(xkb_keysym_t ks) {
 		case XK_End: cs = L'⇲'; break;
 		case XK_KP_End: cs = L'⇲'; break;
 		case XK_Menu: cs = L'≣'; break;
-		case XK_Pause: cs = L'⎉'; break;
+        
 		case XK_Print: cs = L'⎙'; break;
-		case XK_Multi_key: cs = L'⎄'; break;
+		case XK_Sys_Req: cs = L'☈'; break; // ⇼⤄⇌↹⍐⇯⇮⇯
+		case XK_Scroll_Lock: cs = L'⤓'; break; // ↨⇵⥮⥯⬍⇳⇕
+		case XK_Pause: cs = L'⎉'; break;
+		case XK_Break: cs = L'⎊'; break;      // ⌤ ⎀⎁⎃⎅⎆⎌
+		
+		case XK_Multi_key: cs = L'⎄'; break; // клавиша compose
 
 		case XK_Up: cs = L'↑'; break;
-		case XK_KP_Up: cs = L'↑'; break;
+		case XK_KP_Up: cs = L'🢕'; break; // 🢔🢖🢕🢗
 		
 		case XK_Down: cs = L'↓'; break;
-		case XK_KP_Down: cs = L'↓'; break;
+		case XK_KP_Down: cs = L'🢗'; break;
 		
 		case XK_Left: cs = L'←'; break;
-		case XK_KP_Left: cs = L'←'; break;
+		case XK_KP_Left: cs = L'🢔'; break;
 		
 		case XK_Right: cs = L'→'; break;
-		case XK_KP_Right: cs = L'→'; break;
+		case XK_KP_Right: cs = L'🢖'; break;
 		
 		case XK_Shift_L: cs = L'⇧'; break;
 		case XK_Shift_R: cs = L'⇧'; break;
 		case XK_Caps_Lock: cs = L'⇪'; break;// ⇪🄰🄰
 		case XK_Shift_Lock: cs = L'🄰'; break;// ⇪🄰🄰
- 		case XK_ISO_Next_Group: cs = L'🌍'; break; // 🗺🌎🌏🌍 🗾-Япония
-        case XK_Mode_switch: cs = L'🗺'; break;
-		case XK_Control_L: cs = L'⌃'; break;
+ 		case XK_ISO_Next_Group: cs = L'🌍'; break; // переключение раскладки / 🗺🌎🌏🌍 🗾-Япония
+        case XK_Mode_switch: cs = L'🗺'; break; // переключение раскладки, пока клавиша нажата
+		case XK_Control_L: cs = L'⌃'; break; // ˅
 		case XK_Control_R: cs = L'⎈'; break;
 		case XK_Alt_L: cs = L'⌥'; break;
 		case XK_Alt_R: cs = L'⎇'; break;

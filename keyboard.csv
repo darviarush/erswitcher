@@ -64,7 +64,7 @@
 63	0	English (US)	shift	KP_Multiply	*	42	SHIFT	KP_Multiply	*	42	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 64	0	English (US)	shift	Alt_L	⌥	0	SHIFT	Meta_L	⌘	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 65	0	English (US)	shift	space	␣	32	SHIFT	space	␣	32	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-66	0	English (US)	shift	ISO_Next_Group	🗺	0	SHIFT	Caps_Lock	⇪	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+66	0	English (US)	shift	ISO_Next_Group	🌍	0	SHIFT	Caps_Lock	⇪	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 67	0	English (US)	shift	F1	␀	0	SHIFT	F1	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 68	0	English (US)	shift	F2	␀	0	SHIFT	F2	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 69	0	English (US)	shift	F3	␀	0	SHIFT	F3	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
@@ -76,7 +76,7 @@
 75	0	English (US)	shift	F9	␀	0	SHIFT	F9	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 76	0	English (US)	shift	F10	␀	0	SHIFT	F10	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 77	0	English (US)	shift	Num_Lock	⇭	0	SHIFT	Num_Lock	⇭	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-78	0	English (US)	shift	Scroll_Lock	␀	0	SHIFT	Scroll_Lock	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+78	0	English (US)	shift	Scroll_Lock	⤓	0	SHIFT	Scroll_Lock	⤓	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 79	0	English (US)	shift	KP_Home	⇱	0	SHIFT	KP_7	7	55	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 80	0	English (US)	shift	KP_Up	↑	0	SHIFT	KP_8	8	56	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 81	0	English (US)	shift	KP_Prior	␀	0	SHIFT	KP_9	9	57	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
@@ -105,8 +105,8 @@
 104	0	English (US)	shift	ISO_Level3_Shift	␀	0	SHIFT	ISO_Level3_Shift	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 105	0	English (US)	shift	Multi_key	⎄	0	SHIFT	Multi_key	⎄	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 106	0	English (US)	shift	KP_Divide	/	47	SHIFT	KP_Divide	/	47	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-107	0	English (US)	shift	Print	⎙	0	SHIFT	Sys_Req	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-108	0	English (US)	shift	Mode_switch	🌍	0	SHIFT	Multi_key	⎄	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+107	0	English (US)	shift	Print	⎙	0	SHIFT	Sys_Req	☈	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+108	0	English (US)	shift	Mode_switch	🗺	0	SHIFT	Multi_key	⎄	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 109	0	English (US)	shift	Linefeed	␊	10	SHIFT	Linefeed	␊	10	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 110	0	English (US)	shift	Home	⇱	0	SHIFT	Home	⇱	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 111	0	English (US)	shift	Up	↑	0	SHIFT	Up	↑	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
@@ -125,7 +125,7 @@
 124	0	English (US)	shift	XF86PowerOff	␀	0	SHIFT	XF86PowerOff	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 125	0	English (US)	shift	KP_Equal	=	61	SHIFT	KP_Equal	=	61	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 126	0	English (US)	shift	plusminus	±	177	SHIFT	plusminus	±	177	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-127	0	English (US)	shift	Pause	⎉	0	SHIFT	Break	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+127	0	English (US)	shift	Pause	⎉	0	SHIFT	Break	⌤	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 128	0	English (US)	shift	XF86LaunchA	␀	0	SHIFT	XF86LaunchA	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 129	0	English (US)	shift	KP_Decimal	.	46	SHIFT	KP_Decimal	.	46	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 130	0	English (US)	shift	Hangul	␀	0	SHIFT	Hangul	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
@@ -201,7 +201,7 @@
 200	0	English (US)	shift	XF86TouchpadOn	␀	0	SHIFT	XF86TouchpadOn	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 201	0	English (US)	shift	XF86TouchpadOff	␀	0	SHIFT	XF86TouchpadOff	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 202	0	English (US)	shift	(null)	␀	0	SHIFT	(null)	␀	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
-203	0	English (US)	shift	Mode_switch	🌍	0	SHIFT	Mode_switch	🌍	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
+203	0	English (US)	shift	Mode_switch	🗺	0	SHIFT	Mode_switch	🗺	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 204	0	English (US)	shift	(null)	␀	0	SHIFT	Alt_L	⌥	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 205	0	English (US)	shift	(null)	␀	0	SHIFT	Meta_L	⌘	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0
 206	0	English (US)	shift	(null)	␀	0	SHIFT	Super_L	❖	0	1	Russian	shift	(null)	␀	0	SHIFT	(null)	␀	0

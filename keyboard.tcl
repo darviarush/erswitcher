@@ -53,13 +53,22 @@ proc from {a to b} {
 proc keyboard {w keyboard with_null with_prev} {
 	if {$w == "."} {set x ""} {set x $w}
 	
+	array set k_span {
+		9 4
+						22 5
+		23 4			51 4
+		66 5			36 5
+		50 6			62 6
+		37 4	65 16
+	}
+		
 	set kbd "
 		{ 9   [from 67 to 76] 95 96   107 78 127}
-		{49   [from 10 to 22]  }
-		{ [from 23 to 35] 51 }
+		{49   [from 10 to 22]  118 110 112}
+		{ [from 23 to 35] 51   119 115 116}
 		{66 [from 38 to 48] 36 }
-		{50 [from 53 to 62] }
-		{37 207 133 64   65   108 134 135 105 }
+		{50 [from 52 to 62]                     -1  111 }
+		{37 207 133 64   65   108 134 135 105   113 116 114 }
 	"
 		
 	set row 0
@@ -69,6 +78,8 @@ proc keyboard {w keyboard with_null with_prev} {
 		set col 0
 		
 		foreach k $rowset {
+		
+			if {$k == -1} {incr col 3; continue}
 		
 			set kb [lindex $keyboard $k]
 			set prev_sym ""
@@ -86,7 +97,6 @@ proc keyboard {w keyboard with_null with_prev} {
 					set shift_i [expr $i_kb+2+4*$j]
 				
 					set name [lindex $kb [expr $shift_i+1]]
-					puts stderr $name
 					set sym [lindex $kb [expr $shift_i+2]]
 					set sym_num [lindex $kb [expr $shift_i+3]]
 				
@@ -95,22 +105,18 @@ proc keyboard {w keyboard with_null with_prev} {
 					if {!$with_prev && $prev_sym == $sym} {continue}
 					if {$sym == "(null)"} { if {$with_null} {set sym "∅"} {continue} }
 					
-					puts stderr "label $frame.lab${i}_$j sym=`$sym` len=[string length $sym]"
 					label $frame.lab${i}_$j -text $sym
 				
-					puts stderr grid
 					grid $frame.lab${i}_$j -row $i -column $j -in $frame
-					puts stderr endgrid
 					set prev_sym $sym
 				}
 			}
 		
 			set span 3
+			catch {set span $k_span($k)}
 			
-			puts stderr "col=$col row=$row"
 			grid $frame -column $col -row $row -columnspan $span -sticky "nsew"
-			puts stderr end____grid
-			incr col 3
+			incr col $span
 		}
 		incr row
 		
