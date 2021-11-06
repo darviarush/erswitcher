@@ -76,6 +76,8 @@ int keys_pressed;			// нажато клавишь
 // TODO: задержку указывать в конфиге
 // дефолтная задержка
 #define DELAY 		    10000
+// .0 - обязателен, иначе деление будет целочисленным
+#define USEC_TO_DBL(U)	(U / 1000000.0)
 
 int delay = DELAY;          // задержка между программными нажатиями клавишь в микросекундах
 
@@ -366,7 +368,7 @@ int after(double interval, void(*fn)()) {
 
 	struct timeval curtime;
 	gettimeofday(&curtime, 0);
-	timers[i].time = curtime.tv_sec + curtime.tv_usec / 1000000 + interval;
+	timers[i].time = curtime.tv_sec + curtime.tv_usec / 1000000.0 + interval;
 
 	if(timers_size <= i) timers_size = i+1;
 
@@ -376,7 +378,7 @@ int after(double interval, void(*fn)()) {
 void timers_apply() {
 	struct timeval curtime;
 	gettimeofday(&curtime, 0);
-	double now = curtime.tv_sec + curtime.tv_usec / 1000000;
+	double now = curtime.tv_sec + curtime.tv_usec / 1000000.0;
 
 	int i; int last = 0;
 	for(i=0; i<timers_size; i++) {
@@ -392,6 +394,33 @@ void timers_apply() {
 }
 
 //@category Иксы
+
+#define SYSTEM_TRAY_REQUEST_DOCK    0
+#define SYSTEM_TRAY_BEGIN_MESSAGE   1
+#define SYSTEM_TRAY_CANCEL_MESSAGE  2
+
+void send_systray_message(Display* d, long message, long data1, long data2, long data3) {
+    XEvent ev;
+
+    Atom selection_atom = XInternAtom(d, "_NET_SYSTEM_TRAY_S0", False);
+    Window tray = XGetSelectionOwner(d, selection_atom);
+
+    if(tray != None) XSelectInput(d, tray, StructureNotifyMask);
+
+    memset(&ev, 0, sizeof(ev));
+    ev.xclient.type = ClientMessage;
+    ev.xclient.window = tray;
+    ev.xclient.message_type = XInternAtom(d, "_NET_SYSTEM_TRAY_OPCODE", False);
+    ev.xclient.format = 32;
+    ev.xclient.data.l[0] = CurrentTime;
+    ev.xclient.data.l[1] = message;
+    ev.xclient.data.l[2] = data1; // <--- your window is only here
+    ev.xclient.data.l[3] = data2;
+    ev.xclient.data.l[4] = data3;
+
+    XSendEvent(d, tray, False, NoEventMask, &ev);
+    XSync(d, False);
+}
 
 // Обработка ошибок
 int xerror = 0;
@@ -414,7 +443,8 @@ void open_display() {
 	XSynchronize(d, True);
 
 	sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
-	utf8_atom = XInternAtom(d, "UTF8_STRING", False);
+	utf8_atom = XInternAtom(d, "UTF8_STRING", True);
+	if(utf8_atom == None) utf8_atom = XA_STRING; // для поддержки на старых системах
 	clipboard_atom = XInternAtom(d, "CLIPBOARD", False);
 	targets_atom = XInternAtom(d, "TARGETS", False);
 	incr_atom = XInternAtom(d, "INCR", False);
@@ -425,7 +455,9 @@ void open_display() {
 	// Создаём окно
 	w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
 	// подписываемся на события окна
-	XSelectInput(d, w, PropertyChangeMask);
+	XSelectInput(d, w, PropertyChangeMask | ButtonPressMask);
+	
+	send_systray_message(d, SYSTEM_TRAY_REQUEST_DOCK, w, 0, 0);
 }
 
 // возвращает текущее окно
@@ -435,6 +467,9 @@ Window get_current_window() {
 	XGetInputFocus(d, &w, &revert_to);
 	return w;
 }
+
+
+//@category клавиатура и мышь
 
 // возвращает модификатры с кнопками мыши
 unsigned int get_input_state() {
@@ -819,7 +854,7 @@ void shift_insert() {
 	maybe_group = active_state.group;
 }
 
-// устанавливаем в clipboard строку для передачи другим приложениям
+// устанавливаем в clipboard данные для передачи другим приложениям
 void set_clipboard(char* s, int len, Atom target) {
 	clipboard_s = s;
 	clipboard_len = len;
@@ -845,6 +880,17 @@ void event_next() {
 	if(DEBUG) fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
 
 	switch(event.type) {
+		case ButtonPress: // нажали на иконке
+			// если окно tcl запущено - закрываем его
+			if(config_window_pid) kill(-9, config_window_pid);
+			// запускаем новое
+			config_window_pid = fork();
+			if(config_window_pid < 0) {
+				fprintf(stderr, "");
+			} else if(config_window_pid == 0) {
+				execl(".local/");
+			}
+		break;
 		case SelectionNotify: // получить данные из буфера обмена
 			if(event.xselection.selection != clipboard_atom) {
 				fprintf(stderr, "SelectionNotify: Какой-то другой буфер запрошен\n");
@@ -1025,10 +1071,11 @@ void event_next() {
 
 void event_delay(double seconds) {
 	// задержка, но коль пришли события иксов - сразу выходим
-	int fd_display = ConnectionNumber(d);
 	struct timeval tv = { (int) seconds, (int) ((seconds - (int) seconds) * 1000000) };
+	
 	fd_set readset;
 	FD_ZERO(&readset);
+	int fd_display = ConnectionNumber(d);
 	FD_SET(fd_display, &readset);
 	select(fd_display + 1, &readset, NULL, NULL, &tv);
 
@@ -1077,7 +1124,7 @@ int goto_home() {
 	const char* home = getenv("HOME");
 	if(!home) {fprintf(stderr, "WARN: нет getenv(HOME)\n");	return 0;}
 	if(chdir(home)) {fprintf(stderr, "WARN: не могу перейти в каталог пользователя %s\n", home); return 0;}
-	setenv("PWD", home, 1);
+	setenv("PWD", home, 1);	
 	return 1;
 }
 
@@ -1607,7 +1654,7 @@ int main(int ac, char** av) {
 		// сработают таймеры, чьё время пришло
 		timers_apply();
 
-		event_delay(delay / 1000000);
+		event_delay(USEC_TO_DBL(delay));
    	}
 
    	return 0;
