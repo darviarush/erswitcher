@@ -1302,7 +1302,7 @@ void insert_from_clipboard(char* s) {
 		get_selection(clipboard_atom, targets_atom, insert_from_clipboard_step1);
 	}
 }
-і
+
 void compose(char*) {
 	if(pos == 0) return;
 	
@@ -1327,9 +1327,9 @@ void compose(char*) {
 	if(DEBUG) { printf("compose -> %s\n", to); fflush(stdout); }
 	
 	// удаляем мнемонику введённую ранее
-	int group = get_group();
+	unikey_t key = keyboard_state(0);
 	press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
-	set_group(group);
+	set_group(key.group);
 	// запоминаем содержимое буфера обмена, подменяем буфер собой и вставляем из него композэ
 	insert_from_clipboard(to);
 }
