@@ -21,7 +21,7 @@
 
 # MINDMAP
 
-Ссылка на метнальную карту проекта: https://mm.tt/map/2103991969?t=R40E3CBQoD.
+Ссылка на метнальную карту проекта: https://www.mindmeister.com/map/2103991969.
 
 # DESCIPTION
 
