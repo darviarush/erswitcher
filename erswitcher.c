@@ -79,7 +79,10 @@ int keys_pressed;			// нажато клавишь
 // .0 - обязателен, иначе деление будет целочисленным
 #define USEC_TO_DBL(U)	(U / 1000000.0)
 
-int delay = DELAY;          // задержка между программными нажатиями клавишь в микросекундах
+int delay = DELAY;          	// задержка между программными нажатиями клавишь в микросекундах
+int loop_delay = DELAY;			// задержка между опросами клавиатуры
+pid_t config_window_pid = 0;	// pid конфигуратора
+
 
 typedef struct {
 	double time; 			// время в секундах, когда таймер должен сработать
@@ -101,11 +104,12 @@ char* clipboard_pos = NULL;		// позиция в буфере обмена пр
 int clipboard_len = 0;			// длина буфера обмена для отправки данных
 Atom clipboard_target;			// тип данных в буфере обмена для отправки данных
 
-char* selection_retrive = NULL; // буфер обмена для получения данных
-int selection_retrive_length = 0;
+char* selection_retrive = NULL; 	// буфер обмена для получения данных
+int selection_retrive_length = 0;	// длина данных в буфере
+Atom selection_retrive_type;		// тип данных в буфере: utf8_atom, например
 
-void (*on_get_selection)(char*,int,Atom) = NULL;		// обработчик завершения считывания буфера
-void (*on_copy_selection)(int,int) = NULL;	// обработчик завершения копирования буфера обмена в буфер ввода
+void (*on_get_selection)(char*,int,Atom) = NULL;	// обработчик завершения считывания буфера
+void (*on_copy_selection)(int,int) = NULL;			// обработчик завершения копирования буфера обмена в буфер ввода
 
 int incr_is = False;	// передача буфера обмена частями
 Atom incr_propid;		// что передаём (например, utf8_atom)
@@ -118,8 +122,8 @@ Atom targets_atom;		// запрос на формат данных
 Atom incr_atom;			// передача буфера обмена частями
 
 // для шагов ввода через буфер
-char* insert_from_clipboard_data;
-char* insert_from_clipboard_save_data;
+char* insert_from_clipboard_data;		// что нужно ввести (compose)
+char* insert_from_clipboard_save_data;	// что было в буфере обмена
 int insert_from_clipboard_save_len;
 Atom insert_from_clipboard_save_target;
 
@@ -775,8 +779,7 @@ char* get_event_type(int n) {
 	return names[n];
 }
 
-
-// заказываем получить содержимое буфера обмена в utf8
+// заказываем получить содержимое буфера обмена в response_format_atom
 // после получения произойдёт вызов обработчика on_get_selection
 void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,int,Atom)) {
 
@@ -790,7 +793,19 @@ void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,
     if(DEBUG) { printf("get_selection: owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");fflush(stdout); }
 
 	// если владелец буфера мы же, то и отдаём что есть
-	//if(w == owner) return clipboard_s;
+	if(w == owner) {
+		if(DEBUG) { printf("get_selection: буфер - мы же\n");fflush(stdout); }
+		on_get_selection = NULL;
+		if(clipboard_s) {
+			if(DEBUG) { printf("get_selection: Отдаю clipboard_s: %s\n", clipboard_s); fflush(stdout); }
+			fn(clipboard_s, clipboard_len, clipboard_target);
+		}
+		else {
+			if(DEBUG) { printf("get_selection: Отдаю пустую строку\n"); fflush(stdout); }
+			fn(strdup(""), 0, utf8_atom);
+		}
+		return;
+	}
 
 	// требование перевода в utf8:
 	XConvertSelection(d, number_buf,
@@ -881,15 +896,19 @@ void event_next() {
 
 	switch(event.type) {
 		case ButtonPress: // нажали на иконке
-			// если окно tcl запущено - закрываем его
-			if(config_window_pid) kill(-9, config_window_pid);
-			// запускаем новое
-			config_window_pid = fork();
-			if(config_window_pid < 0) {
-				fprintf(stderr, "");
-			} else if(config_window_pid == 0) {
-				execl(".local/");
-			}
+			// // если окно tcl запущено - закрываем его
+			// if(config_window_pid) kill(-9, config_window_pid);
+			// // запускаем новое
+			// config_window_pid = fork();
+			// if(config_window_pid < 0) {
+				// perror("ERROR: fork не запустился");
+			// } else if(config_window_pid == 0) {
+				// char* path = "erswitcher-config";
+				// char* tclsh = "/usr/bin/tclsh";
+				// execl(tclsh, path);
+				// fprintf(stderr, "ERROR: в конфигураторе %s\n", path);
+				// exit(1);
+			// }
 		break;
 		case SelectionNotify: // получить данные из буфера обмена
 			if(event.xselection.selection != clipboard_atom) {
@@ -932,7 +951,6 @@ void event_next() {
 			
 			int format;	// формат строки
 			unsigned long bytesafter, length;
-			Atom target;
 			char* result = NULL;
 
 			// считываем
@@ -942,13 +960,13 @@ void event_next() {
 				0L,
 				1024*1024*64,	// максимальный размер, который мы готовы принять
 			    incr_is, (Atom) AnyPropertyType,
-				&target, 	// тип возвращаемого значения: INCR - передача по частям
+				&selection_retrive_type, 	// тип возвращаемого значения: INCR - передача по частям
 			    &format, &length, &bytesafter,
 				(unsigned char**) &result);
 				
-			char* target_name = XGetAtomName(d, target);
-			printf("read selection: s=`%s` len=%lu after=%lu target=%s\n", result, length, bytesafter, target_name); fflush(stdout);
-			if(target_name) XFree(target_name);
+			char* selection_retrive_type_name = XGetAtomName(d, selection_retrive_type);
+			printf("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s\n", result, length, bytesafter, selection_retrive_type_name); fflush(stdout);
+			if(selection_retrive_type_name) XFree(selection_retrive_type_name);
 				
 			// завершаем
 			void send_on_get_selection() {
@@ -956,7 +974,7 @@ void event_next() {
 				if(on_get_selection) {
 					void(*fn)(char*,int,Atom) = on_get_selection;
 					on_get_selection = NULL;
-					fn(selection_retrive, selection_retrive_length, target);
+					fn(selection_retrive, selection_retrive_length, selection_retrive_type);
 				} else {
 					fprintf(stderr, "Нет on_get_selection!\n");
 					free(selection_retrive);
@@ -981,7 +999,7 @@ void event_next() {
 				memcpy(selection_retrive, result, length);
 				selection_retrive[selection_retrive_length = length] = '\0';
 				
-				if(target == incr_atom) incr_is = True;
+				if(selection_retrive_type == incr_atom) incr_is = True;
 				else {
 					send_on_get_selection();
 				}
@@ -1215,10 +1233,10 @@ void insert_from_clipboard_step2(char* s, int len, Atom target) {
 	set_clipboard(insert_from_clipboard_data, 
                   strlen(insert_from_clipboard_data),
                   utf8_atom);	// начинаем раздавать
-	
+
 	insert_from_clipboard_data = NULL;
-	 
-	shift_insert();
+
+	after(0.10, shift_insert);
 	after(0.31, insert_from_clipboard_step3);
 }
 void insert_from_clipboard_step1(char* s, int len, Atom target) {
@@ -1654,7 +1672,7 @@ int main(int ac, char** av) {
 		// сработают таймеры, чьё время пришло
 		timers_apply();
 
-		event_delay(USEC_TO_DBL(delay));
+		event_delay(USEC_TO_DBL(loop_delay));
    	}
 
    	return 0;
