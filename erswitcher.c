@@ -779,7 +779,7 @@ char* get_event_type(int n) {
 	return names[n];
 }
 
-// заказываем получить содержимое буфера обмена в response_format_atom
+// заказываем получить содержимое буфера обмена с типом response_format_atom
 // после получения произойдёт вызов обработчика on_get_selection
 void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,int,Atom)) {
 
@@ -788,6 +788,8 @@ void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,
 		char* name_buf = XGetAtomName(d, number_buf);
         fprintf(stderr, "Буфер %s не поддерживается владельцем\n", name_buf);
 		if(name_buf) XFree(name_buf);
+		
+		fn(strdup(""), 0, utf8_atom);
         return;
     }
     if(DEBUG) { printf("get_selection: owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");fflush(stdout); }
@@ -796,9 +798,13 @@ void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,
 	if(w == owner) {
 		if(DEBUG) { printf("get_selection: буфер - мы же\n");fflush(stdout); }
 		on_get_selection = NULL;
+		
 		if(clipboard_s) {
 			if(DEBUG) { printf("get_selection: Отдаю clipboard_s: %s\n", clipboard_s); fflush(stdout); }
-			fn(clipboard_s, clipboard_len, clipboard_target);
+			
+			char* s = malloc(clipboard_len);
+			memcpy(clipboard_s, s, clipboard_len);
+			fn(s, clipboard_len, clipboard_target);
 		}
 		else {
 			if(DEBUG) { printf("get_selection: Отдаю пустую строку\n"); fflush(stdout); }
@@ -870,7 +876,7 @@ void shift_insert() {
 }
 
 // устанавливаем в clipboard данные для передачи другим приложениям
-void set_clipboard(char* s, int len, Atom target) {
+void set_clipboard(char* s, int len, Atom target) {	
 	clipboard_s = s;
 	clipboard_len = len;
 	clipboard_target = target;
@@ -886,6 +892,14 @@ void set_clipboard(char* s, int len, Atom target) {
 	Window owner = XGetSelectionOwner(d, clipboard_atom);
 
 	if(DEBUG) fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
+}
+
+// очистить буфер раздачи данных клипборда
+void clipboard_free() {
+	if(clipboard_s) {
+		free(clipboard_s);
+		clipboard_s = NULL;
+	}
 }
 
 void event_next() {
@@ -993,7 +1007,10 @@ void event_next() {
 				}
 			} else {		// стандартно
 			
-				if(selection_retrive) free(selection_retrive);
+				if(selection_retrive) {
+					fprintf(stderr, "ALERT: selection_retrive не удалена. Такого быть не должно!\n");
+					free(selection_retrive);
+				}
 				
 				selection_retrive = (char*) malloc(length + bytesafter + 1);
 				memcpy(selection_retrive, result, length);
@@ -1218,14 +1235,16 @@ void run_command(char* s) {
 	}
 }
 
+// начинаем раздавать сохранённые и тщательно отобранные у другого приложения данные
 void insert_from_clipboard_step3() {
 	fprintf(stderr, "insert_from_clipboard_step3: reset buffer len=%i\n", insert_from_clipboard_save_len);
 	set_clipboard(insert_from_clipboard_save_data,
                   insert_from_clipboard_save_len,
                   insert_from_clipboard_save_target);
 }
+// получаем данные из буфера обмена, сохраняем и вставляем из буфера обмена
 void insert_from_clipboard_step2(char* s, int len, Atom target) {
-	fprintf(stderr, "insert_from_clipboard_step2: save buffer len=%i\n", len);
+	fprintf(stderr, "insert_from_clipboard_step2: save buffer %s\n", s);
 	insert_from_clipboard_save_data = s;
 	insert_from_clipboard_save_len = len;
 	insert_from_clipboard_save_target = target;
@@ -1237,11 +1256,13 @@ void insert_from_clipboard_step2(char* s, int len, Atom target) {
 	insert_from_clipboard_data = NULL;
 
 	after(0.10, shift_insert);
-	after(0.31, insert_from_clipboard_step3);
+	after(0.31, insert_from_clipboard_step3);	// раздаём из буфера сохранённые данные
 }
+// получаем какие типы данных есть в буфере обмена
 void insert_from_clipboard_step1(char* s, int len, Atom target) {
 	fprintf(stderr, "insert_from_clipboard_step1: targets len=%i\n", len);
-	if(target == None) { insert_from_clipboard_step2(NULL, 0, None); return; }
+	// в буфере ничего нет
+	if(target == None) { insert_from_clipboard_step2(strdup(""), 0, utf8_atom); return; }
 	
 	Atom* targets = (Atom*) s;
 	int size = len / sizeof(Atom);
@@ -1263,11 +1284,23 @@ void insert_from_clipboard_step1(char* s, int len, Atom target) {
 	}
 	free(s);
 	if(mytarget != None) get_selection(clipboard_atom, mytarget, insert_from_clipboard_step2);
-	else insert_from_clipboard_step2(NULL, 0, None);
+	else insert_from_clipboard_step2(strdup(""), 0, utf8_atom);
 }
+// запоминаем содержимое буфера обмена, подменяем буфер собой и вставляем из него композэ
 void insert_from_clipboard(char* s) {
 	insert_from_clipboard_data = s;
-	get_selection(clipboard_atom, targets_atom, insert_from_clipboard_step1);
+	
+	Window owner = XGetSelectionOwner(d, clipboard_atom);	// владелец буфера
+	if(owner == None) {	// нет владельца - значит и раздавать ничего не надо
+		clipboard_free();
+		insert_from_clipboard_step2(strdup(""), 0, utf8_atom);
+	} else if(owner == w) {	// владелец - мы и уже раздаём. Сохраняем, что у нас есть
+		insert_from_clipboard_step2(clipboard_s, clipboard_len, clipboard_target);
+	}
+	else {
+		clipboard_free();
+		get_selection(clipboard_atom, targets_atom, insert_from_clipboard_step1);
+	}
 }
 
 void compose(char*) {
@@ -1293,7 +1326,9 @@ void compose(char*) {
 	
 	if(DEBUG) { printf("compose -> %s\n", to); fflush(stdout); }
 	
+	// удаляем мнемонику введённую ранее
 	press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
+	// запоминаем содержимое буфера обмена, подменяем буфер собой и вставляем из него композэ
 	insert_from_clipboard(to);
 }
 
