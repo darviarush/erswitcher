@@ -453,15 +453,18 @@ void open_display() {
 	targets_atom = XInternAtom(d, "TARGETS", False);
 	incr_atom = XInternAtom(d, "INCR", False);
 
+	// получаем максимально возможный размер данных для передачи через буфер обмена
 	selection_chunk_size = XExtendedMaxRequestSize(d) / 4;
 	if(!selection_chunk_size) selection_chunk_size = XMaxRequestSize(d) / 4;
+	printf("selection_chunk_size = %i\n", selection_chunk_size); fflush(stdout);
 
 	// Создаём окно
-	w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0);
+	w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0x00FF0000);
 	// подписываемся на события окна
 	XSelectInput(d, w, PropertyChangeMask | ButtonPressMask);
 	
-	send_systray_message(d, SYSTEM_TRAY_REQUEST_DOCK, w, 0, 0);
+	// стыкуем окно с системным лотком
+	//send_systray_message(d, SYSTEM_TRAY_REQUEST_DOCK, w, 0, 0);
 }
 
 // возвращает текущее окно
@@ -823,7 +826,10 @@ void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,
 	XSync(d, False);
 
 	on_get_selection = fn;
-	fprintf(stderr, "set on_get_selection by addr %p <- %p\n", &on_get_selection, on_get_selection);
+	
+	char* fmt = XGetAtomName(d, response_format_atom);
+	fprintf(stderr, "get_selection %s!\n", fmt);
+	XFree(fmt);
 }
 
 // переписываем строку в буфер ввода
@@ -909,21 +915,6 @@ void event_next() {
 	if(DEBUG) fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
 
 	switch(event.type) {
-		case ButtonPress: // нажали на иконке
-			// // если окно tcl запущено - закрываем его
-			// if(config_window_pid) kill(-9, config_window_pid);
-			// // запускаем новое
-			// config_window_pid = fork();
-			// if(config_window_pid < 0) {
-				// perror("ERROR: fork не запустился");
-			// } else if(config_window_pid == 0) {
-				// char* path = "erswitcher-config";
-				// char* tclsh = "/usr/bin/tclsh";
-				// execl(tclsh, path);
-				// fprintf(stderr, "ERROR: в конфигураторе %s\n", path);
-				// exit(1);
-			// }
-		break;
 		case SelectionNotify: // получить данные из буфера обмена
 			if(event.xselection.selection != clipboard_atom) {
 				fprintf(stderr, "SelectionNotify: Какой-то другой буфер запрошен\n");
@@ -965,7 +956,7 @@ void event_next() {
 			
 			int format;	// формат строки
 			unsigned long bytesafter, length;
-			char* result = NULL;
+			unsigned char* result = NULL;
 
 			// считываем
 			XGetWindowProperty(event.xselection.display,
@@ -976,12 +967,12 @@ void event_next() {
 			    incr_is, (Atom) AnyPropertyType,
 				&selection_retrive_type, 	// тип возвращаемого значения: INCR - передача по частям
 			    &format, &length, &bytesafter,
-				(unsigned char**) &result);
+				&result);
 				
 			char* selection_retrive_type_name = XGetAtomName(d, selection_retrive_type);
-			printf("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s\n", result, length, bytesafter, selection_retrive_type_name); fflush(stdout);
+			printf("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s format=%i\n", result, length, bytesafter, selection_retrive_type_name, format); fflush(stdout);
 			if(selection_retrive_type_name) XFree(selection_retrive_type_name);
-				
+
 			// завершаем
 			void send_on_get_selection() {
 				fprintf(stderr, "send_on_get_selection\n");
@@ -995,7 +986,7 @@ void event_next() {
 				}
 				selection_retrive = NULL;
 			}
-			
+
 			if(incr_is) {	// мы в цикле INCR
 				memcpy(selection_retrive + selection_retrive_length, result, length);
 				selection_retrive[selection_retrive_length += length] = '\0';
@@ -1027,7 +1018,7 @@ void event_next() {
 		case SelectionClear:
 			fprintf(stderr, "SelectionClear: Утрачено право собственности на буфер обмена.\n");
 		break;
-		case SelectionRequest:
+		case SelectionRequest: // запрос данных из буфера обмена
 			
 			Window win = event.xselectionrequest.requestor;
 			Atom pty = event.xselectionrequest.property;
@@ -1042,7 +1033,7 @@ void event_next() {
 						pty,
 						XA_ATOM,
 						32, PropModeReplace, (unsigned char *) types,
-						(int) (sizeof(types) / sizeof(Atom))
+						sizeof(types) / sizeof(Atom)
 				);
 
 				if(DEBUG) fprintf(stderr, "отправляем targets\n");
@@ -1083,9 +1074,15 @@ void event_next() {
 		break;
 		case PropertyNotify:	// протокол INCR: отправка по частям
 			if(event.xproperty.state == PropertyDelete) {
+				if(!clipboard_s) break;
+				if(clipboard_len <= selection_chunk_size) break;
+				
+				if(DEBUG) {printf("state == PropertyDelete\n"); fflush(stdout);}
 				Window win = event.xselectionrequest.requestor;
 				Atom pty = event.xselectionrequest.property;
 				Atom target_notify = event.xselectionrequest.target;
+				
+				//if(win != ) break;
 				
 				int len = clipboard_pos+selection_chunk_size < clipboard_s+clipboard_len?
 					selection_chunk_size:
@@ -1099,6 +1096,27 @@ void event_next() {
 				clipboard_pos += len;
 				//if(clipboard_pos == clipboard_s+clipboard_len) // конец
 			}
+		break;
+		case ClientMessage:	// окно пристыковано к системному лотку
+			XWindowAttributes attr;
+			XGetWindowAttributes(d, w, &attr);
+			
+			printf("win = %i x %i\n", attr.width, attr.height);
+		break;
+		case ButtonPress: // нажали на иконке
+			// // если окно tcl запущено - закрываем его
+			// if(config_window_pid) kill(-9, config_window_pid);
+			// // запускаем новое
+			// config_window_pid = fork();
+			// if(config_window_pid < 0) {
+				// perror("ERROR: fork не запустился");
+			// } else if(config_window_pid == 0) {
+				// char* path = "erswitcher-config";
+				// char* tclsh = "/usr/bin/tclsh";
+				// execl(tclsh, path);
+				// fprintf(stderr, "ERROR: в конфигураторе %s\n", path);
+				// exit(1);
+			// }
 		break;
 	}
 
@@ -1237,14 +1255,14 @@ void run_command(char* s) {
 
 // начинаем раздавать сохранённые и тщательно отобранные у другого приложения данные
 void insert_from_clipboard_step3() {
-	fprintf(stderr, "insert_from_clipboard_step3: reset buffer len=%i\n", insert_from_clipboard_save_len);
+	printf("--> insert_from_clipboard_step3: reset buffer len=%i\n", insert_from_clipboard_save_len); fflush(stdout);
 	set_clipboard(insert_from_clipboard_save_data,
                   insert_from_clipboard_save_len,
                   insert_from_clipboard_save_target);
 }
 // получаем данные из буфера обмена, сохраняем и вставляем из буфера обмена
 void insert_from_clipboard_step2(char* s, int len, Atom target) {
-	fprintf(stderr, "insert_from_clipboard_step2: save buffer %s\n", s);
+	fprintf(stderr, "--> insert_from_clipboard_step2: save buffer %s\n", s);
 	insert_from_clipboard_save_data = s;
 	insert_from_clipboard_save_len = len;
 	insert_from_clipboard_save_target = target;
@@ -1260,15 +1278,15 @@ void insert_from_clipboard_step2(char* s, int len, Atom target) {
 }
 // получаем какие типы данных есть в буфере обмена
 void insert_from_clipboard_step1(char* s, int len, Atom target) {
-	fprintf(stderr, "insert_from_clipboard_step1: targets len=%i\n", len);
+	printf("--> insert_from_clipboard_step1: targets len=%i\n", len); fflush(stdout);
 	// в буфере ничего нет
 	if(target == None) { insert_from_clipboard_step2(strdup(""), 0, utf8_atom); return; }
 	
 	Atom* targets = (Atom*) s;
-	int size = len / sizeof(Atom);
+	int size = len;// / sizeof(Atom);
 	
 	if(DEBUG) {
-		printf("\nTargets: sizeof(Atom)=%li size=%i\n", sizeof(Atom), size); 
+		printf("\nTargets: len=%i sizeof(Atom)=%li size=%i\n", len, sizeof(Atom), size); 
 		for(int i=0; i<size; i++) {
 			char* target_name = XGetAtomName(d, targets[i]);
 			printf("%i) %lu - %s\n", i, targets[i], target_name); 
@@ -1288,6 +1306,9 @@ void insert_from_clipboard_step1(char* s, int len, Atom target) {
 }
 // запоминаем содержимое буфера обмена, подменяем буфер собой и вставляем из него композэ
 void insert_from_clipboard(char* s) {
+	
+	printf("--> insert_from_clipboard %s\n", s); fflush(stdout);
+	
 	insert_from_clipboard_data = s;
 	
 	Window owner = XGetSelectionOwner(d, clipboard_atom);	// владелец буфера
@@ -1325,7 +1346,7 @@ void compose(char*) {
 	if(to == NULL) { fprintf(stderr, "compose: Ничего не найдено!\n"); return; }
 	
 	if(DEBUG) { printf("compose -> %s\n", to); fflush(stdout); }
-	
+
 	// удаляем мнемонику введённую ранее
 	unikey_t key = keyboard_state(0);
 	press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
