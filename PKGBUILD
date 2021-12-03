@@ -1,7 +1,7 @@
 # Maintainer: Yaroslav O. Kosmina <darviarush@mail.ru>
 
 pkgname=erswitcher
-pkgver=4
+pkgver=5
 pkgdesc="Transliterator for keyboard input"
 source=(erswitcher-$pkgver.tar.gz)
 url="https://github.com/darviarush/erswitcher"
