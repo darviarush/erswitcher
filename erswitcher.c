@@ -1458,6 +1458,7 @@ void load_config(int) {
 			"?\?=؟\n"
 			"?=¿\n"
 			"!=¡\n"
+			"n=¶\n"
 			"# Неразрывный пробел (\u00A0, &nbsp;)\n"
 			" = \n"
 			"# Утопающий и кричащий о помощи смайлик\n"
@@ -1477,6 +1478,9 @@ void load_config(int) {
 			"# Математические символы\n"
 			"+-=±\n"
 			"++=∑\n"
+			"**=∑\n"
+			"*=×\n"
+			"q=√\n"
 			"<<=≤\n"
 			">>=≥\n"
 			"2=½\n"
@@ -1562,7 +1566,12 @@ void load_config(int) {
 		// TODO: возврат курсора на указанную позицию - необходимо для сниппетов
 		// TODO: выделение в нутрь сниппетов
 		
-		char* v = strchr(s, '=');
+		char* v; for(;;) { 
+			v = strchr(s, '='); 
+			if(!v) break;
+			if(v == s) break;
+			if(v[-1] != '\\') break;
+		}
 		if(!v) { fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=`. Пропущено\n", path, lineno); continue; }
 		*v = '\0'; v++;
 
@@ -1576,9 +1585,14 @@ void load_config(int) {
 			
 			wint_t* w = compose_map[compose_map_size].word;
 			int i = 0;
+			int m = 0;
 			
 			FOR_UTF8(s) {
 				STEP_UTF8(s, ws);
+				if(ws == L'\\') {
+					if(m==0) {m=1; continue;}
+				}
+				m = 0;
 				
 				if(i >= COMPOSE_KEY_MAX) {fprintf(stderr, "WARN: %s:%i: строка слишком длинная \"%s\" > %i. Пропущенo\n", path, lineno, s, COMPOSE_KEY_MAX); goto NEXT_LINE;}
 				

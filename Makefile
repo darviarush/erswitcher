@@ -29,9 +29,4 @@ dist:
 		autoconf
 		./configure
 
-keyboard: keyboard.c
-		gcc $(CFLAGS) $(CLIBS) -o keyboard keyboard.c
-
-k: keyboard
-		./keyboard > keyboard.csv
 
