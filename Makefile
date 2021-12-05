@@ -29,5 +29,3 @@ dist:
 		mv configure.scan configure.in
 		autoconf
 		./configure
-
-

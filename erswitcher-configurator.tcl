@@ -81,7 +81,9 @@ set path "~/.config/erswitcher.conf"
 set conf [read_file $path]
 
 proc coloring {text} {
-	.t.text delete 1.0 end-1c
+	set pos [.t.text index insert]
+	.t.text delete 1.0 end
+	
 	foreach line [split $text "\n"] {
 		switch -regexp $line {
 			^\s*# { .t.text insert end $line -fg #AFEEEE }
@@ -95,6 +97,10 @@ proc coloring {text} {
 			default { .t.text insert end $line -bg #DC143C -fg white }
 		}
 	}
+	
+	tk::TextSetCursor .t.text $pos
+	.t.text see $pos
+	#focus .t.text
 }
 
 coloring $conf
@@ -105,6 +111,9 @@ bind .t.text <KeyRelease> {
 	set $text [.t.text get 1.0 end-1c]
 	write_file $path $text
 	coloring $text
-	
+	set lines [split [exec ps aux] "\n"]
+	foreach line $lines {
+		
+	}
 }
 
