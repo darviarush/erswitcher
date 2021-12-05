@@ -12,6 +12,7 @@ clean:
 install:
 		mkdir -p ~/.local/bin
 		mv -f erswitcher ~/.local/bin/erswitcher
+		cp erswitcher-configurator ~/.local/bin/erswitcher-configurator
 
 launch: kill
 		~/.local/bin/erswitcher &> /dev/null &
