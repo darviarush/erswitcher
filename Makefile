@@ -12,7 +12,11 @@ clean:
 install:
 		mkdir -p ~/.local/bin
 		mv -f erswitcher ~/.local/bin/erswitcher
-		cp erswitcher-configurator ~/.local/bin/erswitcher-configurator
+		cp -a erswitcher-configurator.tcl ~/.local/bin/erswitcher-configurator.tcl
+		if [ ! -e ~/.config/erswitcher.conf ]; then cp -a erswitcher.conf ~/.config/erswitcher.conf; fi
+		
+sync:
+		cp -a ~/.config/erswitcher.conf erswitcher.conf
 
 launch: kill
 		~/.local/bin/erswitcher &> /dev/null &
@@ -22,6 +26,9 @@ s: erswitcher
 
 kill:
 		killall -9 erswitcher || true
+
+astyle:
+	astyle `find . -name "*.[ch]"`
 
 dist:
 		autoscan

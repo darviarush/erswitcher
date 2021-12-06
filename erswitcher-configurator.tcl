@@ -1,8 +1,16 @@
-#!/usr/bin/wish
+#!/usr/bin/env wish
 
 package require Tk
 
 tk appname "En-Ru Switcher Конфигуратор"
+
+# центрируем окно
+set width 600
+set height 500
+set x [expr { ( [winfo vrootwidth  .] - $width  ) / 2 }]
+set y [expr { ( [winfo vrootheight .] - $height ) / 2 }]
+puts ${width}x${height}+${x}+${y}
+wm geometry . ${width}x${height}+${x}+${y}
 
 #@category виджеты
 
@@ -32,16 +40,16 @@ proc write_file {path text} {
 }
 
 #@category редактирование
-bind Entry <Insert> {}
+# bind Entry <Insert> {}
 bind Text <Insert> {}
 
-bind Entry <<Paste>> {
-	catch { %W delete sel.first sel.last }
-	catch {
-		%W insert insert [::tk::GetSelection %W CLIPBOARD]
-		tk::EntrySeeInsert %W
-	}
-}
+# bind Entry <<Paste>> {
+	# catch { %W delete sel.first sel.last }
+	# catch {
+		# %W insert insert [::tk::GetSelection %W CLIPBOARD]
+		# tk::EntrySeeInsert %W
+	# }
+# }
 
 proc ::tk_textPaste w {
     if {![catch {::tk::GetSelection $w CLIPBOARD} sel]} {
@@ -59,61 +67,71 @@ proc ::tk_textPaste w {
     }
 }
 
-# при установке курсора меняем и позицию в тулбаре
-rename ::tk::TextSetCursor ::tk::TextSetCursorOrig
-proc ::tk::TextSetCursor {w pos} {
-    ::tk::TextSetCursorOrig $w $pos
-	event generate $w <<CursorChanged>>
-}
+# # при установке курсора меняем и позицию в тулбаре
+# rename ::tk::TextSetCursor ::tk::TextSetCursorOrig
+# proc ::tk::TextSetCursor {w pos} {
+    # ::tk::TextSetCursorOrig $w $pos
+	# event generate $w <<CursorChanged>>
+# }
 
-rename ::tk::TextButton1 ::tk::TextSetButton1Orig
-proc ::tk::TextButton1 {w x y} {
-  ::tk::TextSetButton1Orig $w $x $y
-  event generate $w <<CursorChanged>>
-}
+# rename ::tk::TextButton1 ::tk::TextSetButton1Orig
+# proc ::tk::TextButton1 {w x y} {
+  # ::tk::TextSetButton1Orig $w $x $y
+  # event generate $w <<CursorChanged>>
+# }
 
 #@category инициализация
  
 pack [make_scrolled_y [frame .t] [text .t.text -wrap word]] -fill both -expand 1
 
+.t.text tag configure remark -foreground #008080
+.t.text tag configure section -foreground #DC143C
+.t.text tag configure equal -foreground #1E90FF
+.t.text tag configure error -background #DC143C -foreground white
 
 set path "~/.config/erswitcher.conf"
 set conf [read_file $path]
+.t.text insert end $conf
 
 proc coloring {text} {
-	set pos [.t.text index insert]
-	.t.text delete 1.0 end
-	
-	foreach line [split $text "\n"] {
-		switch -regexp $line {
-			^\s*# { .t.text insert end $line -fg #AFEEEE }
-			^\s*\[.*\]\s*$ { .t.text insert end $line -fg #F08080 }
-			= { 
-				regexp (([^\\]|\\.)*)=(.*) $line -> a b
-				.t.text insert end $a 
-				.t.text insert end = -fg #1E90FF
-				.t.text insert end $b 
-			}
-			default { .t.text insert end $line -bg #DC143C -fg white }
-		}
+	foreach i {remark section equal error} {
+		.t.text tag remove $i 1.0 end
 	}
 	
-	tk::TextSetCursor .t.text $pos
-	.t.text see $pos
-	#focus .t.text
+	set re {^((?:\\.|[^\\])*)=}
+	
+	set lineno 0
+	foreach line [split $text "\n"] {
+		incr lineno
+		
+		switch -regexp -- $line {
+			{^\#} { .t.text tag add remark $lineno.0 $lineno.end }
+			{^\[(functions|compose|snippets|commands|sendkeys)\]\s*$} { .t.text tag add section $lineno.0 $lineno.end }
+			{^\s*$} {}
+			{=} {
+				regexp $re $line -> a
+				set charno [string length $a]
+				.t.text tag add equal $lineno.$charno $lineno.$charno+1c
+			}
+			default { .t.text tag add error $lineno.0 $lineno.end }
+		}
+	}	
 }
 
 coloring $conf
 
 #after 10 {focus .t.text}
 
+# колоризируем текст и отправляем erswitcher-у сигнал на пересчитывание конфига
 bind .t.text <KeyRelease> {
-	set $text [.t.text get 1.0 end-1c]
+	global conf
+	set text [.t.text get 1.0 end-1c]
+	if {$conf == $text} {return}
+	set conf $text
 	write_file $path $text
 	coloring $text
-	set lines [split [exec ps aux] "\n"]
-	foreach line $lines {
-		
-	}
+	set res [catch {exec killall -HUP erswitcher}]
+	
+	puts "Сигнал отправлен erswitcher-у с результатом: $res"
 }
 
