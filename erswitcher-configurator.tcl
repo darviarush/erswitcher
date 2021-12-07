@@ -82,7 +82,7 @@ proc ::tk_textPaste w {
 
 #@category инициализация
  
-pack [make_scrolled_y [frame .t] [text .t.text -wrap word]] -fill both -expand 1
+pack [make_scrolled_y [frame .t] [text .t.text -wrap word -undo 1 -maxundo -1]] -fill both -expand 1
 
 .t.text tag configure remark -foreground #008080
 .t.text tag configure section -foreground #DC143C
@@ -120,8 +120,6 @@ proc coloring {text} {
 
 coloring $conf
 
-#after 10 {focus .t.text}
-
 # колоризируем текст и отправляем erswitcher-у сигнал на пересчитывание конфига
 bind .t.text <KeyRelease> {
 	global conf
@@ -130,7 +128,8 @@ bind .t.text <KeyRelease> {
 	set conf $text
 	write_file $path $text
 	coloring $text
-	set res [catch {exec killall -HUP erswitcher}]
-	puts "Сигнал отправлен erswitcher-у с результатом: $res"
+
+	set res [catch {exec killall -HUP erswitcher} result]
+	puts "Сигнал отправлен erswitcher-у с результатом: $res ($result)"
 }
 

@@ -949,8 +949,19 @@ void shift_insert() {
     maybe_group = active_state.group;
 }
 
+// очистить буфер раздачи данных клипборда
+void clipboard_free() {
+    if(clipboard_s) {
+        free(clipboard_s);
+        clipboard_s = NULL;
+    }
+}
+
 // устанавливаем в clipboard данные для передачи другим приложениям
+// s должна быть в выделенной памяти, так как при новой установке или потере буфером фокуса она будет очищена
 void set_clipboard(char* s, int len, Atom target) {
+	clipboard_free();
+	
     clipboard_s = s;
     clipboard_len = len;
     clipboard_target = target;
@@ -966,14 +977,6 @@ void set_clipboard(char* s, int len, Atom target) {
     Window owner = XGetSelectionOwner(d, clipboard_atom);
 
     if(DEBUG) fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
-}
-
-// очистить буфер раздачи данных клипборда
-void clipboard_free() {
-    if(clipboard_s) {
-        free(clipboard_s);
-        clipboard_s = NULL;
-    }
 }
 
 void event_next() {
@@ -1086,6 +1089,7 @@ void event_next() {
         break;
     case SelectionClear:
         fprintf(stderr, "SelectionClear: Утрачено право собственности на буфер обмена.\n");
+		clipboard_free();
         break;
     case SelectionRequest: // запрос данных из буфера обмена
 
@@ -1180,7 +1184,11 @@ void event_next() {
         break;
     case ButtonPress: // нажали на иконке в систрее
         // если окно tcl запущено - закрываем его
-        if(config_window_pid) kill(-9, config_window_pid);
+		//system("killall -9 erswitcher-configurator.tcl");
+        if(config_window_pid) {
+			int res = kill(config_window_pid, SIGKILL);
+			if(DEBUG) { printf("config_window_pid=%i kill %i res=%i\n", config_window_pid, SIGKILL, res); fflush(stdout); }
+		}
         // запускаем новое
         config_window_pid = fork();
         if(config_window_pid < 0) {
@@ -1348,7 +1356,7 @@ void run_command(char* s) {
 }
 
 void insert_from_clipboard(char* s) {
-	set_clipboard(s,
+	set_clipboard(strdup(s),
                   strlen(s),
                   utf8_atom);	// начинаем раздавать
 
@@ -1412,13 +1420,15 @@ void selection_invertcase(char*) {
     copy_selection(print_invertcase_buffer);
 }
 
+int need_load_config = 0;
+void signal_load_config(int) { need_load_config = 1; }
 
-void load_config(int) {
+void load_config() {
     if(DEBUG) fprintf(stderr, "Конфигурация применяется ...\n");
 
-    clipboard_s = NULL;
-    clipboard_len = 0;
-    clipboard_target = utf8_atom;
+    // clipboard_s = NULL;
+    // clipboard_len = 0;
+    // clipboard_target = utf8_atom;
 
     for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
     free(keyfn);
@@ -1795,9 +1805,9 @@ int main(int ac, char** av) {
     init_keyboard();
 
     // конфигурация должна загружаться после инициализации клавиатуры
-    load_config(0);
+    load_config();
 
-    signal(SIGHUP, load_config);
+    signal(SIGHUP, signal_load_config);
     signal(SIGCHLD, SIG_IGN);
 
     unsigned int state1, state2 = 0;
@@ -1854,6 +1864,12 @@ int main(int ac, char** av) {
         timers_apply();
 
         event_delay(USEC_TO_DBL(loop_delay));
+		
+		// обработка сигналов
+		if(need_load_config) {
+			need_load_config = 0;
+			load_config();
+		}
     }
 
     return 0;
