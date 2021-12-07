@@ -512,14 +512,12 @@ void open_display() {
     // Создаём окно
     w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0x00DC143C);
     // подписываемся на события окна
-    XSelectInput(d, w, 
-		  PropertyChangeMask 
-		| ButtonPressMask 		// 
+    XSelectInput(d, w,
+		  PropertyChangeMask 	// Работа с буфером
+		| ButtonPressMask 		// Слушаем клики мышкой на окно
 		| ExposureMask			// разрешаем запрос на перерисовку
 		| StructureNotifyMask	// сработает, когда станут видны ширина и высота окна
 	);
-
-	//w_gc = ;
 
     // стыкуем окно с системным лотком
     send_systray_message(d, SYSTEM_TRAY_REQUEST_DOCK, w, 0, 0);

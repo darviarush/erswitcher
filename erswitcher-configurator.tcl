@@ -131,7 +131,6 @@ bind .t.text <KeyRelease> {
 	write_file $path $text
 	coloring $text
 	set res [catch {exec killall -HUP erswitcher}]
-	
 	puts "Сигнал отправлен erswitcher-у с результатом: $res"
 }
 
