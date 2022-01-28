@@ -16,7 +16,7 @@ install:
 		if [ ! -e ~/.config/erswitcher.conf ]; then cp -a erswitcher.conf ~/.config/erswitcher.conf; fi
 		
 install_conf:
-	cp -a erswitcher.conf ~/.config/erswitcher.conf
+		cp -a erswitcher.conf ~/.config/erswitcher.conf
 		
 sync:
 		cp -a ~/.config/erswitcher.conf erswitcher.conf
@@ -31,7 +31,7 @@ kill:
 		killall -9 erswitcher || true
 
 astyle:
-	astyle `find . -name "*.[ch]"`
+		astyle `find . -name "*.[ch]"`
 
 dist:
 		autoscan
