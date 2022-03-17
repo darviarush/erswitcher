@@ -106,7 +106,7 @@ proc coloring {text} {
 		
 		switch -regexp -- $line {
 			{^\#} { .t.text tag add remark $lineno.0 $lineno.end }
-			{^\[(functions|compose|snippets|commands|sendkeys)\]\s*$} { .t.text tag add section $lineno.0 $lineno.end }
+			{^\[(functions|options|compose|snippets|commands|sendkeys)\]\s*$} { .t.text tag add section $lineno.0 $lineno.end }
 			{^\s*$} {}
 			{=} {
 				regexp $re $line -> a

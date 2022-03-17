@@ -32,9 +32,11 @@
 
 extern char **environ;
 
+
 //@category Отладка
 
 #define DEBUG	1
+
 
 //@category Клавиши
 
@@ -74,6 +76,7 @@ int pos = 0;				// позиция в буфере символов
 unikey_t word[BUF_SIZE];	// буфер символов
 int keys_pressed;			// нажато клавишь
 
+
 //@category Задержки
 
 // TODO: задержку указывать в конфиге
@@ -95,6 +98,7 @@ typedef struct {
 #define MAX_TIMERS			256
 mytimer_t timers[MAX_TIMERS];
 int timers_size = 0;
+
 
 //@category Иксы
 
@@ -134,6 +138,7 @@ char* insert_from_clipboard_save_data;	// что было в буфере обм
 int insert_from_clipboard_save_len;
 Atom insert_from_clipboard_save_target;
 
+
 //@category Комбинации -> Функции
 
 typedef struct {
@@ -159,6 +164,7 @@ typedef struct {
 int compose_map_size = 0;
 int compose_map_max_size = 0;
 compose_t* compose_map = NULL;
+
 
 //@category Раскладки
 
@@ -1481,6 +1487,12 @@ void load_config() {
                 "KP_Begin=compose\n"
                 "Scroll_Lock=compose\n"
                 "\n"
+                "[options]\n"
+                "# Задержка между вызовами клавиатуры в секундах\n"
+                "loop_delay=0,01\n"
+                "# Задержка между нажатиями клавишь в секундах\n"
+                "delay=0,01\n"
+                "\n"
                 "[compose]\n"
                 "# Замены (мнемоники) - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
                 "\n"
@@ -1541,7 +1553,7 @@ void load_config() {
                 "# Математические символы\n"
                 "+-=±\n"
                 "++=∑\n"
-                "**=∑\n"
+                "**=∏\n"
                 "*=×\n"
                 "q=√\n"
                 "<<=≤\n"
@@ -1591,6 +1603,7 @@ void load_config() {
     int lineno = 0;
 
 #define SEC_FUNCTIONS 	((void (*)(char*)) -1)
+#define SEC_OPTIONS     ((void (*)(char*)) -2)
     void (*fn)(char*) = NULL;
 
 NEXT_LINE:
@@ -1617,6 +1630,7 @@ NEXT_LINE:
 
         if(*s == '[') { // это секция. Сверяемся со списком
             if(EQ(s, "[functions]")) fn = SEC_FUNCTIONS;
+            else if(EQ(s, "[options]")) fn = SEC_OPTIONS;
             else if(EQ(s, "[compose]")) fn = compose;
             else if(EQ(s, "[sendkeys]")) fn = sendkeys;
             else if(EQ(s, "[snippets]")) fn = insert_from_clipboard;
@@ -1646,6 +1660,30 @@ NEXT_LINE:
         }
         *v = '\0';
         v++;
+
+        if(fn == SEC_OPTIONS) {
+            if(EQ(s, "delay")) {
+                delay = atof(v) * 1000000;
+                if(delay <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("delay = %i микросекунд\n", delay);
+            }
+            else if(EQ(s, "loop_delay")) {
+                loop_delay = atof(v) * 1000000;
+                if(loop_delay <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: loop_delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("loop_delay = %i микросекунд\n", loop_delay);
+            }
+            else {
+                fprintf(stderr, "WARN: %s:%i: ошибка: неизвестная опция `%s`. Пропущено\n", path, lineno, s);
+            }
+
+            continue;
+        }
 
         // это мнемоника
         if(fn == compose) {
