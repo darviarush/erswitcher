@@ -49,17 +49,17 @@ bind Text <Insert> {}
 
 proc ::tk_textPaste w {
     if {![catch {::tk::GetSelection $w CLIPBOARD} sel]} {
-	set oldSeparator [$w cget -autoseparators]
-	if {$oldSeparator} {
-	    $w configure -autoseparators 0
-	    $w edit separator
-	}
-	catch { $w delete sel.first sel.last }
-	$w insert insert $sel
-	if {$oldSeparator} {
-	    $w edit separator
-	    $w configure -autoseparators 1
-	}
+		set oldSeparator [$w cget -autoseparators]
+		if {$oldSeparator} {
+		    $w configure -autoseparators 0
+		    $w edit separator
+		}
+		catch { $w delete sel.first sel.last }
+		$w insert insert $sel
+		if {$oldSeparator} {
+		    $w edit separator
+		    $w configure -autoseparators 1
+		}
     }
 }
 
@@ -78,8 +78,6 @@ proc ::tk_textPaste w {
 
 #@category инициализация
 
-set bookmarks []
-
 pack [panedwindow .m -orient horizontal] -fill both -expand 1
 
 pack [make_scrolled_y [frame .l] [listbox .l.list -selectmode single]] -side left -fill y
@@ -93,6 +91,19 @@ pack [make_scrolled_y [frame .t] [text .t.text -wrap word -undo 1 -maxundo -1]] 
 .t.text tag configure section -foreground #DC143C
 .t.text tag configure equal -foreground #1E90FF
 .t.text tag configure error -background #DC143C -foreground white
+
+set bookmarks []
+proc add_bookmark {title lineno} {
+	global bookmarks
+	.l.list insert end $title
+	lappend bookmarks $lineno
+}
+proc clear_bookmarks {} {
+	global bookmarks
+	set bookmarks []
+	.l.list delete 0 end
+}
+
 
 # центрируем окно
 set path_wmconf "~/.config/erswitcher-configurator.conf"
@@ -130,9 +141,7 @@ proc coloring {text} {
 		.t.text tag remove $i 1.0 end
 	}
 	# удаляем закладки
-	global bookmarks
-	set bookmarks []
-	.l.list delete 0 end
+	clear_bookmarks
 	
 	set re {^((?:\\.|[^\\])*)=}
 	
@@ -145,14 +154,16 @@ proc coloring {text} {
 				# закладки
 				set is [regexp {^\#\#\s+(.+)} $line -> s]
 				if {$is} {
-					lappend bookmarks $lineno
-					.l.list insert end $s
+					add_bookmark $s $lineno
 				}
 				# подсветка комментария в тексте
 				.t.text tag add bookmark $lineno.0 $lineno.end
 			}
 			{^\#} {	.t.text tag add remark $lineno.0 $lineno.end }
-			{^\[(functions|options|compose|snippets|commands|sendkeys)\]\s*$} { .t.text tag add section $lineno.0 $lineno.end }
+			{^\[(functions|options|compose|snippets|commands|sendkeys)\]\s*$} { 
+				.t.text tag add section $lineno.0 $lineno.end
+				add_bookmark $line $lineno
+			}
 			{^\s*$} {}
 			{=} {
 				regexp $re $line -> a
@@ -181,7 +192,6 @@ bind .t.text <KeyRelease> {
 
 # при выборе закладки переходим к ней
 bind .l.list <<ListboxSelect>> {
-	puts [list %W %T [%W index active] [%W curselection] [%W index anchor] ]
 	set idx [%W curselection]
 	if {$idx != ""} {
 		set pos [lindex $bookmarks $idx]
