@@ -244,21 +244,21 @@ void init_keyboard() {
     // int i, k = 0;
     // int min_keycode, max_keycode, keysyms_per_keycode = 0;
 
-    // XDisplayKeycodes (dpy, &min_keycode, &max_keycode);
-    // XGetKeyboardMapping (dpy, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
+    // XDisplayKeycodes (d, &min_keycode, &max_keycode);
+    // XGetKeyboardMapping (d, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
 
     // for (i = 0; i < 8; i++) {
-    // for (int j = 0; j < map->max_keypermod; j++) {
-    // if (map->modifiermap[k]) {
-    // KeySym ks;
-    // int index = 0;
-    // do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
-    // char* nm = XKeysymToString(ks);
+		// for (int j = 0; j < map->max_keypermod; j++) {
+			// if (map->modifiermap[k]) {
+				// KeySym ks;
+				// int index = 0;
+				// do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
+				// char* nm = XKeysymToString(ks);
 
-    // //fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
-    // }
-    // k++;
-    // }
+				// fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
+			// }
+			// k++;
+		// }
     // }
 
     //EXIT_INIT_KB:
@@ -765,7 +765,8 @@ void print_translate_buffer(int from, int backspace) {
     //printf("print_translate_buffer: %S\n", word+from);
 
     clear_active_mods();
-    int trans_group = active_state.group == group_en? group_ru: group_en;
+	// сразу меняем раскладку
+    active_state.group = active_state.group == group_en? group_ru: group_en;
 
     // отправляем бекспейсы, чтобы удалить ввод
     if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
@@ -777,9 +778,9 @@ void print_translate_buffer(int from, int backspace) {
     }
 
     recover_active_mods();
+	
+	// в некоторых приложениях переключение не работает
 
-    // меняем group раскладку
-    set_group(trans_group);
 }
 
 void print_invertcase_buffer(int from, int backspace) {
