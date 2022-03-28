@@ -32,9 +32,11 @@
 
 extern char **environ;
 
+
 //@category Отладка
 
 #define DEBUG	1
+
 
 //@category Клавиши
 
@@ -74,6 +76,7 @@ int pos = 0;				// позиция в буфере символов
 unikey_t word[BUF_SIZE];	// буфер символов
 int keys_pressed;			// нажато клавишь
 
+
 //@category Задержки
 
 // TODO: задержку указывать в конфиге
@@ -95,6 +98,7 @@ typedef struct {
 #define MAX_TIMERS			256
 mytimer_t timers[MAX_TIMERS];
 int timers_size = 0;
+
 
 //@category Иксы
 
@@ -134,6 +138,7 @@ char* insert_from_clipboard_save_data;	// что было в буфере обм
 int insert_from_clipboard_save_len;
 Atom insert_from_clipboard_save_target;
 
+
 //@category Комбинации -> Функции
 
 typedef struct {
@@ -159,6 +164,7 @@ typedef struct {
 int compose_map_size = 0;
 int compose_map_max_size = 0;
 compose_t* compose_map = NULL;
+
 
 //@category Раскладки
 
@@ -238,21 +244,21 @@ void init_keyboard() {
     // int i, k = 0;
     // int min_keycode, max_keycode, keysyms_per_keycode = 0;
 
-    // XDisplayKeycodes (dpy, &min_keycode, &max_keycode);
-    // XGetKeyboardMapping (dpy, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
+    // XDisplayKeycodes (d, &min_keycode, &max_keycode);
+    // XGetKeyboardMapping (d, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
 
     // for (i = 0; i < 8; i++) {
-    // for (int j = 0; j < map->max_keypermod; j++) {
-    // if (map->modifiermap[k]) {
-    // KeySym ks;
-    // int index = 0;
-    // do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
-    // char* nm = XKeysymToString(ks);
+		// for (int j = 0; j < map->max_keypermod; j++) {
+			// if (map->modifiermap[k]) {
+				// KeySym ks;
+				// int index = 0;
+				// do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
+				// char* nm = XKeysymToString(ks);
 
-    // //fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
-    // }
-    // k++;
-    // }
+				// fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
+			// }
+			// k++;
+		// }
     // }
 
     //EXIT_INIT_KB:
@@ -759,7 +765,8 @@ void print_translate_buffer(int from, int backspace) {
     //printf("print_translate_buffer: %S\n", word+from);
 
     clear_active_mods();
-    int trans_group = active_state.group == group_en? group_ru: group_en;
+	// сразу меняем раскладку
+    active_state.group = active_state.group == group_en? group_ru: group_en;
 
     // отправляем бекспейсы, чтобы удалить ввод
     if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
@@ -771,9 +778,9 @@ void print_translate_buffer(int from, int backspace) {
     }
 
     recover_active_mods();
+	
+	// в некоторых приложениях переключение не работает
 
-    // меняем group раскладку
-    set_group(trans_group);
 }
 
 void print_invertcase_buffer(int from, int backspace) {
@@ -1481,6 +1488,12 @@ void load_config() {
                 "KP_Begin=compose\n"
                 "Scroll_Lock=compose\n"
                 "\n"
+                "[options]\n"
+                "# Задержка между вызовами клавиатуры в секундах\n"
+                "loop_delay=0,01\n"
+                "# Задержка между нажатиями клавишь в секундах\n"
+                "delay=0,01\n"
+                "\n"
                 "[compose]\n"
                 "# Замены (мнемоники) - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
                 "\n"
@@ -1541,11 +1554,11 @@ void load_config() {
                 "# Математические символы\n"
                 "+-=±\n"
                 "++=∑\n"
-                "**=∑\n"
+                "**=∏\n"
                 "*=×\n"
                 "q=√\n"
-                "<<=≤\n"
-                ">>=≥\n"
+                "<\\==≤\n"
+                ">\\==≥\n"
                 "2=½\n"
                 "3=⅓\n"
                 "4=¼\n"
@@ -1591,6 +1604,7 @@ void load_config() {
     int lineno = 0;
 
 #define SEC_FUNCTIONS 	((void (*)(char*)) -1)
+#define SEC_OPTIONS     ((void (*)(char*)) -2)
     void (*fn)(char*) = NULL;
 
 NEXT_LINE:
@@ -1617,6 +1631,7 @@ NEXT_LINE:
 
         if(*s == '[') { // это секция. Сверяемся со списком
             if(EQ(s, "[functions]")) fn = SEC_FUNCTIONS;
+            else if(EQ(s, "[options]")) fn = SEC_OPTIONS;
             else if(EQ(s, "[compose]")) fn = compose;
             else if(EQ(s, "[sendkeys]")) fn = sendkeys;
             else if(EQ(s, "[snippets]")) fn = insert_from_clipboard;
@@ -1646,6 +1661,30 @@ NEXT_LINE:
         }
         *v = '\0';
         v++;
+
+        if(fn == SEC_OPTIONS) {
+            if(EQ(s, "delay")) {
+                delay = atof(v) * 1000000;
+                if(delay <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("delay = %i микросекунд\n", delay);
+            }
+            else if(EQ(s, "loop_delay")) {
+                loop_delay = atof(v) * 1000000;
+                if(loop_delay <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: loop_delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("loop_delay = %i микросекунд\n", loop_delay);
+            }
+            else {
+                fprintf(stderr, "WARN: %s:%i: ошибка: неизвестная опция `%s`. Пропущено\n", path, lineno, s);
+            }
+
+            continue;
+        }
 
         // это мнемоника
         if(fn == compose) {
