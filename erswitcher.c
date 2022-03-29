@@ -779,13 +779,127 @@ void print_translate_buffer(int from, int backspace) {
 
     recover_active_mods();
 	
-	// в некоторых приложениях переключение не работает
+	// в некоторых приложениях переключение клавиатуры не работает, пока не пошлёшь сигнал окну
+	//send_notify_to_current_window();
+	
+	
+	// printf("cur window: %li\n", w);
+	
+	// Window inFocus;
+	// int rev;
+	// XGetInputFocus(d, &inFocus, &rev);
+	// printf("in focus window: %li %i\n", inFocus, rev);
+	
+	
+	// XSetInputFocus(d, None, RevertToNone, CurrentTime);
+	// XFlush(d);
+	
+	// XGetInputFocus(d, &inFocus, &rev);
+	// printf("in focus window 2: %li %i\n", inFocus, rev);
+	
+	// XSetInputFocus(d, w, RevertToParent, CurrentTime);
+	// XFlush(d);
+	
+	// XGetInputFocus(d, &inFocus, &rev);
+	// printf("in focus window 3: %li %i\n", inFocus, rev);
+	
+	//XSetInputFocus(d, w, RevertToNone, CurrentTime);
+	//XFlush(d);
+	
+	
+		
+	// press(SYM_TO_KEY(XK_Control_L).code, 1);
+	// press(SYM_TO_KEY(XK_Control_L).code, 0);
+	
+	if(active_state.group == group_ru) {
+		
+		Window win = get_current_window();
+	
+		// Window root; int x, y; unsigned int width, height, border_width, depth;
+		// XGetGeometry(d, win, &root, &x, &y, &width, &height, &border_width, &depth);
+	
+		// printf("win=%li root=%li width=%u height=%u\n", win, root, width, height);
+	
+		XEvent ev;
+		memset(&ev, 0, sizeof(ev));	
+	
+		// ev.xvisibility.type = VisibilityNotify;
+		// ev.xvisibility.serial = 0;
+		// ev.xvisibility.send_event = False;
+		// ev.xvisibility.display = d;
+		// ev.xvisibility.window = win;
+		// ev.xvisibility.state = VisibilityUnobscured;
+
+		// XSendEvent(d, win, False, VisibilityNotify, &ev);
+		// XSync(d, False);
+
+		// memset(&ev, 0, sizeof(ev));
+		
+		
+		
+		ev.xexpose.type = Expose;
+		ev.xexpose.serial = 0;
+		ev.xexpose.send_event = True;
+		ev.xexpose.display = d;
+		ev.xexpose.window = win;
+		ev.xexpose.x = 0;
+		ev.xexpose.y = 0;
+		ev.xexpose.width = 10;
+		ev.xexpose.height = 10;
+		ev.xexpose.count = 1;
+
+		XSendEvent(d, win, False, Expose, &ev);
+		XSync(d, False);
+		
+		
+		Window dummy;
+		int root_x, root_y, w_x, w_y;
+		unsigned int mask;
+		//root = DefaultRootWindow(d);
+		XQueryPointer(d, win, &dummy, &dummy,
+					  &root_x, &root_y, &w_x, &w_y, &mask);
+		printf("root_x=%i root_y=%i w_x=%i w_y=%i mask=%u\n", root_x, root_y, w_x, w_y, mask);
+		
+		unsigned state = get_input_state();
+		
+		memset(&ev, 0, sizeof(ev));
+		
+		ev.xkey.type = ButtonPress;
+		ev.xkey.serial = 0;
+		ev.xkey.send_event = True;
+		ev.xkey.display = d;
+		ev.xkey.window = win;
+		ev.xkey.subwindow = win;
+		ev.xkey.time = CurrentTime;
+		ev.xkey.x = w_x;
+		ev.xkey.y = w_y;
+		ev.xkey.x_root = root_x;
+		ev.xkey.y_root = root_y;
+		ev.xkey.state = state | ControlMask;
+		ev.xkey.keycode = SYM_TO_KEY(XK_Control_L).code;
+		ev.xkey.same_screen = 0;
+
+		XSendEvent(d, win, False, ButtonPress, &ev);
+		XSync(d, False);
+		
+		memset(&ev, 0, sizeof(ev));
+		ev.xkey.type = ButtonRelease;
+		ev.xkey.state = state | ControlMask;
+		
+		XSendEvent(d, win, False, ButtonRelease, &ev);
+		XSync(d, False);
+		
+		
+		printf("send->\n");
+		
+	}
+	
 
 }
 
 void print_invertcase_buffer(int from, int backspace) {
-    //word[pos] = 0;
-    //printf("print_invertcase_buffer: %S\n", word+from);
+    // word[pos] = 0;
+    // printf("print_invertcase_buffer: %S\n", word+from);
 
     clear_active_mods();
 
