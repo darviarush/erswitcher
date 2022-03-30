@@ -62,19 +62,19 @@ void event_next() {
 
     fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
 	
-	if(event.type == Expose) {
+	// if(event.type == Expose) {
 		
-		fprintf(stderr, "[%li ]",
-			ev.xexpose.send_event,
-			ev.xexpose.display,
-			ev.xexpose.window,
-			ev.xexpose.x,
-			ev.xexpose.y,
-			ev.xexpose.width,
-			ev.xexpose.height,
-			ev.xexpose.count
-		);
-	}
+		// fprintf(stderr, "[%li ]",
+			// ev.xexpose.send_event,
+			// ev.xexpose.display,
+			// ev.xexpose.window,
+			// ev.xexpose.x,
+			// ev.xexpose.y,
+			// ev.xexpose.width,
+			// ev.xexpose.height,
+			// ev.xexpose.count
+		// );
+	// }
 
 }
 
@@ -82,7 +82,7 @@ int main() {
 
 	
 	int black, white;
-	GC gc;
+	GC gc;	
 
 	d = XOpenDisplay(NULL);
 	/* 
