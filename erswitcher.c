@@ -552,29 +552,20 @@ unsigned int get_input_state() {
     return mask;
 }
 
-// Переключает раскладку
-void set_group(int group) {
-    if(keyboard_state(0).group == group) return;
-    XkbLockGroup(d, XkbUseCoreKbd, group);
-    XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
-    printf("set_group: %i\n", group);
-}
-
 // Эмулирует нажатие или отжатие клавиши
 void press(int code, int is_press) {
     unikey_t key = keyboard_state(code);
-    printf("   press: %i ", code);
+    printf("   %s: %i ", is_press? "press": "release", code);
     print_sym(key.mods, KEY_TO_SYM(key));
-    printf(" %s\n", is_press? "PRESS": "RELEASE");
+    printf("\n");
     XTestFakeKeyEvent(d, code, is_press? 1: 0, CurrentTime);
     XSync(d, False);
 }
 
-// устанавливает модификаторы
+// устанавливает модификаторы. Локи пропускает
 void send_mods(int mods, int is_press) {
 	mods &= ~(LockMask|NumMask);
-	
+
     XModifierKeymap *modifiers = XGetModifierMapping(d);
 
     for (int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
@@ -593,6 +584,53 @@ void send_mods(int mods, int is_press) {
 
     XFreeModifiermap(modifiers);
 }
+
+// устанавливает или снимает клавишу и модификаторы
+void press_mods(int code, int mods, int is_press) {
+	//XTestGrabControl(d, True);
+	
+	if(!is_press) press(code, 0);
+	send_mods(mods, is_press);
+	if(is_press) press(code, 1);
+	
+	//XTestGrabControl(d, False);
+	//XFlush(d);
+}
+
+// устанавливает локи. Модификаторы пропускает
+void set_locks(int mods) {
+	int loks[2] = {LockMask, NumMask};
+	
+	for(int i=0; i<2; i++) {
+		if(mods & LockMask) {
+			unikey_t k = SYM_TO_KEY(loks[i] == LockMask? XK_Caps_Lock: XK_Num_Lock);
+			
+			press_mods(k.code, k.mods, 1);
+			press_mods(k.code, k.mods, 0);
+			usleep(delay/2);
+		}
+	}
+}
+
+// Переключает раскладку
+void set_group(int group) {
+	if(keyboard_state(0).group == group) return;
+	
+	// пробуем переключить через нажатие клавиши
+	unikey_t k = SYM_TO_KEY(XK_ISO_Next_Group);
+	for(int i=0; i<8; i++) {
+		press_mods(k.code, k.mods, 1);
+		press_mods(k.code, k.mods, 0);
+		usleep(delay / 2);
+		if(keyboard_state(0).group == group) { printf("   set_group ISO: %i\n", group); return; }
+	}
+	
+    XkbLockGroup(d, XkbUseCoreKbd, group);
+    XkbStateRec state;
+    XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
+    printf("set_group: %i\n", group);
+}
+
 
 // // приводит клавиатуру в соответсвие с модификаторами (нажимает управляющие клавиши или отжимает, если нужно)
 // void sync_mods(int mods) {
@@ -636,38 +674,23 @@ void send_key(unikey_t key, int is_press) {
         printf("send_key: No Key!\n");
         return;
     }
-
-	//XTestGrabControl(d, True);
 	
-	// if(key.mods & (LockMask|NumMask)) {
-		
-		// if(key.mods & LockMask) send_key(SYM_TO_KEY(XK_Caps_Lock), 2);
-		// if(key.mods & NumMask) send_key(SYM_TO_KEY(XK_Num_Lock), 2);
-	// }
-
     printf("send_key: %s %s\n", KEY_TO_STR(key), is_press == 2? "": (is_press? "PRESS": "RELEASE"));
-    set_group(key.group);
-    send_mods(key.mods, is_press);
-    press(key.code, is_press);
+	
+	int xdelay = delay / 2;
+	if(xdelay <= 0) xdelay = 1;
+	
+	set_locks(key.mods);
+	set_group(key.group);
+    press_mods(key.code, key.mods, is_press);
 	
 	if(is_press == 2) {
-		if(delay/2) usleep(delay/2);
-		press(key.code, 0);
-		send_mods(key.mods, 0);
+		usleep(xdelay);
+		press_mods(key.code, key.mods, 0);
+		set_locks(key.mods);
 	}
 
-	//XTestGrabControl(d, False);
-    XFlush(d);
-
-    if(delay) {
-		if(is_press == 2) { if(delay/2) usleep(delay/2); else usleep(delay); }
-		else usleep(delay);
-	}
-	
-	// if(is_press != 1) {
-		// if(key.mods & LockMask) send_key(SYM_TO_KEY(XK_Caps_Lock), 2);
-		// if(key.mods & NumMask) send_key(SYM_TO_KEY(XK_Num_Lock), 2);
-	// }
+	usleep(xdelay);	
 }
 
 // Эмулирует нажатие и отжатие клавиши
@@ -713,15 +736,7 @@ void clear_active_mods() {
     // отжимаем модификаторы
     for(int i = 0; i<active_len; i++) press(active_codes[i], 0);
 
-    // снимаем Капс-лок (он не входит в модификаторы)
-    if(active_state.mods & LockMask) {
-        press_key(SYM_TO_KEY(XK_Caps_Lock));
-    }
-
-    // снимаем Нам-лок (он не входит в модификаторы)
-    if(active_state.mods & NumMask) {
-        press_key(SYM_TO_KEY(XK_Num_Lock));
-    }
+	set_locks(active_state.mods);
 	
 	printf("===== clear_active_mods END =====\n");
 }
@@ -745,23 +760,9 @@ void recover_active_mods() {
         }
     }
 
-    // восстанавливаем Капс-лок (он не входит в модификаторы)
-    if(active_state.mods & LockMask && !(state.mods & LockMask)) {
-        press_key(SYM_TO_KEY(XK_Caps_Lock));
-    }
-
-    // восстанавливаем Num-лок (он не входит в модификаторы)
-    if(active_state.mods & NumMask && !(state.mods & NumMask)) {
-        press_key(SYM_TO_KEY(XK_Num_Lock));
-    }
-
-	//XTestGrabControl(d, True);
-
+    set_locks(active_state.mods);
     set_group(active_state.group);
-	
-	//XTestGrabControl(d, False);
-	XFlush(d);
-
+		
 	printf("===== recover_active_mods END =====\n");
 
     active_use--;
