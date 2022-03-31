@@ -749,6 +749,9 @@ void recover_active_mods() {
     // снимаем нажатые модификаторы
     unikey_t state = keyboard_state(0);
     send_mods(state.mods, 0);
+	
+	set_locks(active_state.mods);
+    set_group(active_state.group);
 
     char active_keys[32];
     XQueryKeymap(d, active_keys);
@@ -758,11 +761,27 @@ void recover_active_mods() {
         if(BIT(keys, code)==BIT(active_keys, code)) {
             press(code, 1);
         }
-    }
-
-    set_locks(active_state.mods);
-    set_group(active_state.group);
-		
+    }	
+	
+	// хак для телеграма
+	
+	// XLowerWindow(d, current_win);
+	// XRaiseWindow(d, current_win);
+	
+	XEvent e;
+	
+	e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 1};
+	
+	XSendEvent(d, current_win, False, Expose, &e);
+	
+	usleep(delay);
+	
+	XTestGrabControl(d, True);
+	press(SYM_TO_KEY(XK_Control_L).code, 1);
+	press(SYM_TO_KEY(XK_Control_L).code, 0);
+	XTestGrabControl(d, False);
+	XFlush(d);
+	
 	printf("===== recover_active_mods END =====\n");
 
     active_use--;
