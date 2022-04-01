@@ -724,6 +724,7 @@ void clear_active_mods() {
 
     active_len = 0;
 
+	// может быть зажат правый контрол, поэтому ищем среди соответствующих и нажатых
     for(int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
         for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
             int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
@@ -750,9 +751,6 @@ void recover_active_mods() {
     unikey_t state = keyboard_state(0);
     send_mods(state.mods, 0);
 	
-	set_locks(active_state.mods);
-    set_group(active_state.group);
-
     char active_keys[32];
     XQueryKeymap(d, active_keys);
     for(int i=0; i<active_len; i++) {
@@ -763,24 +761,35 @@ void recover_active_mods() {
         }
     }	
 	
+	set_locks(active_state.mods);
+    set_group(active_state.group);
+	
 	// хак для телеграма
 	
 	// XLowerWindow(d, current_win);
 	// XRaiseWindow(d, current_win);
-	
+		
 	XEvent e;
+	memset(&e, 0, sizeof(XEvent));
 	
 	e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 1};
 	
-	XSendEvent(d, current_win, False, Expose, &e);
+	XSendEvent(d, current_win, True, Expose, &e);
 	
 	usleep(delay);
 	
-	XTestGrabControl(d, True);
-	press(SYM_TO_KEY(XK_Control_L).code, 1);
-	press(SYM_TO_KEY(XK_Control_L).code, 0);
-	XTestGrabControl(d, False);
-	XFlush(d);
+	memset(&e, 0, sizeof(XEvent));
+	
+	e.xmotion = (XMotionEvent) {type: MotionNotify, state: Button1Mask, };
+	
+	XSendEvent(d, current_win, True, MotionNotify, &e);
+	
+	
+	// XTestGrabControl(d, True);
+	// press(SYM_TO_KEY(XK_Control_L).code, 1);
+	// press(SYM_TO_KEY(XK_Control_L).code, 0);
+	// XTestGrabControl(d, False);
+	// XFlush(d);
 	
 	printf("===== recover_active_mods END =====\n");
 
