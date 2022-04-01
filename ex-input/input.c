@@ -61,9 +61,9 @@ void event_next() {
     XNextEvent(d, &event);
 
     fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
-	
+
 	// if(event.type == Expose) {
-		
+
 		// fprintf(stderr, "[%li ]",
 			// ev.xexpose.send_event,
 			// ev.xexpose.display,
@@ -80,9 +80,8 @@ void event_next() {
 
 int main() {
 
-	
 	int black, white;
-	GC gc;	
+	GC gc;
 
 	d = XOpenDisplay(NULL);
 	/* 
