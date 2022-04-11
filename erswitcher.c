@@ -600,10 +600,11 @@ void press_mods(int code, int mods, int is_press) {
 // устанавливает локи. Модификаторы пропускает
 void set_locks(int mods) {
 	int loks[2] = {LockMask, NumMask};
+	int loks_sym[2] = {XK_Caps_Lock, XK_Num_Lock};
 	
 	for(int i=0; i<2; i++) {
-		if(mods & LockMask) {
-			unikey_t k = SYM_TO_KEY(loks[i] == LockMask? XK_Caps_Lock: XK_Num_Lock);
+		if(mods & loks[i]) {
+			unikey_t k = SYM_TO_KEY(loks_sym[i]);
 			
 			press_mods(k.code, k.mods, 1);
 			press_mods(k.code, k.mods, 0);
@@ -616,19 +617,20 @@ void set_locks(int mods) {
 void set_group(int group) {
 	if(keyboard_state(0).group == group) return;
 	
-	// пробуем переключить через нажатие клавиши
-	unikey_t k = SYM_TO_KEY(XK_ISO_Next_Group);
-	for(int i=0; i<8; i++) {
-		press_mods(k.code, k.mods, 1);
-		press_mods(k.code, k.mods, 0);
-		usleep(delay / 2);
-		if(keyboard_state(0).group == group) { printf("   set_group ISO: %i\n", group); return; }
-	}
+	// // пробуем переключить через нажатие клавиши
+	// unikey_t k = SYM_TO_KEY(XK_ISO_Next_Group);
+	// for(int i=0; i<8; i++) {
+		// press_mods(k.code, k.mods, 1);
+		// press_mods(k.code, k.mods, 0);
+		// usleep(delay / 2);
+		// if(keyboard_state(0).group == group) { printf("   set_group ISO: %i\n", group); return; }
+	// }
 	
     XkbLockGroup(d, XkbUseCoreKbd, group);
     XkbStateRec state;
     XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
+	usleep(delay);
 }
 
 
@@ -768,26 +770,49 @@ void recover_active_mods() {
 	
 	// XLowerWindow(d, current_win);
 	// XRaiseWindow(d, current_win);
+	if(active_state.group == group_ru) {
+		usleep(delay);
 		
-	XEvent e;
-	memset(&e, 0, sizeof(XEvent));
+		XEvent e;
+		memset(&e, 0, sizeof(XEvent));
+		
+		e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 0};
+		
+		XSendEvent(d, current_win, True, Expose, &e);
+		
+		usleep(delay);
+		
+		press_key(SYM_TO_KEY(XK_Control_L));
+		
+		// unikey_t ks = SYM_TO_KEY(XK_Tab);
+		// ks.mods |= AltMask;
+		// press_key(ks);
+		// ks.mods |= ShiftMask;
+		// press_key(ks);
+	}
 	
-	e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 1};
+	// char buf[1024];
 	
-	XSendEvent(d, current_win, True, Expose, &e);
+	// for(int i=0; i<2; i++) {
+		// sprintf(buf, "xdotool %s %lu", i==0? "windowminimize": "windowactivate", current_win);
+		// printf("%s\n", buf);
+		
+		// int res = system(buf);
+		// printf("res=%i\n", res);
+	// }
 	
-	usleep(delay);
+	// memset(&e, 0, sizeof(XEvent));
 	
-	memset(&e, 0, sizeof(XEvent));
+	// e.xmotion = (XMotionEvent) {type: MotionNotify, state: Button1Mask, };
 	
-	e.xmotion = (XMotionEvent) {type: MotionNotify, state: Button1Mask, };
-	
-	XSendEvent(d, current_win, True, MotionNotify, &e);
+	// XSendEvent(d, current_win, True, MotionNotify, &e);
 	
 	
 	// XTestGrabControl(d, True);
 	// press(SYM_TO_KEY(XK_Control_L).code, 1);
+	// usleep(delay/2);
 	// press(SYM_TO_KEY(XK_Control_L).code, 0);
+	// usleep(delay/2);
 	// XTestGrabControl(d, False);
 	// XFlush(d);
 	

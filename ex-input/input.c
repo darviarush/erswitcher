@@ -57,24 +57,24 @@ char* get_event_type(int n) {
 }
 
 void event_next() {
-    XEvent event;
-    XNextEvent(d, &event);
+    XEvent ev;
+    XNextEvent(d, &ev);
 
-    fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
+    fprintf(stderr, "[%i %s]:\n", ev.type, get_event_type(ev.type));
 
-	// if(event.type == Expose) {
+	if(ev.type == Expose) {
 
-		// fprintf(stderr, "[%li ]",
-			// ev.xexpose.send_event,
-			// ev.xexpose.display,
-			// ev.xexpose.window,
-			// ev.xexpose.x,
-			// ev.xexpose.y,
-			// ev.xexpose.width,
-			// ev.xexpose.height,
-			// ev.xexpose.count
-		// );
-	// }
+		fprintf(stderr, "  send_event=%i\n", ev.xexpose.send_event);
+		fprintf(stderr, "  display=%p\n", ev.xexpose.display);
+		fprintf(stderr, "  window=%lu\n", ev.xexpose.window);
+		fprintf(stderr, "  x=%i\n", ev.xexpose.x);
+		fprintf(stderr, "  y=%i\n", ev.xexpose.y);
+		fprintf(stderr, "  width=%i\n", ev.xexpose.width);
+		fprintf(stderr, "  height=%i\n", ev.xexpose.height);
+		fprintf(stderr, "  count=%i\n", ev.xexpose.count);
+		
+	}
+	else fprintf(stderr, "  NO!\n");
 
 }
 
