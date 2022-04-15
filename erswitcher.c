@@ -631,7 +631,7 @@ void set_group(int group) {
     XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
 	// TODO: Добавить задержку в опции
-	//usleep(delay); // тут задержку делаем побольше
+	usleep(delay); // тут задержку делаем побольше
 }
 
 
@@ -773,6 +773,8 @@ void recover_active_mods() {
 	// XLowerWindow(d, current_win);
 	// XRaiseWindow(d, current_win);
 	if(active_state.group == group_ru) {
+		//press_key(INT_TO_KEY(L','));
+		
 		// usleep(delay);
 		
 		// XEvent e;
