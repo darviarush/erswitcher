@@ -91,6 +91,7 @@ pack [make_scrolled_y [frame .t] [text .t.text -wrap word -undo 1 -maxundo -1]] 
 .t.text tag configure section -foreground #DC143C
 .t.text tag configure equal -foreground #1E90FF
 .t.text tag configure error -background #DC143C -foreground white
+.t.text tag configure warn -background #CD5C5C -foreground white
 
 set bookmarks []
 proc add_bookmark {title lineno} {
@@ -137,13 +138,16 @@ set conf [read_file $path]
 # колоризирует код и переписывает закладки
 proc coloring {text} {
 	# удаляем теги
-	foreach i {bookmark remark section equal error} {
+	foreach i {bookmark remark section equal error warn} {
 		.t.text tag remove $i 1.0 end
 	}
 	# удаляем закладки
 	clear_bookmarks
 	
-	set re {^((?:\\.|[^\\])*)=}
+	# множество опций, если ключ встречается несколько раз, то все вхождения подсвечиваются оранжевым 
+	array set keys []
+	
+	set re {^((?:\\.|[^\\])*?)=}
 	
 	set lineno 0
 	foreach line [split $text "\n"] {
@@ -166,9 +170,16 @@ proc coloring {text} {
 			}
 			{^\s*$} {}
 			{=} {
-				regexp $re $line -> a
-				set charno [string length $a]
+				regexp $re $line -> key
+				set charno [string length $key]
 				.t.text tag add equal $lineno.$charno $lineno.$charno+1c
+				
+				if {[info exists keys($key)]} {
+					.t.text tag add warn {*}$keys($key)
+					.t.text tag add warn $lineno.0 $lineno.$charno
+				} else {
+					set keys($key) "$lineno.0 $lineno.$charno"
+				}
 			}
 			default { .t.text tag add error $lineno.0 $lineno.end }
 		}

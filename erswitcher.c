@@ -771,18 +771,18 @@ void recover_active_mods() {
 	// XLowerWindow(d, current_win);
 	// XRaiseWindow(d, current_win);
 	if(active_state.group == group_ru) {
-		usleep(delay);
+		// usleep(delay);
 		
-		XEvent e;
-		memset(&e, 0, sizeof(XEvent));
+		// XEvent e;
+		// memset(&e, 0, sizeof(XEvent));
 		
-		e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 0};
+		// e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 0};
 		
-		XSendEvent(d, current_win, True, Expose, &e);
+		// XSendEvent(d, current_win, True, Expose, &e);
 		
-		usleep(delay);
+		// usleep(delay);
 		
-		press_key(SYM_TO_KEY(XK_Control_L));
+		// press_key(SYM_TO_KEY(XK_Control_L));
 		
 		// unikey_t ks = SYM_TO_KEY(XK_Tab);
 		// ks.mods |= AltMask;
