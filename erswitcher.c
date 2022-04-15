@@ -683,7 +683,7 @@ void send_key(unikey_t key, int is_press) {
 	int xdelay = delay / 2;
 	if(xdelay <= 0) xdelay = 1;
 
-	// группу нужно переключать до нажатия шифта, иначе первую может не переключать
+	// Группу нужно переключать до нажатия шифта, иначе первую может не переключать
 	set_group(key.group);
 	set_locks(key.mods);
     press_mods(key.code, key.mods, is_press);
