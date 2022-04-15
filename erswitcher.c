@@ -630,7 +630,8 @@ void set_group(int group) {
     XkbStateRec state;
     XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
-	usleep(delay);
+	// TODO: Добавить задержку в опции
+	usleep(delay*2); // тут задержку делаем побольше
 }
 
 
