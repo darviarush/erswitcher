@@ -631,7 +631,7 @@ void set_group(int group) {
     XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
     printf("set_group: %i\n", group);
 	// TODO: Добавить задержку в опции
-	usleep(delay*2); // тут задержку делаем побольше
+	//usleep(delay); // тут задержку делаем побольше
 }
 
 
@@ -682,9 +682,10 @@ void send_key(unikey_t key, int is_press) {
 	
 	int xdelay = delay / 2;
 	if(xdelay <= 0) xdelay = 1;
-	
-	set_locks(key.mods);
+
+	// группу нужно переключать до нажатия шифта, иначе первую может не переключать
 	set_group(key.group);
+	set_locks(key.mods);
     press_mods(key.code, key.mods, is_press);
 	
 	if(is_press == 2) {
