@@ -31,7 +31,7 @@
 #include <wctype.h>
 #include <xkbcommon/xkbcommon.h>
 
-extern char **environ;
+extern char** environ;
 
 
 //@category Отладка
@@ -1366,8 +1366,8 @@ void event_next() {
         if(config_window_pid < 0) {
             perror("ERROR: fork не запустился");
         } else if(config_window_pid == 0) {
-			char* path = ".local/bin/erswitcher-configurator.tcl";
-			char* argv[] = {};
+			const char* path = ".local/bin/erswitcher-configurator.tcl";
+			char* const argv[] = {NULL};
             execve(path, argv, environ);
             fprintf(stderr, "ERROR: конфигуратор %s не запущен! Ошибка: %s\n", path, strerror(errno));
             exit(1);

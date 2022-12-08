@@ -67,6 +67,18 @@ _EN—RU Switcher_ будет скомпилирован, установлен �
 * tcl
 * tk
 
+## ubuntu
+
+```sh
+sudo apt install gcc name libxkbcommon-dev libxtst-dev tcltk
+```
+
+## arhlinux
+
+```sh
+sudo pacman -S make gcc libx11 libxkbcommon libxtst tcl tk
+```
+
 # AUTOLOAD
 
 При старте _EN—RU Switcher_ переписывает файлы в каталоге пользователя **~/.local/applications/erswitcher.desktop** и **~/.config/autostart/erswitcher.desktop**. Таким образом он сразу же запускается при старте рабочего стола поддерживающего стандарт _freedesktop.org_.
