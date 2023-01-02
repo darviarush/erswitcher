@@ -15,6 +15,9 @@ install:
 		cp -a erswitcher-configurator.tcl ~/.local/bin/erswitcher-configurator.tcl
 		if [ ! -e ~/.config/erswitcher.conf ]; then cp -a erswitcher.conf ~/.config/erswitcher.conf; fi
 
+diff:
+		meld ~/.config/erswitcher.conf erswitcher.conf
+
 install_conf:
 		cp -a erswitcher.conf ~/.config/erswitcher.conf
 
