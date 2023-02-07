@@ -6,7 +6,7 @@ tk appname "En-Ru Switcher Конфигуратор"
 
 #@category виджеты
 
-# делаем вертикальный скроллбар. f - фрейм с виджетом w для которого скроллбар и делается 
+# делаем вертикальный скроллбар. f - фрейм с виджетом w для которого скроллбар и делается
 proc make_scrolled_y {f w} {
 	scrollbar $f.scrollbar  -orient vertical -width 10 -command "$w yview"
 	$w configure -yscrollcommand "$f.scrollbar set"
@@ -132,7 +132,7 @@ wm protocol . WM_DELETE_WINDOW {
 
 # показываем конфиг
 set path "~/.config/erswitcher.conf"
-set conf [read_file $path]
+set conf [string trim [read_file $path]]
 .t.text insert end $conf
 
 # колоризирует код и переписывает закладки
@@ -192,9 +192,10 @@ coloring $conf
 bind .t.text <KeyRelease> {
 	global conf
 	set text [.t.text get 1.0 end-1c]
+	set $text [string trim $text]
 	if {$conf == $text} {return}
 	set conf $text
-	write_file $path $text
+	write_file $path "$text\n"
 	coloring $text
 
 	set res [catch {exec killall -HUP erswitcher} result]
