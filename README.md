@@ -183,7 +183,7 @@ Alt+Control+Shift+Break=kate ~/.config/erswitcher.conf && killall -HUP erswitche
 
 # AUTHOR
 
-_Yaroslav O. Kosmina_ <darviarush@mail.ru>.
+_Yaroslav O. Kosmina_ <dart@cpan.org>.
 
 # LICENSE
 
