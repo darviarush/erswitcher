@@ -42,3 +42,7 @@ dist:
 		mv configure.scan configure.in
 		autoconf
 		./configure
+
+changes:
+	echo "Список нововведений в En-Ru Switcher:\n\n" > Changes
+	
