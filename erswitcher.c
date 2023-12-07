@@ -159,6 +159,7 @@ int keyfn_active = -1;
 typedef struct {
     wint_t word[COMPOSE_KEY_MAX];
     int pos;
+    int cursor_back;        // на сколько позиций назад вернуть курсор
     char* to;
 } compose_t;
 
@@ -868,6 +869,12 @@ void press_key_multi(unikey_t key, int n) {
     for(int i=0; i<n; i++) press_key(key);
 }
 
+int utf8_strlen(const char *s) {
+    int count = 0;
+    while (*s) count += (*s++ & 0xC0) != 0x80;
+    return count;
+}
+
 #define FOR_UTF8(S)			\
 	mbstate_t mbs_UTF8 = {0}; 	\
 	for(size_t charlen_UTF8, i_UTF8 = 0;	\
@@ -1535,6 +1542,14 @@ void insert_from_clipboard(char* s) {
     after(0.10, shift_insert);
 }
 
+// Нажата клавиша компосе - нужно заменить мнемонику на значение
+int cursor_back = 0;
+void cursor_back__fn() {
+    fprintf(stderr, "Курсор влево на %i позиций\n", cursor_back);
+    press_key_multi(SYM_TO_KEY(XK_Left), cursor_back);
+    cursor_back = 0;
+}
+
 void compose(char*) {
     if(pos == 0) return;
 
@@ -1549,6 +1564,7 @@ void compose(char*) {
         if(n == -1) {	// дошли до конца
             to = compose_map[i].to;
             remove_sym = compose_map[i].pos;
+            cursor_back = compose_map[i].cursor_back;
             break;
         }
 
@@ -1570,6 +1586,8 @@ void compose(char*) {
     set_group(key.group);
     // подменяем буфер собой и вставляем из него композэ
 	insert_from_clipboard(to);
+
+    if(cursor_back) after(0.30, cursor_back__fn);
 }
 
 void word_translate(char*) {
@@ -1830,8 +1848,15 @@ NEXT_LINE:
         v++;
 
         // меняем \char на символы
+        char* compose_position_cursor = NULL;
         for(char* x = v; *x; x++) {
             if(*x == '\\') {
+                if(x[1] == '^') {
+                    for(char* f=x; *f; f++) *f = f[2];
+                    compose_position_cursor = x;
+                    continue;
+                }
+
                 int to = 0;
                 switch(x[1]) {
                     case '\\': to = '\\'; break;
@@ -1901,6 +1926,12 @@ NEXT_LINE:
 
                 word[i++] = ws;
             }
+
+            if(compose_position_cursor) {
+                compose_map[compose_map_size].cursor_back = utf8_strlen(compose_position_cursor);
+                printf("cursor_back = %i\n", compose_map[compose_map_size].cursor_back);
+            }
+            else compose_map[compose_map_size].cursor_back = 0;
 
             compose_map[compose_map_size].pos = i;
             compose_map[compose_map_size++].to = strdup(v);
