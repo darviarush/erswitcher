@@ -1814,6 +1814,8 @@ NEXT_LINE:
         // TODO: key=value на несколько строк
         // TODO: возврат курсора на указанную позицию - необходимо для сниппетов
         // TODO: выделение внутрь сниппетов
+
+        // разбираем ключ
         char* v = s;
         while(*v) {
 			if(*v == '\\') { v++; if(*v == '\0') break; v++; continue; }
@@ -1827,6 +1829,24 @@ NEXT_LINE:
         *v = '\0';
         v++;
 
+        // меняем \char на символы
+        for(char* x = v; *x; x++) {
+            if(*x == '\\') {
+                int to = 0;
+                switch(x[1]) {
+                    case '\\': to = '\\'; break;
+                    case 'n': to = '\n'; break;
+                    case 't': to = '\t'; break;
+                }
+
+                if(to) {
+                    *x=to;
+                    for(char* f=x+1; *f; f++) *f = f[1];
+                }
+            }
+        }
+
+        // после =
         if(fn == SEC_OPTIONS) {
             if(EQ(s, "delay")) {
                 delay = atof(v) * 1000000;
@@ -1859,7 +1879,8 @@ NEXT_LINE:
                 compose_map = realloc(compose_map, compose_map_max_size * sizeof(compose_t));
             }
 
-            wint_t* w = compose_map[compose_map_size].word;
+            // разбираем ключ
+            wint_t* word = compose_map[compose_map_size].word;
             int i = 0;
             int m = 0;
 
@@ -1878,14 +1899,14 @@ NEXT_LINE:
                     goto NEXT_LINE;
                 }
 
-                w[i++] = ws;
+                word[i++] = ws;
             }
 
             compose_map[compose_map_size].pos = i;
             compose_map[compose_map_size++].to = strdup(v);
-			
+
 			if(DEBUG) {printf("compose: %s ⟶ %s\n", s, v); fflush(stdout);}
-			
+
             continue;
         }
 
