@@ -1,2 +1,4 @@
 erswitcher
 *.cache/
+.vscode/
+
