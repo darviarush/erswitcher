@@ -92,6 +92,8 @@ pack [make_scrolled_y [frame .t] [text .t.text -wrap word -undo 1 -maxundo -1]] 
 .t.text tag configure equal -foreground #1E90FF
 .t.text tag configure error -background #DC143C -foreground white
 .t.text tag configure warn -background #CD5C5C -foreground white
+.t.text tag configure cursor -foreground #4169E1
+.t.text tag configure backslash -foreground #228B22
 
 set bookmarks []
 proc add_bookmark {title lineno} {
@@ -143,16 +145,16 @@ proc coloring {text} {
 	}
 	# удаляем закладки
 	clear_bookmarks
-	
+
 	# множество опций, если ключ встречается несколько раз, то все вхождения подсвечиваются оранжевым 
 	array set keys []
-	
+
 	set re {^((?:\\.|[^\\])*?)=}
-	
+
 	set lineno 0
 	foreach line [split $text "\n"] {
 		incr lineno
-		
+
 		switch -regexp -- $line {
 			{^## } {
 				# закладки
@@ -171,19 +173,33 @@ proc coloring {text} {
 			{^\s*$} {}
 			{=} {
 				regexp $re $line -> key
+
 				set charno [string length $key]
 				.t.text tag add equal $lineno.$charno $lineno.$charno+1c
-				
+
 				if {[info exists keys($key)]} {
 					.t.text tag add warn {*}$keys($key)
 					.t.text tag add warn $lineno.0 $lineno.$charno
 				} else {
 					set keys($key) "$lineno.0 $lineno.$charno"
 				}
+
+				foreach {m} [regexp -start $charno -indices -all -inline {\\[nt^]} $line] {
+					set i [lindex $m 0]
+					set j [lindex $m 1]
+
+					if {[string range $line $i $j] == "\\^"} {
+						set backslash cursor
+					} else {
+						set backslash backslash
+					}
+					.t.text tag add $backslash $lineno.$i $lineno.[expr $j+1]
+				}
+
 			}
 			default { .t.text tag add error $lineno.0 $lineno.end }
 		}
-	}	
+	}
 }
 
 coloring $conf
@@ -192,7 +208,7 @@ coloring $conf
 bind .t.text <KeyRelease> {
 	global conf
 	set text [.t.text get 1.0 end-1c]
-	set $text [string trim $text]
+	set text [string trim $text]
 	if {$conf == $text} {return}
 	set conf $text
 	write_file $path "$text\n"
@@ -207,6 +223,6 @@ bind .l.list <<ListboxSelect>> {
 	set idx [%W curselection]
 	if {$idx != ""} {
 		set pos [lindex $bookmarks $idx]
-		.t.text see "$pos.0"		
+		.t.text see "$pos.0"
 	}
 }
