@@ -86,14 +86,36 @@ pack [make_scrolled_y [frame .t] [text .t.text -wrap word -undo 1 -maxundo -1]] 
 .m add .l
 .m add .t
 
-.t.text tag configure bookmark -foreground #DC143C
-.t.text tag configure remark -foreground #008080
-.t.text tag configure section -foreground #DC143C
-.t.text tag configure equal -foreground #1E90FF
-.t.text tag configure error -background #DC143C -foreground white
-.t.text tag configure warn -background #CD5C5C -foreground white
-.t.text tag configure cursor -foreground #4169E1
-.t.text tag configure backslash -foreground #228B22
+set colors {
+	bookmark 	#DC143C
+	remark 		#008080
+	section 	#DC143C
+	equal 		#1E90FF
+	error 		#DC143C
+	warn 		#CD5C5C
+	cursor 		#4169E1
+	backslash 	#228B22
+}
+
+set bgcolors {error warn}
+
+# set bg [.t.text cget -background]
+
+dict for {key fg} $colors {
+	if { $key in $bgcolors } {
+		.t.text tag configure $key -background $fg -foreground white
+	} else {
+		.t.text tag configure $key -foreground $fg
+	}
+}
+# .t.text tag configure bookmark -foreground #DC143C
+# .t.text tag configure remark -foreground #008080
+# .t.text tag configure section -foreground #DC143C
+# .t.text tag configure equal -foreground #1E90FF
+# .t.text tag configure error -background #DC143C -foreground white
+# .t.text tag configure warn -background #CD5C5C -foreground white
+# .t.text tag configure cursor -foreground #4169E1
+# .t.text tag configure backslash -foreground #228B22
 
 set bookmarks []
 proc add_bookmark {title lineno} {
@@ -139,9 +161,10 @@ set conf [string trim [read_file $path]]
 
 # колоризирует код и переписывает закладки
 proc coloring {text} {
+	global colors
 	# удаляем теги
-	foreach i {bookmark remark section equal error warn} {
-		.t.text tag remove $i 1.0 end
+	dict for {color_name fg} $colors {
+		.t.text tag remove $color_name 1.0 end
 	}
 	# удаляем закладки
 	clear_bookmarks
@@ -204,12 +227,27 @@ proc coloring {text} {
 
 coloring $conf
 
+# выделяем всё
+bind .t.text <Control-KeyRelease-a> {
+	#puts "Control-KeyRelease-a"
+	%W tag add sel 1.0 end
+}
+
 # колоризируем текст и отправляем erswitcher-у сигнал на пересчитывание конфига
+# bind .t.text <KeyPress> {
+# 	puts "KeyPress: A=%A K=%K k=%k N=%N"
+# }
+
 bind .t.text <KeyRelease> {
 	global conf
+
+	#puts "KeyRelease: A=%A K=%K k=%k N=%N"
+
 	set text [.t.text get 1.0 end-1c]
 	set text [string trim $text]
-	if {$conf == $text} {return}
+	if {$conf == $text} {
+		return
+	}
 	set conf $text
 	write_file $path "$text\n"
 	coloring $text
