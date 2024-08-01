@@ -90,17 +90,6 @@ int delay = DELAY;          	// задержка между программны
 int loop_delay = DELAY;			// задержка между опросами клавиатуры
 pid_t config_window_pid = 0;	// pid конфигуратора
 
-
-typedef struct {
-    double time; 			// время в секундах, когда таймер должен сработать
-    void(*fn)();
-} mytimer_t;
-
-#define MAX_TIMERS			256
-mytimer_t timers[MAX_TIMERS];
-int timers_size = 0;
-
-
 //@category Иксы
 
 Display *d;					// текущий дисплей
@@ -411,6 +400,17 @@ int in_sym(KeySym symbol, KeySym* symbols) {
 
 //@category Задержки
 
+typedef struct {
+    double time; 			// время в секундах, когда таймер должен сработать
+    void(*fn)();
+} mytimer_t;
+
+#define MAX_TIMERS			256
+mytimer_t timers[MAX_TIMERS];
+int timers_size = 0;
+
+#define TIMEVAL_TO_DBL(T)   (T.tv_sec + USEC_TO_DBL(T.tv_usec))
+
 int after(double interval, void(*fn)()) {
     int i;
     for(i=0; i<MAX_TIMERS; i++) {
@@ -426,7 +426,7 @@ int after(double interval, void(*fn)()) {
 
     struct timeval curtime;
     gettimeofday(&curtime, 0);
-    timers[i].time = curtime.tv_sec + curtime.tv_usec / 1000000.0 + interval;
+    timers[i].time = TIMEVAL_TO_DBL(curtime) + interval;
 
     if(timers_size <= i) timers_size = i+1;
 
@@ -436,7 +436,7 @@ int after(double interval, void(*fn)()) {
 void timers_apply() {
     struct timeval curtime;
     gettimeofday(&curtime, 0);
-    double now = curtime.tv_sec + curtime.tv_usec / 1000000.0;
+    double now = TIMEVAL_TO_DBL(curtime);
 
     int i;
     int last = 0;
@@ -589,11 +589,11 @@ void send_mods(int mods, int is_press) {
 // устанавливает или снимает клавишу и модификаторы
 void press_mods(int code, int mods, int is_press) {
 	//XTestGrabControl(d, True);
-	
+
 	if(!is_press) press(code, 0);
 	send_mods(mods, is_press);
 	if(is_press) press(code, 1);
-	
+
 	//XTestGrabControl(d, False);
 	//XFlush(d);
 }
@@ -602,11 +602,11 @@ void press_mods(int code, int mods, int is_press) {
 void set_locks(int mods) {
 	int loks[2] = {LockMask, NumMask};
 	int loks_sym[2] = {XK_Caps_Lock, XK_Num_Lock};
-	
+
 	for(int i=0; i<2; i++) {
 		if(mods & loks[i]) {
 			unikey_t k = SYM_TO_KEY(loks_sym[i]);
-			
+
 			press_mods(k.code, k.mods, 1);
 			press_mods(k.code, k.mods, 0);
 			usleep(delay/2);
@@ -617,7 +617,7 @@ void set_locks(int mods) {
 // Переключает раскладку
 void set_group(int group) {
 	if(keyboard_state(0).group == group) return;
-	
+
 	// // пробуем переключить через нажатие клавиши
 	// unikey_t k = SYM_TO_KEY(XK_ISO_Next_Group);
 	// for(int i=0; i<8; i++) {
@@ -626,7 +626,7 @@ void set_group(int group) {
 		// usleep(delay / 2);
 		// if(keyboard_state(0).group == group) { printf("   set_group ISO: %i\n", group); return; }
 	// }
-	
+
     XkbLockGroup(d, XkbUseCoreKbd, group);
     XkbStateRec state;
     XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
@@ -640,18 +640,18 @@ void set_group(int group) {
 // void sync_mods(int mods) {
 	// int active_mods = keyboard_state(0).mods;
 	// if(!(mods | active_mods)) return;
-	
+
 	// XModifierKeymap *modifiers = XGetModifierMapping(d);
 
     // for (int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
 		// if(!(1 << mod_index) & (LockMask|NumMask|ShiftMask)) continue;
-		
+
 		// int maybe_press = mods & (1 << mod_index);
 		// int is_press = active_mods & (1 << mod_index);
-		
+
 		// // если должен быть нажат и не нажат или нажат и не должен быть нажат
         // if((maybe_press && !is_press) || (is_press && !maybe_press)) {
-			
+
             // for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
                 // int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
                 // if(code) {	// кейкод клавиши-модификатора найден
@@ -660,16 +660,16 @@ void set_group(int group) {
 						// press(code, 0);
 					// }
 					// else press(code, maybe_press? 1: 0); // нажимаем, если не нажат или отжимаем
-					
+
                     // //if(delay/2) usleep(delay/2);
 					// break;
                 // }
             // }
-			
+
         // }
     // }
 
-    // XFreeModifiermap(modifiers);	
+    // XFreeModifiermap(modifiers);
 // }
 
 // Эмулирует нажатие или отжатие клавиши
@@ -678,9 +678,9 @@ void send_key(unikey_t key, int is_press) {
         printf("send_key: No Key!\n");
         return;
     }
-	
+
     printf("send_key: %s %s\n", KEY_TO_STR(key), is_press == 2? "": (is_press? "PRESS": "RELEASE"));
-	
+
 	int xdelay = delay / 2;
 	if(xdelay <= 0) xdelay = 1;
 
@@ -688,14 +688,14 @@ void send_key(unikey_t key, int is_press) {
 	set_group(key.group);
 	set_locks(key.mods);
     press_mods(key.code, key.mods, is_press);
-	
+
 	if(is_press == 2) {
 		usleep(xdelay);
 		press_mods(key.code, key.mods, 0);
 		set_locks(key.mods);
 	}
 
-	usleep(xdelay);	
+	usleep(xdelay);
 }
 
 // Эмулирует нажатие и отжатие клавиши
@@ -717,9 +717,9 @@ void clear_active_mods() {
         exit(1);
     }
     active_use++;
-	
+
 	printf("===== clear_active_mods START =====\n");
-	
+
 
     init_keyboard();
 
@@ -743,7 +743,7 @@ void clear_active_mods() {
     for(int i = 0; i<active_len; i++) press(active_codes[i], 0);
 
 	set_locks(active_state.mods);
-	
+
 	printf("===== clear_active_mods END =====\n");
 }
 
@@ -755,7 +755,7 @@ void recover_active_mods() {
     // снимаем нажатые модификаторы
     unikey_t state = keyboard_state(0);
     send_mods(state.mods, 0);
-	
+
     char active_keys[32];
     XQueryKeymap(d, active_keys);
     for(int i=0; i<active_len; i++) {
@@ -764,55 +764,55 @@ void recover_active_mods() {
         if(BIT(keys, code)==BIT(active_keys, code)) {
             press(code, 1);
         }
-    }	
-	
+    }
+
 	set_locks(active_state.mods);
     set_group(active_state.group);
-	
+
 	// хак для телеграма
-	
+
 	// XLowerWindow(d, current_win);
 	// XRaiseWindow(d, current_win);
 	if(active_state.group == group_ru) {
 		//press_key(INT_TO_KEY(L','));
-		
+
 		// usleep(delay);
-		
+
 		// XEvent e;
 		// memset(&e, 0, sizeof(XEvent));
-		
+
 		// e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 0};
-		
+
 		// XSendEvent(d, current_win, True, Expose, &e);
-		
+
 		// usleep(delay);
-		
+
 		// press_key(SYM_TO_KEY(XK_Control_L));
-		
+
 		// unikey_t ks = SYM_TO_KEY(XK_Tab);
 		// ks.mods |= AltMask;
 		// press_key(ks);
 		// ks.mods |= ShiftMask;
 		// press_key(ks);
 	}
-	
+
 	// char buf[1024];
-	
+
 	// for(int i=0; i<2; i++) {
 		// sprintf(buf, "xdotool %s %lu", i==0? "windowminimize": "windowactivate", current_win);
 		// printf("%s\n", buf);
-		
+
 		// int res = system(buf);
 		// printf("res=%i\n", res);
 	// }
-	
+
 	// memset(&e, 0, sizeof(XEvent));
-	
+
 	// e.xmotion = (XMotionEvent) {type: MotionNotify, state: Button1Mask, };
-	
+
 	// XSendEvent(d, current_win, True, MotionNotify, &e);
-	
-	
+
+
 	// XTestGrabControl(d, True);
 	// press(SYM_TO_KEY(XK_Control_L).code, 1);
 	// usleep(delay/2);
@@ -820,7 +820,7 @@ void recover_active_mods() {
 	// usleep(delay/2);
 	// XTestGrabControl(d, False);
 	// XFlush(d);
-	
+
 	printf("===== recover_active_mods END =====\n");
 
     active_use--;
@@ -920,39 +920,39 @@ void print_translate_buffer(int from, int backspace) {
     }
 
     recover_active_mods();
-	
+
 	// в некоторых приложениях переключение клавиатуры не работает, пока не пошлёшь сигнал окну
 	//send_notify_to_current_window();
-	
-	
+
+
 	// printf("cur window: %li\n", w);
-	
+
 	// Window inFocus;
 	// int rev;
 	// XGetInputFocus(d, &inFocus, &rev);
 	// printf("in focus window: %li %i\n", inFocus, rev);
-	
-	
+
+
 	// XSetInputFocus(d, None, RevertToNone, CurrentTime);
 	// XFlush(d);
-	
+
 	// XGetInputFocus(d, &inFocus, &rev);
 	// printf("in focus window 2: %li %i\n", inFocus, rev);
-	
+
 	// XSetInputFocus(d, w, RevertToParent, CurrentTime);
 	// XFlush(d);
-	
+
 	// XGetInputFocus(d, &inFocus, &rev);
 	// printf("in focus window 3: %li %i\n", inFocus, rev);
-	
+
 	//XSetInputFocus(d, w, RevertToNone, CurrentTime);
 	//XFlush(d);
-	
-	
-		
+
+
+
 	// press(SYM_TO_KEY(XK_Control_L).code, 1);
 	// press(SYM_TO_KEY(XK_Control_L).code, 0);
-	
+
 }
 
 void print_invertcase_buffer(int from, int backspace) {
@@ -1140,7 +1140,7 @@ void clipboard_free() {
 // s должна быть в выделенной памяти, так как при новой установке или потере буфером фокуса она будет очищена
 void set_clipboard(char* s, int len, Atom target) {
 	clipboard_free();
-	
+
     clipboard_s = s;
     clipboard_len = len;
     clipboard_target = target;
@@ -1387,7 +1387,7 @@ void event_next() {
 		break;
 	case Expose:		// запрос на перерисовку окна ⌘
 		if(event.xexpose.count != 0) break;
-		
+
 		break;
     }
 
@@ -1461,60 +1461,65 @@ int goto_home() {
 
 void init_desktop(char* program) {
 
-    mkdir(".local", 0700);
-    mkdir(".local/share", 0700);
-    mkdir(".local/share/applications", 0700);
+	const char* app = ".local/share/applications/erswitcher.desktop";
 
-    const char* app = ".local/share/applications/erswitcher.desktop";
+	if(access(app, R_OK) != 0) {
 
-    FILE* f = fopen(app, "wb");
-    if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), app);
-    else {
-        fprintf(f,
-                "[Desktop Entry]\n"
-                "Encoding=UTF-8\n"
-                "Terminal=false\n"
-                "Type=Application\n"
-                "Name=EN-RU Switcher\n"
-                "Comment=Transliterator for keyboard input\n"
-                "GenericName[ru]=Русско-английский клавиатурный переключатель\n"
-                "Comment[ru]=Транслитератор ввода с клавиатуры\n"
-                "Exec=%s\n"
-                "X-GNOME-Autostart-enabled=true\n"
-                "Icon=preferences-desktop-keyboard\n"
-                "Categories=Keyboard;Transliterate;Development;System;\n",
-                program
-               );
+		mkdir(".local", 0700);
+		mkdir(".local/share", 0700);
+		mkdir(".local/share/applications", 0700);
 
-        fclose(f);
-    }
+		FILE* f = fopen(app, "wb");
+		if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), app);
+		else {
+			fprintf(f,
+					"[Desktop Entry]\n"
+					"Encoding=UTF-8\n"
+					"Terminal=false\n"
+					"Type=Application\n"
+					"Name=EN-RU Switcher\n"
+					"Comment=Transliterator for keyboard input\n"
+					"GenericName[ru]=Русско-английский клавиатурный переключатель\n"
+					"Comment[ru]=Транслитератор ввода с клавиатуры\n"
+					"Exec=%s\n"
+					"X-GNOME-Autostart-enabled=true\n"
+					"Icon=preferences-desktop-keyboard\n"
+					"Categories=Keyboard;Transliterate;Development;System;\n",
+					program
+				   );
 
-    mkdir(".config", 0700);
-    mkdir(".config/autostart", 0700);
+			fclose(f);
+		}
+	}
 
-    const char* autostart = ".config/autostart/erswitcher.desktop";
+	const char* autostart = ".config/autostart/erswitcher.desktop";
 
-    f = fopen(autostart, "wb");
-    if(!f) {
-        fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart);
-        return;
-    }
+	if(access(autostart, R_OK) != 0) {
+		mkdir(".config", 0700);
+		mkdir(".config/autostart", 0700);
 
-    fprintf(f,
-            "[Desktop Entry]\n"
-            "Name=EN-RU Switcher\n"
-            "Comment=Transliterator for keyboard input\n"
-            "Exec=%s\n"
-            "Icon=preferences-desktop-keyboard\n"
-            "Terminal=false\n"
-            "Type=Application\n"
-            "Categories=Keyboard;Transliterate;Development;System;\n"
-            "Keywords=keyboard;transliterate;erswitcher;switch\n"
-            "X-GNOME-UsesNotifications=t\n",
-            program
-           );
+		FILE* f = fopen(autostart, "wb");
+		if(!f) {
+			fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart);
+			return;
+		}
 
-    fclose(f);
+		fprintf(f,
+			"[Desktop Entry]\n"
+			"Name=EN-RU Switcher\n"
+			"Comment=Transliterator for keyboard input\n"
+			"Exec=%s\n"
+			"Icon=preferences-desktop-keyboard\n"
+			"Terminal=false\n"
+			"Type=Application\n"
+			"Categories=Keyboard;Transliterate;Development;System;\n"
+			"Keywords=keyboard;transliterate;erswitcher;switch\n"
+			"X-GNOME-UsesNotifications=t\n",
+			program
+	   );
+
+		fclose(f);
+	}
 }
 
 void check_any_instance() {
@@ -1525,21 +1530,170 @@ void check_any_instance() {
     // if(rc) fprintf(stderr, "%s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
 }
 
-void run_command(char* s) {
-    if(fork() == 0) {
-        fprintf(stderr, "Будет запущена команда: %s\n", s);
-        int rc = system(s);
-        fprintf(stderr, "Команда %s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
-        exit(rc);
-    }
-}
-
 void insert_from_clipboard(char* s) {
 	set_clipboard(strdup(s),
                   strlen(s),
                   utf8_atom);	// начинаем раздавать
 
     after(0.10, shift_insert);
+}
+
+/*
+
+-2. У команды есть таймаут.
+-1. Нельзя запустить несколько команд одновременно.
+0. Копируем выделенное в буфер, а из него – в файл, если указан %i
+1. Запускаем команду в отдельном процессе
+2. Опрашиваем по таймеру: завершился ли процесс
+3. Когда процесс завершился, то считываем файл %o и вставляем из буфера
+
+*/
+
+char* curcommand = NULL;
+char* curcommand_infile = "/tmp/erswitcher-input";
+char* curcommand_outfile = "/tmp/erswitcher-output";
+pid_t curcommand_pid;
+float command_timeout = 13; // В секундах
+
+int is_blank(char* s) {
+    while(isspace(*s)) s++;
+    return *s == '\0';
+}
+
+// Из формата делает путь
+char* command_fmt2ptr(char* clipboard, char* curcommand) {
+    FILE* f = fopen(curcommand_infile, "wb");
+    if(!f) { fprintf(stderr, "Временный infile `%s` не открыт!\n", curcommand_infile); }
+    fprintf(f, "%s", clipboard);
+    fclose(f);
+
+    char *ptr;
+    size_t ptr_size;
+
+    f = open_memstream(&ptr, &ptr_size);
+    if(!f) { fprintf(stderr, "Файл в памяти не открыт!\n"); }
+
+    char* v, *s = curcommand;
+    while(NULL != (v = strchr(s, '%'))) {
+        fprintf(f, "%.*s", (int)(v-s), s);
+        v++;
+        if(*v == 'i') fprintf(f, "%s", curcommand_infile);
+        else if(*v == 'o') fprintf(f, "%s", curcommand_outfile);
+        else if(*v == '%') fprintf(f, "%%");
+        else {
+            fprintf(stderr, "Замена в формате не валидна! `%s`\n", curcommand);
+            fprintf(f, "%%%c", *v);
+        }
+        s = v + 1;
+    }
+    fprintf(f, "%s", s);
+
+    // hello world!
+    fclose(f);
+    return ptr; 
+}
+
+void _interval_run_command() {
+
+    int status;
+    pid_t completed = waitpid(curcommand_pid, &status, WNOHANG);
+    if(DEBUG) fprintf(stderr, "completed %i exited %i signaled %i\n", completed, WIFEXITED(status), WIFSIGNALED(status));
+
+    // Не завершился
+    if(!completed) {
+        // Уничтожаем, если вышел таймаут
+        // if() {
+        //     curcommand = NULL;
+        //     kill();
+        //     return;
+        // }
+
+        fprintf(stderr, "new after\n");
+
+        after(0.10, _interval_run_command);
+        return;
+    }
+
+    if(strstr(curcommand, "%o")) {
+        fprintf(stderr, "end cmd\n");
+
+        FILE* f = fopen(curcommand_outfile, "rb");
+        if(!f) {
+            fprintf(stderr, "Файл команды не открыт\n");
+        }
+        else { // Отправляем в клипборд файл вывода
+            fseek(f, 0L, SEEK_END);
+            size_t size = ftell(f);
+            char* buf_ptr = (char*) malloc(size + 1);
+            fseek(f, 0L, SEEK_SET);
+            fread(buf_ptr, size, 1, f);
+            fclose(f);
+
+            buf_ptr[size] = '\0';
+            if(size) {
+                if(buf_ptr[size-1] == '\n') buf_ptr[size-1] = '\0';
+            }
+
+            insert_from_clipboard(buf_ptr);
+            free(buf_ptr);
+        }
+    }
+
+    fprintf(stderr, "end cmd real\n");
+
+    unlink(curcommand_outfile);
+    unlink(curcommand_infile);
+    curcommand = NULL;
+}
+
+void on_run_command(char* clipboard, int, Atom) {
+    // Команда из формата. Не забыть очистить
+    char* command_ptr = command_fmt2ptr(clipboard, curcommand);
+    
+    if(DEBUG) fprintf(stderr, "on_run_command: %s\n", command_ptr);
+
+    curcommand_pid = fork();
+    if(curcommand_pid == 0) {
+        char* path = "/bin/sh";
+		char* argv[] = {path, "-c", command_ptr, NULL};
+        execve(path, argv, environ);
+        perror("ERROR: execve /bin/sh");
+        exit(1);
+    }
+
+    if(curcommand_pid < 0) {
+        fprintf(stderr, "ERROR: команда %s не форкнулась! Ошибка: %s\n", command_ptr, strerror(errno));
+        free(command_ptr);
+        return;
+    }
+
+    free(command_ptr);
+    after(0.5, _interval_run_command);
+}
+
+void run_command(char* s) {
+    if(!s) {
+        fprintf(stderr, "Нет команды!\n");
+        return;
+    }
+    
+    if(is_blank(s)) {
+        fprintf(stderr, "Пустая команда!\n");
+        return;
+    }
+
+    if(curcommand) {
+        fprintf(stderr, "Команда выполняется!\n");
+        return;
+    }
+
+    curcommand = s;
+
+    if(strstr(s, "%i")) {
+        control_insert();
+        get_selection(clipboard_atom, utf8_atom, on_run_command);       
+    }
+    else on_run_command("", 0, (Atom) NULL);
 }
 
 // Нажата клавиша компосе - нужно заменить мнемонику на значение
@@ -1640,8 +1794,18 @@ void load_config() {
             return;
         }
 
-        fprintf(f,
-                "#####################################################################\n"
+		const char* etc = "/usr/share/erswitcher.conf.simple";
+		FILE* c = fopen(etc, "rb");
+		if(c) {
+			#define BUF_SIZE_1M 	(1024*1024)
+			char buf[BUF_SIZE_1M];
+			int size;
+			while(0 != (size = fread(buf, BUF_SIZE_1M, 1, c))) fwrite(buf, size, 1, f);
+			fclose(c);
+		}
+		else
+			fprintf(f,
+			"#####################################################################\n"
                 "#              Конфигурацонный файл erswitcher-а                    #\n"
                 "#                                                                   #\n"
                 "# Автор: Ярослав О. Косьмина                                        #\n"
@@ -1758,6 +1922,8 @@ void load_config() {
                 // ▄︻┻┳═ㅤㅤㅤ’’\̵͇ \з=(• - ̪●)=ε/̵͇ /’ ’ ㅤㅤㅤ═┳┻︻▄
                 // 0:47 ━━●━━━━━━━━━━━ 3:30
                 // ⇆ㅤㅤㅤㅤ◁ㅤㅤ❚❚ㅤㅤ▷ㅤㅤㅤㅤ↻
+                "## SQL\n"
+                "sele=SELECT *\\nFROM \\^ p\\nWHERE \\nORDER BY p.id DESC\\nLIMIT 100\\n\n"
                 "\n"
                 "[sendkeys]\n"
                 "# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
@@ -1770,6 +1936,9 @@ void load_config() {
                 "[commands]\n"
                 "# Команды операционной системы. Выполняются в оболочке шелла\n"
                 "Alt+Control+Shift+Break=kate ~/.config/erswitcher.conf && killall -HUP erswitcher\n"
+                "Alt+Control+d=date > %%o\n"
+                "Alt+Control+t=trans ru:en -b < %%i > %%o\n"
+                "Alt+Control+y=trans en:ru -b < %%i > %%o\n"
                );
 
         fclose(f);
@@ -2046,9 +2215,10 @@ int main(int ac, char** av) {
         return 1;
     }
 
+	// меняет директорию на дир. пользователя
     if(!goto_home()) return 1;
 
-    init_desktop(program);	// меняет директорию на дир. пользователя
+    init_desktop(program); // создаёт десктопный файл, если его нет
     free(program);
 
     open_display();
@@ -2120,7 +2290,7 @@ int main(int ac, char** av) {
         timers_apply();
 
         event_delay(USEC_TO_DBL(loop_delay));
-		
+
 		// обработка сигналов
 		if(need_load_config) {
 			need_load_config = 0;
