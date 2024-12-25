@@ -1091,6 +1091,17 @@ void to_buffer(char* s) {
     }
 }
 
+// нажимаем комбинацию Shift+LeftArrow (выделить предыдущий от курсора символ)
+void shift_leftArrow() {
+    clear_active_mods();
+    unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
+    send_key(shift_left, 1);
+    press_key(SYM_TO_KEY(XK_Left));
+    send_key(shift_left, 0);
+    recover_active_mods();
+    maybe_group = active_state.group;
+}
+
 // нажимаем комбинацию Control+Insert (выделение добавить в буфер обмена (clipboard))
 void control_insert() {
     clear_active_mods();
@@ -1552,8 +1563,11 @@ void insert_from_clipboard(char* s) {
 char* curcommand = NULL;
 char* curcommand_infile = "/tmp/erswitcher-input";
 char* curcommand_outfile = "/tmp/erswitcher-output";
-pid_t curcommand_pid;
-float command_timeout = 13; // В секундах
+pid_t curcommand_pid = 0;
+float command_timeout = 13;    // В секундах
+float command_interval = 0.1;  // Интервал через который будет запущена _interval_run_command
+float curcommand_progress = 0;
+
 
 int is_blank(char* s) {
     while(isspace(*s)) s++;
@@ -1590,32 +1604,57 @@ char* command_fmt2ptr(char* clipboard, char* curcommand) {
 
     // hello world!
     fclose(f);
-    return ptr; 
+    return ptr;
 }
 
+// Запускается каждые 0.1с и выводит \ | /
 void _interval_run_command() {
 
     int status;
     pid_t completed = waitpid(curcommand_pid, &status, WNOHANG);
     if(DEBUG) fprintf(stderr, "completed %i exited %i signaled %i\n", completed, WIFEXITED(status), WIFSIGNALED(status));
 
+    curcommand_progress += command_interval;
+
     // Не завершился
-    if(!completed) {
-        // Уничтожаем, если вышел таймаут
-        // if() {
-        //     curcommand = NULL;
-        //     kill();
-        //     return;
+    if(completed == 0) {
+        // Проверка таймаута
+        if (curcommand_progress >= command_timeout) {
+            fprintf(stderr, "TIMEOUT(%gs): pid=%i для команды `%s`\n", command_timeout, curcommand_pid, curcommand);
+            kill(-curcommand_pid, SIGKILL);
+            // Удаляем зомби
+            while(waitpid(-1, NULL, WNOHANG) > 0);
+            curcommand = NULL;
+            curcommand_pid = 0;
+
+            char* s = NULL;
+            int result = asprintf(&s, "TIMEOUT %gs!", command_timeout);
+            if(result == -1) {
+                insert_from_clipboard("TIMEOUT!");
+            } else {
+                insert_from_clipboard(s);
+                free(s);
+            }
+            return;
+        }
+
+        // printf("%g - %i = %g\n", curcommand_progress, (int) curcommand_progress, curcommand_progress - ((int) curcommand_progress));
+        // if(curcommand_progress - ((int) curcommand_progress) < 0.02) {
+        //     int x = ((int) curcommand_progress) % 4;
+        //     insert_from_clipboard(
+        //         x == 0? "/": (x == 1? "-": (x == 2? "\\": "|"))
+        //     );
+        //     shift_leftArrow();
         // }
 
         fprintf(stderr, "new after\n");
 
-        after(0.10, _interval_run_command);
+        after(command_interval, _interval_run_command);
         return;
     }
 
     if(strstr(curcommand, "%o")) {
-        fprintf(stderr, "end cmd\n");
+        fprintf(stderr, "end cmd with %%o\n");
 
         FILE* f = fopen(curcommand_outfile, "rb");
         if(!f) {
@@ -1649,16 +1688,14 @@ void _interval_run_command() {
 void on_run_command(char* clipboard, int, Atom) {
     // Команда из формата. Не забыть очистить
     char* command_ptr = command_fmt2ptr(clipboard, curcommand);
-    
+
     if(DEBUG) fprintf(stderr, "on_run_command: %s\n", command_ptr);
 
     curcommand_pid = fork();
     if(curcommand_pid == 0) {
-        char* path = "/bin/sh";
-		char* argv[] = {path, "-c", command_ptr, NULL};
-        execve(path, argv, environ);
-        perror("ERROR: execve /bin/sh");
-        exit(1);
+        setpgid(0, 0);
+        int status = system(command_ptr);
+        exit(status);
     }
 
     if(curcommand_pid < 0) {
@@ -1668,7 +1705,9 @@ void on_run_command(char* clipboard, int, Atom) {
     }
 
     free(command_ptr);
-    after(0.5, _interval_run_command);
+
+    curcommand_progress = 0;
+    after(command_interval, _interval_run_command);
 }
 
 void run_command(char* s) {
@@ -1676,7 +1715,7 @@ void run_command(char* s) {
         fprintf(stderr, "Нет команды!\n");
         return;
     }
-    
+
     if(is_blank(s)) {
         fprintf(stderr, "Пустая команда!\n");
         return;
@@ -2057,6 +2096,22 @@ NEXT_LINE:
                     delay = DELAY;
                 }
                 else printf("loop_delay = %i микросекунд\n", loop_delay);
+            }
+            else if(EQ(s, "command_timeout")) {
+                command_timeout = atof(v);
+                if(command_timeout <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: command_timeout в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("command_timeout = %g секунд\n", command_timeout);
+            }
+            else if(EQ(s, "command_interval")) {
+                command_interval = atof(v);
+                if(command_interval <= 0 ) {
+                    fprintf(stderr, "WARN: %s:%i: ошибка: command_interval в секундах, а не `%s`. Пропущено\n", path, lineno, v);
+                    delay = DELAY;
+                }
+                else printf("command_interval = %g секунд\n", command_interval);
             }
             else {
                 fprintf(stderr, "WARN: %s:%i: ошибка: неизвестная опция `%s`. Пропущено\n", path, lineno, s);
