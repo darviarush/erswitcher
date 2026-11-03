@@ -1,0 +1,73 @@
+name: Multi-OS Cross-Platform C Tests
+
+on: [push, pull_request]
+
+jobs:
+  # --- Задача 1: Матрица для Linux (Ubuntu и Arch Linux) ---
+  test-linux:
+    name: Test on Linux (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Объединяем дистрибутивы через матрицу образов контейнеров
+        include:
+          - distro: "ubuntu"
+            image: "ubuntu:24.04"
+          - distro: "archlinux"
+            image: "archlinux:latest"
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Установка зависимостей в зависимости от выбранного дистрибутива
+      - name: Install dependencies (Ubuntu)
+        if: matrix.distro == 'ubuntu'
+        run: |
+          apt-get update
+          apt-get install -y build-essential check pkg-config
+
+      - name: Install dependencies (Arch Linux)
+        if: matrix.distro == 'archlinux'
+        run: |
+          pacman -Sy --noconfirm --needed base-devel check pkgconf
+
+      - name: Run Test
+        run: make test
+
+  # --- Задача 2: macOS 15 (ARM64) ---
+  test-mac:
+    name: Test on macOS 15 (ARM64)
+    # Начиная с macOS 14/15, GitHub использует только ARM-процессоры (Apple Silicon)
+    runs-on: macos-15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Homebrew)
+        # На macOS пакеты ставятся через стандартный менеджер brew
+        run: |
+          brew update
+          brew install check pkg-config
+
+      - name: Run Test
+        run: make test
+
+  # --- Задача 3: FreeBSD (остается на QEMU эмуляции) ---
+  test-freebsd:
+    name: Test on FreeBSD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests inside FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.1"
+          usescache: true
+          run: |
+            pkg update -f
+            pkg install -y gmake gcc check pkgconf
+            gmake test
