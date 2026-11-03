@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill astyle dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
@@ -103,8 +103,15 @@ s: erswitcher	## Собирает и запускает ./erswitcher
 kill:	## Убивает процесс erswitcher-а
 		killall -9 erswitcher || true
 
-astyle:	## Форматирует код
-		astyle `find . -name "*.[ch]"`
+CLANG_FORMAT ?= clang-format
+
+format:	## Форматирует C/H через clang-format
+		@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || { echo "FAIL: не найден $(CLANG_FORMAT); см. doc/formatting.md" >&2; exit 1; }
+		find main.c src tests -type f \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 -r $(CLANG_FORMAT) -i
+
+format-check:	## Проверяет форматирование C/H без изменений
+		@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || { echo "FAIL: не найден $(CLANG_FORMAT); см. doc/formatting.md" >&2; exit 1; }
+		find main.c src tests -type f \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 -r $(CLANG_FORMAT) --dry-run --Werror
 
 dist:	## Собирает дистрибутив (экспериментально)
 		autoscan
