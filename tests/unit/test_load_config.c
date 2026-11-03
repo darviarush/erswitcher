@@ -18,7 +18,7 @@ START_TEST(er_options_delay_in_seconds) {
         "command_interval=0,1\n"
     );
 
-    ck_assert_int_eq(delay, 10000);
+    ck_assert_int_eq(er_kbd.delay_us, 10000);
     ck_assert_int_eq(loop_delay, 20000);
     ck_assert_double_eq_tol(command_timeout, 13.2, 1e-6);
     ck_assert_double_eq_tol(command_interval, 0.1, 1e-6);
@@ -28,19 +28,19 @@ END_TEST
 START_TEST(er_options_are_read_in_seconds) {
     // 500 — это 500 секунд, а не 500 микросекунд
     er_load("[options]\ndelay=500\n");
-    ck_assert_int_eq(delay, 500 * 1000000);
+    ck_assert_int_eq(er_kbd.delay_us, 500 * 1000000);
 }
 END_TEST
 
 START_TEST(er_options_invalid_delay_falls_back_to_default) {
     er_load("[options]\ndelay=abc\n");
-    ck_assert_int_eq(delay, DELAY);
+    ck_assert_int_eq(er_kbd.delay_us, DELAY);
 }
 END_TEST
 
 START_TEST(er_options_zero_delay_falls_back_to_default) {
     er_load("[options]\ndelay=0\n");
-    ck_assert_int_eq(delay, DELAY);
+    ck_assert_int_eq(er_kbd.delay_us, DELAY);
 }
 END_TEST
 
@@ -51,7 +51,7 @@ START_TEST(er_options_unknown_option_is_skipped) {
         "delay=0,5\n"
     );
 
-    ck_assert_int_eq(delay, 500000);
+    ck_assert_int_eq(er_kbd.delay_us, 500000);
     ck_assert_int_eq(loop_delay, DELAY);
 }
 END_TEST
@@ -61,10 +61,10 @@ START_TEST(er_options_not_set_keep_current_values) {
     // без [options] не сбрасывает прошлые значения. Тест фиксирует это
     // поведение — если оно изменится, тест должен упасть и напомнить
     er_load(ER_MINIMAL_OPTIONS);
-    ck_assert_int_eq(delay, 10000);
+    ck_assert_int_eq(er_kbd.delay_us, 10000);
 
     er_load("[options]\nloop_delay=0,5\n");
-    ck_assert_int_eq(delay, 10000);
+    ck_assert_int_eq(er_kbd.delay_us, 10000);
     ck_assert_int_eq(loop_delay, 500000);
 }
 END_TEST
@@ -129,7 +129,7 @@ START_TEST(er_config_last_section_wins) {
     );
 
     ck_assert_int_eq(keyfn_size, 2);
-    ck_assert_int_eq(delay, 500000);
+    ck_assert_int_eq(er_kbd.delay_us, 500000);
 }
 END_TEST
 

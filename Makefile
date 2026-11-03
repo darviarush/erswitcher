@@ -10,11 +10,51 @@ TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -DERSWITCHER_UNIT
 TEST_LIBS = check libbacktrace
 TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
 
-erswitcher: erswitcher.c main.c	## Компилирует erswitcher
-		gcc $(CFLAGS) $(CLIBS) -o erswitcher erswitcher.c
+# Приложение пока — erswitcher.c (подключает main.c) плюс чистые модули
+# и X11-адаптеры инфраструктуры.
+
+# Чистые доменные модули: без X11, файлов и процессов.
+DOMAIN_SOURCES = \
+	src/domain/text/text.c \
+	src/domain/input_buffer/input_buffer.c \
+	src/domain/case_invert/case_invert.c \
+	src/domain/compose/compose.c \
+	src/domain/command_template/command_template.c \
+	src/domain/config/config.c
+DOMAIN_OBJECTS = $(DOMAIN_SOURCES:.c=.o)
+
+# Сценарии приложения: зависят от domain и ports, но не от X11.
+USE_CASE_SOURCES = \
+	src/use_cases/input/input.c \
+	src/use_cases/translate/translate.c
+USE_CASE_OBJECTS = $(USE_CASE_SOURCES:.c=.o)
+
+# Инфраструктурные адаптеры. В доменных тестах не участвуют.
+INFRASTRUCTURE_SOURCES = \
+	src/infrastructure/x11/keyboard.c \
+	src/infrastructure/x11/clipboard.c
+INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
+
+APP_OBJECTS = erswitcher.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)
+TEST_DOMAIN = tests/unit/test_domain
+
+erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
+		gcc $(CFLAGS) $(CLIBS) -o $@ $^
+
+erswitcher.o: erswitcher.c main.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h)
+		gcc $(CFLAGS) -c -o $@ erswitcher.c
+
+$(DOMAIN_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h)
+		gcc $(CFLAGS) -c -o $@ $<
+
+$(USE_CASE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/use_cases/*/*.h)
+		gcc $(CFLAGS) -c -o $@ $<
+
+$(INFRASTRUCTURE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h)
+		gcc $(CFLAGS) -c -o $@ $<
 
 clean:	## Удаляет исходники
-		rm -fr erswitcher keyboard tests/unit/test
+		rm -fr erswitcher keyboard $(APP_OBJECTS) $(DOMAIN_OBJECTS) tests/unit/test $(TEST_DOMAIN)
 
 install:	## Устанавливает erswitcher в ~/
 		mkdir -p ~/.local/bin
@@ -56,10 +96,14 @@ test: test-unit test-functional	## Все тесты
 
 # Один бинарник на все наборы: монолит подключается #include-ом из test.h
 # (-DERSWITCHER_UNIT), поэтому main() только один
-test-unit:	## Юнит-тесты на Check
+test-unit: $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)	## Юнит-тесты на Check
 		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
+			$(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)) \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
 		cd tests/unit && ./test
+		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test_domain.c \
+			$(DOMAIN_OBJECTS) $$(pkg-config --cflags --libs check)
+		./$(TEST_DOMAIN)
 
 # Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
 # виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate

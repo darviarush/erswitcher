@@ -1,4 +1,6 @@
 erswitcher
 *.cache/
+*.o
 .vscode/
 tests/unit/test
+tests/unit/test_domain

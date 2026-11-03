@@ -5,7 +5,7 @@
  * Общий заголовок юнит-тестов.
  *
  * Монолит подключается целиком, чтобы тесты видели и static-функции,
- * и глобалы (pos, word[], keyfn[], compose_map[], delay...). Побочный
+ * и глобалы (input, keyfn[], compose_map[], er_kbd...). Побочный
  * эффект: сброс состояния между тестами — наша забота, для этого есть
  * er_reset_state().
  *
@@ -121,6 +121,7 @@ static void er_fixture_teardown() {
 static void er_reset_state() {
     mock_reset();
     mock_keymap_clear();
+    clipboard_x11_reset(&er_clipboard);
 
     for(keyfn_t* k = keyfn, *n = keyfn + keyfn_size; k < n; k++) if(k->arg) free(k->arg);
     free(keyfn);
@@ -133,20 +134,19 @@ static void er_reset_state() {
     compose_map = NULL;
     compose_map_size = compose_map_max_size = 0;
 
-    pos = 0;
+    input_buffer_init(&input);
     keys_pressed = 0;
-    memset(word, 0, sizeof word);
     cursor_back = 0;
 
-    delay = DELAY;
+    er_kbd.delay_us = DELAY;
     loop_delay = DELAY;
     command_timeout = 13;
     command_interval = 0.1;
 
-    groups = 0;
-    group_ru = -1;
-    group_en = -1;
-    maybe_group = -1;
+    er_kbd.groups = 0;
+    er_kbd.group_ru = -1;
+    er_kbd.group_en = -1;
+    er_kbd.maybe_group = -1;
 
     curcommand = NULL;
     memset(timers, 0, sizeof timers);
@@ -167,8 +167,8 @@ static void er_reset_state() {
     on_get_selection = NULL;
     on_copy_selection = NULL;
 
-    active_use = 0;
-    active_len = 0;
+    er_kbd.active_use = 0;
+    er_kbd.active_len = 0;
 }
 
 /*
@@ -189,9 +189,9 @@ static void er_keyboard_config() {
     mock_keymap_set(74, 0, 0, XK_F1);
     mock_keymap_set_all_groups(KEY_D, XK_d);
     mock_modifiers_fill();
-    groups = 1;
-    group_en = 0;
-    maybe_group = 0;
+    er_kbd.groups = 1;
+    er_kbd.group_en = 0;
+    er_kbd.maybe_group = 0;
 }
 
 // Начальное состояние перед каждым тестом: песочница и чистые глобалы монолита
@@ -200,8 +200,8 @@ static void er_fixture() {
     er_reset_state();
     mock_keymap_clear();
     mock_keymap_set(75,0,0,0xff13);
-    groups = 1;
-    maybe_group = 0;
+    er_kbd.groups = 1;
+    er_kbd.maybe_group = 0;
 }
 
 // Загружает конфиг из текста (пишет в $HOME/.config/erswitcher.conf)

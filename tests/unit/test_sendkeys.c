@@ -42,10 +42,10 @@ static void er_layout() {
     mock_keymap_set_all_groups(KEY_LEFTMETA, XK_Meta_L);
     mock_modifiers_fill();
 
-    groups = 2;
-    group_en = 0;
-    group_ru = 1;
-    maybe_group = 0;
+    er_kbd.groups = 2;
+    er_kbd.group_en = 0;
+    er_kbd.group_ru = 1;
+    er_kbd.maybe_group = 0;
     mock_keyboard(0);
 
     er_keys_n = 0;

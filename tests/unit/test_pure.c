@@ -6,8 +6,8 @@
  * Когда они начнут переезжать в src/, здесь поменяются только #include.
  */
 
-// Символ кладётся в word[] как клавиша по таблице мока: KEY_TO_INT()
-// достаёт из неё utf32-символ, по которому и работают iswspace/печать
+// Клавиша и её символ кладутся в InputBuffer по таблице мока: KEY_TO_INT()
+// достаёт utf32-символ, по которому и работают iswspace/печать
 static unikey_t pure_key(int ch) {
     int code = ch == ' ' ? KEY_SPACE : KEY_A + (ch - 'a');
     return (unikey_t) {code: code, mods: 0, group: 0};
@@ -21,8 +21,8 @@ static void pure_layout() {
     mock_keymap_set(KEY_C, 0, 0, XK_c);
     mock_keymap_set_all_groups(KEY_SPACE, XK_space);
     mock_modifiers_fill();
-    groups = 1;
-    maybe_group = 0;
+    er_kbd.groups = 1;
+    er_kbd.maybe_group = 0;
 }
 
 // @category utf8
@@ -52,22 +52,45 @@ START_TEST(er_from_space_tail_word) {
     pure_layout();
     // «abc xyz»: последнее слово начинается после пробела
     char const* s = "abc xyz";
-    for(int i = 0; s[i]; i++) word[i] = pure_key(s[i]);
-    pos = strlen(s);
+    for(int i = 0; s[i]; i++) {
+        unikey_t key = pure_key(s[i]);
+        input_buffer_push(&input, key, KEY_TO_INT(key));
+    }
+    ck_assert_int_eq(from_space(), 4);
+}
+END_TEST
+
+START_TEST(er_from_space_trailing_space) {
+    pure_layout();
+    char const* s = "abc ";
+    for(int i = 0; s[i]; i++) {
+        unikey_t key = pure_key(s[i]);
+        input_buffer_push(&input, key, KEY_TO_INT(key));
+    }
+    ck_assert_int_eq(from_space(), 0);
+
+    input_buffer_reset(&input);
+    s = "abc xyz ";
+    for(int i = 0; s[i]; i++) {
+        unikey_t key = pure_key(s[i]);
+        input_buffer_push(&input, key, KEY_TO_INT(key));
+    }
     ck_assert_int_eq(from_space(), 4);
 }
 END_TEST
 
 START_TEST(er_from_space_single_word) {
     pure_layout();
-    for(int i = 0; i < 3; i++) word[i] = pure_key('a' + i);
-    pos = 3;
+    for(int i = 0; i < 3; i++) {
+        unikey_t key = pure_key('a' + i);
+        input_buffer_push(&input, key, KEY_TO_INT(key));
+    }
     ck_assert_int_eq(from_space(), 0);
 }
 END_TEST
 
 START_TEST(er_from_space_empty_buffer) {
-    pos = 0;
+    input_buffer_reset(&input);
     ck_assert_int_eq(from_space(), 0);
 }
 END_TEST
@@ -108,6 +131,7 @@ Suite* suite_pure() {
     tcase_add_test(tc, er_utf8_strlen_cyrillic);
     tcase_add_test(tc, er_utf8_strlen_mixed_and_emoji);
     tcase_add_test(tc, er_from_space_tail_word);
+    tcase_add_test(tc, er_from_space_trailing_space);
     tcase_add_test(tc, er_from_space_single_word);
     tcase_add_test(tc, er_from_space_empty_buffer);
     tcase_add_test(tc, er_in_sym_sequence);

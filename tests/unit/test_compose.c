@@ -8,8 +8,8 @@
  *
  *  1. разбор: ключ -> compose_map[].word/pos, подстановки \n, \t, \\, \^
  *     (cursor_back), сортировка по убыванию длины ключа;
- *  2. выбор мнемоники: compose() читает буфер ввода (pos, word[]) и по
- *     KEY_TO_INT (по символу) находит самый длинный подходящий ключ;
+ *  2. выбор мнемоники: compose() читает буфер ввода (input.pos, input.word[])
+ *     и по KEY_TO_INT (по символу) находит самый длинный подходящий ключ;
  *  3. вставка: что ушло в буфер обмена и сколько бэкспейсов отправлено.
  *
  * Раскладка — та же схема, что на настоящей клавиатуре: буквы в двух группах
@@ -37,10 +37,10 @@ static void er_layout_abc() {
     mock_keymap_set_all_groups(KEY_CAPSLOCK, XK_Caps_Lock);
     mock_keymap_set_all_groups(KEY_NUMLOCK, XK_Num_Lock);
     mock_modifiers_fill();
-    groups = 1;
-    group_en = 0;
-    group_ru = -1;
-    maybe_group = 0;
+    er_kbd.groups = 1;
+    er_kbd.group_en = 0;
+    er_kbd.group_ru = -1;
+    er_kbd.maybe_group = 0;
     mock_keyboard(0);
 }
 
@@ -51,7 +51,10 @@ static unikey_t er_key(char ch) {
 }
 
 static void er_input(char const* s) {
-    for(; *s; s++) word[pos++] = er_key(*s);
+    for(; *s; s++) {
+        unikey_t key = er_key(*s);
+        input_buffer_push(&input, key, KEY_TO_INT(key));
+    }
 }
 
 
@@ -291,14 +294,15 @@ START_TEST(er_compose_key_with_switched_layout) {
     mock_keymap_set_all_groups(KEY_CAPSLOCK, XK_Caps_Lock);
     mock_keymap_set_all_groups(KEY_NUMLOCK, XK_Num_Lock);
     mock_modifiers_fill();
-    groups = 2;
-    group_en = 0;
-    group_ru = 1;
-    maybe_group = 0;
+    er_kbd.groups = 2;
+    er_kbd.group_en = 0;
+    er_kbd.group_ru = 1;
+    er_kbd.maybe_group = 0;
 
     er_load("[compose]\na=б\n");
 
-    word[pos++] = (unikey_t) {code: CODE_A, mods: 0, group: 1};
+    unikey_t key = (unikey_t) {code: CODE_A, mods: 0, group: 1};
+    input_buffer_push(&input, key, KEY_TO_INT(key));
     mock_reset();
     compose(NULL);
 

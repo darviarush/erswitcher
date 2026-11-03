@@ -3,12 +3,35 @@
 ## Юнит-тесты
 
 Каталог `tests/unit/`, фреймворк [Check](https://libcheck.github.io/check/).
-Монолит `erswitcher.c` подключается в тестовый бинарник через `#include`,
-поэтому тесты видят и `static`-функции, и глобальное состояние.
+
+`make test-unit` собирает и запускает два бинарника:
+
+* `tests/unit/test` — старые тесты монолита. `erswitcher.c` подключается
+  через `#include`, поэтому тесты видят и `static`-функции, и глобальное
+  состояние. К нему линкуются `src/use_cases/**/*.o` и
+  `src/infrastructure/x11/keyboard.o` и
+  `src/infrastructure/x11/clipboard.o`; X11-вызовы подменены
+  `tests/unit/mock.c`;
+* `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
+  (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
+  `config`). Они линкуются как обычные объектные файлы и не требуют X11.
 
 ```sh
 make test-unit
 ```
+
+Большая часть доменных модулей уже используется монолитом (`unikey`,
+`input_buffer`, `text`, `case_invert`, `compose`, `command_template`);
+`config` пока покрыт только отдельными тестами. Клавиатурный X11-адаптер
+проверяется набором `keyboard port` через тот же мок: преобразования
+сканкодов и символов, переключение раскладки, инъекция клавиш и опрос
+`keymap`/`keymap_saved`. Сценарии `input`/`translate` проверяются набором
+`use cases` с фейковым портом — без X11 и без `erswitcher.c`.
+
+Буфер обмена проверяется набором `clipboard`: `set`/`clear`, отдача
+собственного буфера, вызов callback при отсутствии владельца,
+асинхронный `SelectionNotify` и сборка ответа INCR. Мок X11 умеет
+возвращать заданного владельца Selection и заданные данные свойства.
 
 ## Функциональные тесты
 

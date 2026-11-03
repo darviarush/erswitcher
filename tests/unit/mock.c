@@ -45,6 +45,12 @@ static int (*mock_fake_key_hook)(Display*, unsigned int, Bool, unsigned long) = 
 static mock_call_t mock_calls[MOCK_CALLS_MAX];
 static int mock_n = 0;
 
+// Настройки ответов X11 для тестов буфера обмена.
+static Window mock_selection_owner = None;
+static Atom mock_property_type = None;
+static const char* mock_property_data = NULL;
+static unsigned long mock_property_after = 0;
+
 // Отпечаток вызова: «имя(аргументы)» пишется в конец очереди
 static void mock_push_int(char const* name, int a, int b, int c, int e) {
     if(mock_n >= MOCK_CALLS_MAX) return;
@@ -138,6 +144,10 @@ static void mock_keymap_clear() {
     mock_keyboard_group = 0;
     mock_keyboard_mods = 0;
     mock_string_to_keysym = NULL;
+    mock_selection_owner = None;
+    mock_property_type = None;
+    mock_property_data = NULL;
+    mock_property_after = 0;
 }
 
 static int mock_keymap_count() { return mock_keymap_n; }
@@ -355,10 +365,18 @@ int XSetSelectionOwner(Display* dpy, Atom selection, Window owner, Time time) {
     return 1;
 }
 
+// Тест может сделать вид, что владелец буфера — наше окно или чужой клиент.
 Window XGetSelectionOwner(Display* dpy, Atom selection) {
     mock_push_int("XGetSelectionOwner(", (int) selection, 0, 0, 0);
     (void) dpy;
-    return None;
+    return mock_selection_owner;
+}
+
+int XConvertSelection(Display* dpy, Atom selection, Atom target, Atom property,
+                      Window requestor, Time time) {
+    mock_push_int("XConvertSelection(", (int) selection, (int) target, (int) property, (int) requestor);
+    (void) dpy; (void) time;
+    return 1;
 }
 
 int XChangeProperty(Display* dpy, Window win, Atom property, Atom type, int format,
@@ -368,17 +386,30 @@ int XChangeProperty(Display* dpy, Window win, Atom property, Atom type, int form
     return 1;
 }
 
+// Тест может подсунуть ответ на SelectionNotify. По умолчанию — пусто.
 int XGetWindowProperty(Display* dpy, Window win, Atom property, long long_offset,
                        long long_length, Bool del, Atom req_type, Atom* actual_type,
                        int* actual_format, unsigned long* nitems,
                        unsigned long* bytes_after, unsigned char** prop) {
     mock_push_int("XGetWindowProperty(", (int) property, (int) long_length, del, 0);
     (void) dpy; (void) win; (void) long_offset; (void) req_type;
-    if(actual_type) *actual_type = None;
-    if(actual_format) *actual_format = 0;
-    if(nitems) *nitems = 0;
-    if(bytes_after) *bytes_after = 0;
-    if(prop) *prop = NULL;
+
+    size_t len = mock_property_data ? strlen(mock_property_data) : 0;
+
+    if(actual_type) *actual_type = mock_property_data ? mock_property_type : None;
+    if(actual_format) *actual_format = mock_property_data ? 8 : 0;
+    if(nitems) *nitems = len;
+    if(bytes_after) *bytes_after = mock_property_after;
+    if(prop) {
+        *prop = NULL;
+        if(mock_property_data) {
+            *prop = malloc(len + 1);
+            if(*prop) {
+                memcpy(*prop, mock_property_data, len);
+                (*prop)[len] = '\0';
+            }
+        }
+    }
     return Success;
 }
 

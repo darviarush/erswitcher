@@ -46,11 +46,18 @@ extern char** environ;
 
 //@category Клавиши
 
-typedef struct {
-    unsigned code:8;
-    unsigned mods:8;
-    unsigned group:8;
-} unikey_t;
+#include "src/domain/unikey/unikey.h"
+#include "src/domain/input_buffer/input_buffer.h"
+#include "src/domain/text/text.h"
+#include "src/domain/case_invert/case_invert.h"
+#include "src/domain/compose/compose.h"
+#include "src/domain/command_template/command_template.h"
+#include "src/use_cases/input/input.h"
+#include "src/use_cases/translate/translate.h"
+#include "src/ports/keyboard.h"
+#include "src/ports/clipboard.h"
+#include "src/infrastructure/x11/keyboard.h"
+#include "src/infrastructure/x11/clipboard.h"
 
 #define KEY_TO_SYM(K)		unikey_to_keysym(K)
 #define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
@@ -71,15 +78,10 @@ typedef struct {
 
 // Установлен ли бит
 #define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
-// размер клавиатуры в битах
-#define KEYBOARD_SIZE   (32*8)
-// размер буфера word
-#define BUF_SIZE	1024
+// размер буфера word (совпадает с доменным InputBuffer)
+#define BUF_SIZE	INPUT_BUFFER_CAPACITY
 
-char keyboard_buf1[32], keyboard_buf2[32];			// состояния клавиатуры: предыдущее и текущее. Каждый бит соотвествует клавише на клавиатуре: нажата/отжата
-char *saved=keyboard_buf1, *keys=keyboard_buf2;		// для обмена состояний
-int pos = 0;				// позиция в буфере символов
-unikey_t word[BUF_SIZE];	// буфер символов
+input_buffer_t input;		// буфер ввода: word[], symbol[], pos
 int keys_pressed;			// нажато клавишь
 
 
@@ -91,7 +93,6 @@ int keys_pressed;			// нажато клавишь
 // .0 - обязателен, иначе деление будет целочисленным
 #define USEC_TO_DBL(U)	(U / 1000000.0)
 
-int delay = DELAY;          	// задержка между программными нажатиями клавишь в микросекундах
 int loop_delay = DELAY;			// задержка между опросами клавиатуры
 pid_t config_window_pid = 0;	// pid конфигуратора
 
@@ -104,28 +105,27 @@ Window current_win;			// окно устанавливается при ввод
 int w_width = -1;			// ширина окна
 int w_height = -1;			// высота окна
 
-int selection_chunk_size; 	// максимально возможный размер данных для передачи через буфер обмена
-char* clipboard_s = NULL;		// буфер обмена для отправки данных
-char* clipboard_pos = NULL;		// позиция в буфере обмена при отправке данных частями (INCR)
-int clipboard_len = 0;			// длина буфера обмена для отправки данных
-Atom clipboard_target;			// тип данных в буфере обмена для отправки данных
+// Временные макросы совместимости: состояние буфера обмена уже принадлежит
+// X11-адаптеру. Они исчезнут вместе с монолитом после переноса app_run.
+#define selection_chunk_size er_clipboard.selection_chunk_size
+#define clipboard_s          er_clipboard.send_data
+#define clipboard_pos        er_clipboard.send_pos
+#define clipboard_len        er_clipboard.send_len
+#define clipboard_target     er_clipboard.send_target
+#define selection_retrive    er_clipboard.receive_data
+#define selection_retrive_length er_clipboard.receive_len
+#define selection_retrive_type   er_clipboard.receive_type
+#define on_get_selection     er_clipboard.pending_callback
+#define incr_is              er_clipboard.incr_is
+#define incr_propid          er_clipboard.incr_property
+#define incr_window          er_clipboard.incr_window
+#define sel_data_atom        er_clipboard.sel_data_atom
+#define utf8_atom            er_clipboard.utf8_atom
+#define clipboard_atom       er_clipboard.clipboard_atom
+#define targets_atom         er_clipboard.targets_atom
+#define incr_atom            er_clipboard.incr_atom
 
-char* selection_retrive = NULL; 	// буфер обмена для получения данных
-int selection_retrive_length = 0;	// длина данных в буфере
-Atom selection_retrive_type;		// тип данных в буфере: utf8_atom, например
-
-void (*on_get_selection)(char*,int,Atom) = NULL;	// обработчик завершения считывания буфера
 void (*on_copy_selection)(int,int) = NULL;			// обработчик завершения копирования буфера обмена в буфер ввода
-
-int incr_is = False;	// передача буфера обмена частями
-Atom incr_propid;		// что передаём (например, utf8_atom)
-Window incr_window;		// какое окно нам передаёт данные
-
-Atom sel_data_atom;		// указывается в запросе на выборку
-Atom utf8_atom;			// запросы на чтение/запись буфера обмена - данные преобразовать в utf8
-Atom clipboard_atom;	// идентификатор буфера обмена clipboard
-Atom targets_atom;		// запрос на формат данных
-Atom incr_atom;			// передача буфера обмена частями
 
 // для шагов ввода через буфер
 char* insert_from_clipboard_data;		// что нужно ввести (compose)
@@ -148,15 +148,6 @@ int keyfn_size = 0;
 int keyfn_max_size = 0;
 int keyfn_active = -1;
 
-#define COMPOSE_KEY_MAX		20
-#define COMPOSE_VAL_MAX		COMPOSE_KEY_MAX * 6
-typedef struct {
-    wint_t word[COMPOSE_KEY_MAX];
-    int pos;
-    int cursor_back;        // на сколько позиций назад вернуть курсор
-    char* to;
-} compose_t;
-
 int compose_map_size = 0;
 int compose_map_max_size = 0;
 compose_t* compose_map = NULL;
@@ -164,148 +155,68 @@ compose_t* compose_map = NULL;
 
 //@category Раскладки
 
-int groups = 0;			// Количество раскладок
-int group_ru = -1;		// Номер русской раскладки или -1
-int group_en = -1;		// Номер английской раскладки или -1
+// Обёртки над портом клавиатуры: старые имена остаются для монолита и
+// тестов, реализация Xkb/XTest живёт в infrastructure/x11/keyboard.c.
+static keyboard_port_t kbd_port;
 
-// с какой группы начинать поиск сканкода по символу
-// после поиска maybe_group переключается в группу найденного символа
-int maybe_group = -1;
+static void keyboard_port_ensure(void) {
+    if(!kbd_port.init) keyboard_x11_port(&kbd_port, &er_kbd);
+    er_kbd.display = d;
+}
 
-void set_group(int group);
-unikey_t keyboard_state(int code);
-void clear_active_mods();
-void recover_active_mods();
+static input_use_case_t input_uc;
+static void input_use_case_ensure(void) {
+    keyboard_port_ensure();
+    if(!input_uc.buffer) input_use_case_init(&input_uc, &input, &kbd_port);
+    input_uc.keyboard = &kbd_port;
+}
 
-// инициализирует названия клавиатуры
-static char* Russian = "Russian";
-static char* English = "English";
+//@category Буфер обмена
+
+static clipboard_port_t clipboard_port_state;
+
+static void clipboard_port_ensure(void) {
+    if(!clipboard_port_state.get) clipboard_x11_port(&clipboard_port_state, &er_clipboard);
+    er_clipboard.display = d;
+    er_clipboard.window = w;
+}
+
+static void get_clipboard(clipboard_get_callback_t fn, void* context) {
+    clipboard_port_ensure();
+    clipboard_port_state.get(&clipboard_port_state,
+                              CLIPBOARD_SELECTION_CLIPBOARD,
+                              CLIPBOARD_FORMAT_UTF8,
+                              fn, context);
+}
+
+static int keyboard_current_group(void) {
+    keyboard_port_ensure();
+    return kbd_port.state(&kbd_port, 0).group;
+}
+
 void init_keyboard() {
-
-    // инициализируем раскладки клавиатуры
-    XkbDescRec* kb = XkbAllocKeyboard();
-    if(!kb) return;
-
-    kb->dpy = d;
-    if(XkbGetNames(d, XkbGroupNamesMask, kb) != Success) return;
-
-    Atom* gs = kb->names->groups;
-    // groups < XkbNumKbdGroups &&
-    for(groups = 0; gs[groups] != 0;) {
-        char* kb_name = XGetAtomName(d, gs[groups]);
-        if(strncmp(kb_name, Russian, strlen(Russian)) == 0) group_ru = groups;
-        if(strncmp(kb_name, English, strlen(English)) == 0) group_en = groups;
-        XFree(kb_name);
-        groups++;
-    }
-
-    // mkdir(".cache", 0744);
-    // char* path = ".cache/erswitcher.keyboard.csv";
-    // FILE* f = fopen(path, "wb");
-    // if(!f) {
-    // fprintf(stderr, "Не открыть для записи %s\n", path);
-    // goto EXIT_INIT_KB;
-    // }
-
-    // malloc();
-
-    // unikey_t state = keyboard_state(0);
-    // clear_active_mods();
-
-    // fprintf(f, "\n");
-    // fprintf(f, "%i;Раскладка;%s\n", group, kb_name);
-    // fprintf(f, "\n");
-    // fprintf(f, "Сканкод;Символ;Символ с shift\n");
-    // for(int code = 0; code < KEYBOARD_SIZE; ++code) {
-    // fprintf(f, "%i;", code);
-    // for(int group = 0; group<groups; group++) {
-    // set_group(group);
-    // char* kb_name = XGetAtomName(d, gs[group]);
-    // fprintf(f, "%i;%s;", group, kb_name);
-    // XFree(kb_name);
-
-    // }
-
-    // //unikey_t key = {code: code, mods: shift? ShiftMask: 0, group: group};
-    // KeySym ks = XKeycodeToKeysym(d, code);
-    // KeySym ks2 = XKeycodeToKeysym(d, code);
-    // fprintf(f, "%i;%s;%s", code, SYM_TO_STR(ks), SYM_TO_STR(ks2));
-    // }
-
-    // recover_active_mods();
-    // fclose(f);
-
-    // TODO: инициализируем модификаторы
-    // в иксах есть 8 модификаторов. И на них можно назначить разные модифицирующие или лочащиеся клавиши
-    // int i, k = 0;
-    // int min_keycode, max_keycode, keysyms_per_keycode = 0;
-
-    // XDisplayKeycodes (d, &min_keycode, &max_keycode);
-    // XGetKeyboardMapping (d, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode);
-
-    // for (i = 0; i < 8; i++) {
-		// for (int j = 0; j < map->max_keypermod; j++) {
-			// if (map->modifiermap[k]) {
-				// KeySym ks;
-				// int index = 0;
-				// do { ks = XKeycodeToKeysym(dpy, map->modifiermap[k], index++); } while ( !ks && index < keysyms_per_keycode);
-				// char* nm = XKeysymToString(ks);
-
-				// fprintf (fp, "%s  %s (0x%0x)", (j > 0 ? "," : ""), (nm ? nm : "BadKey"), map->modifiermap[k]);
-			// }
-			// k++;
-		// }
-    // }
-
-    //EXIT_INIT_KB:
-    XkbFreeNames(kb, XkbGroupNamesMask, 0);
+    keyboard_port_ensure();
+    kbd_port.init(&kbd_port);
 }
 
 KeySym unikey_to_keysym(unikey_t key) {
-    KeySym ks = XkbKeycodeToKeysym(d, key.code, key.group, key.mods & ShiftMask? 1: 0);
-    if(ks == NoSymbol) ks = XkbKeycodeToKeysym(d, key.code, group_en, key.mods & ShiftMask? 1: 0);
-    if(key.mods & LockMask) {
-        KeySym lower, upper;
-        XConvertCase(ks, &lower, &upper);
-        if(key.mods & ShiftMask) ks = lower;
-        else ks = upper;
-    }
-    return ks;
+    keyboard_port_ensure();
+    return (KeySym) kbd_port.to_keysym(&kbd_port, key);
 }
 
 unikey_t keyboard_state(int code) {
-    XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);
-    return (unikey_t) {code: code, mods: state.mods, group: state.group};
+    keyboard_port_ensure();
+    return kbd_port.state(&kbd_port, code);
 }
 
 unikey_t keysym_to_unikey(KeySym ks) {
-    // вначале ищем в текущей раскладке
-    //unikey_t key = keyboard_state(XKeysymToKeycode(d, ks));
-    //if(key.code) return key;
+    keyboard_port_ensure();
+    return kbd_port.from_keysym(&kbd_port, (uint32_t) ks);
+}
 
-    // maybe_group == -1 — ещё не смотрели ни одной раскладки; с -1
-    // XkbKeycodeToKeysym() ничего не найдёт, поэтому пропускаем текущую
-    if(maybe_group >= 0) {
-        for(int code = 0; code < KEYBOARD_SIZE; ++code)
-            for(int shift = 0; shift < 2; ++shift) {
-                KeySym search_ks = XkbKeycodeToKeysym(d, code, maybe_group, shift);
-                if(ks == search_ks)	return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: maybe_group};
-            }
-    }
-
-    // чтобы не переключать клавиатуру и shift пойдём от обратного:
-    for(int group = 0; group < groups; ++group)
-        for(int code = 0; code < KEYBOARD_SIZE; ++code)
-            for(int shift = 0; shift < 2; ++shift) {
-                KeySym search_ks = XkbKeycodeToKeysym(d, code, group, shift);
-                if(ks == search_ks)	{
-                    maybe_group = group;
-                    return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: group};
-                }
-            }
-
-    return (unikey_t) {code: 0, mods: 0, group: 0};
+void set_group(int group) {
+    keyboard_port_ensure();
+    kbd_port.set_layout(&kbd_port, group);
 }
 
 // маски модификаторов и локов. На некоторых клавиатурах разные модификаторы могут иметь одну и ту же маску. И их нельзя будет различить
@@ -323,82 +234,7 @@ unikey_t keysym_to_unikey(KeySym ks) {
 #define SuperMask		Mod4Mask
 #define HyperMask		Mod5Mask
 void print_sym(int mods, KeySym ks) {
-    int begin = 0;
-    for(int i=0; i<32; i++) {
-        int mask = mods & (1<<i);
-        if(!mask) continue;
-        if(begin) printf("+");
-        else begin = 1;
-        switch(mask) {
-        case ShiftMask:
-            printf("⇧Shift");
-            break;
-        case LockMask:
-            printf("⇪🄰CapsLock");
-            break;// ⇪🄰
-        case ControlMask:
-            printf("⌃⎈Ctrl");
-            break;
-        case Mod1Mask:
-            printf("⌥⎇Alt");
-            break;
-        case Mod2Mask:
-            printf("⇭NumLock");
-            break; // ⓛ🄸
-        case Mod3Mask:
-            printf("❖Meta");
-            break;
-        case Mod4Mask:
-            printf("⌘⊞❖Super");
-            break;
-        case Mod5Mask:
-            printf("✦Hyper");
-            break;
-        default:
-            printf("Mod%i", i);
-        }
-    }
-
-    if(begin) printf("+");
-    //wint_t cs = xkb_keysym_to_utf32(ks);
-    //if(cs) printf("%C", cs);
-    //else
-    switch(ks) {
-    case XK_Escape:
-        printf("⎋");
-        break;
-    case XK_BackSpace:
-        printf("⌫←");
-        break;
-    case XK_Delete:
-        printf("⌦");
-        break;
-    case XK_Return:
-        printf("↵↩⏎⌤⌅⎆");
-        break;
-    case XK_Tab:
-        printf("↹");
-        break;
-    case XK_Home:
-        printf("⇱");
-        break;
-    case XK_End:
-        printf("⇲");
-        break;
-    case XK_Menu:
-        printf("≣");
-        break;
-    case XK_Pause:
-        printf("⎉");
-        break;
-    case XK_Print:
-        printf("⎙");
-        break;
-    case XK_Multi_key:
-        printf("⎄");
-        break;
-    }
-    printf("%s", XKeysymToString(ks));
+    keyboard_x11_print_sym(mods, (uint32_t) ks);
 }
 
 // входит в массив
@@ -511,23 +347,17 @@ void open_display() {
 
     XSetErrorHandler(null_X_error);
 
-    XSynchronize(d, True);
-
-    sel_data_atom = XInternAtom(d, "XSEL_DATA", False);
-    utf8_atom = XInternAtom(d, "UTF8_STRING", True);
-    if(utf8_atom == None) utf8_atom = XA_STRING; // для поддержки на старых системах
-    clipboard_atom = XInternAtom(d, "CLIPBOARD", False);
-    targets_atom = XInternAtom(d, "TARGETS", False);
-    incr_atom = XInternAtom(d, "INCR", False);
-
-    // получаем максимально возможный размер данных для передачи через буфер обмена
-    selection_chunk_size = XExtendedMaxRequestSize(d) / 4;
-    if(!selection_chunk_size) selection_chunk_size = XMaxRequestSize(d) / 4;
-    printf("selection_chunk_size = %i\n", selection_chunk_size);
-    fflush(stdout);
+    // Не включаем отладочный синхронный режим Xlib: он делает каждый
+    // XQueryKeymap/XGetInputFocus/XQueryPointer полноценным round-trip'ом.
+    // При опросе клавиатуры каждые loop_delay это заметно увеличивает
+    // задержку ввода, особенно под композитором/на медленном X-сервере.
+    XSynchronize(d, False);
 
     // Создаём окно
     w = XCreateSimpleWindow(d, XDefaultRootWindow(d), -10, -10, 1, 1, 0, 0, 0x00DC143C);
+
+    // Атомы и размер куска для Selection/INCR принадлежат clipboard-адаптеру
+    clipboard_x11_init(&er_clipboard, d, w);
     // подписываемся на события окна
     XSelectInput(d, w,
 		  PropertyChangeMask 	// Работа с буфером
@@ -563,326 +393,44 @@ unsigned int get_input_state() {
 }
 
 // Эмулирует нажатие или отжатие клавиши
-void press(int code, int is_press) {
-    unikey_t key = keyboard_state(code);
-    printf("   %s: %i ", is_press? "press": "release", code);
-    print_sym(key.mods, KEY_TO_SYM(key));
-    printf("\n");
-    XTestFakeKeyEvent(d, code, is_press? 1: 0, CurrentTime);
-    XSync(d, False);
-}
-
-// устанавливает модификаторы. Локи пропускает
-void send_mods(int mods, int is_press) {
-	mods &= ~(LockMask|NumMask);
-
-    XModifierKeymap *modifiers = XGetModifierMapping(d);
-
-    for (int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
-        if(mods & (1 << mod_index)) {
-
-            for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
-                int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
-                if(code) {	// кейкод клавиши-модификатора
-					press(code, is_press);
-                    //if(delay) usleep(delay/2);
-                    break;
-                }
-            }
-        }
-    }
-
-    XFreeModifiermap(modifiers);
-}
-
-// устанавливает или снимает клавишу и модификаторы
-void press_mods(int code, int mods, int is_press) {
-	//XTestGrabControl(d, True);
-
-	if(!is_press) press(code, 0);
-	send_mods(mods, is_press);
-	if(is_press) press(code, 1);
-
-	//XTestGrabControl(d, False);
-	//XFlush(d);
-}
-
-// устанавливает локи. Модификаторы пропускает
-void set_locks(int mods) {
-	int loks[2] = {LockMask, NumMask};
-	int loks_sym[2] = {XK_Caps_Lock, XK_Num_Lock};
-
-	for(int i=0; i<2; i++) {
-		if(mods & loks[i]) {
-			unikey_t k = SYM_TO_KEY(loks_sym[i]);
-
-			press_mods(k.code, k.mods, 1);
-			press_mods(k.code, k.mods, 0);
-			usleep(delay/2);
-		}
-	}
-}
-
-// Переключает раскладку
-void set_group(int group) {
-	if(keyboard_state(0).group == group) return;
-
-	// // пробуем переключить через нажатие клавиши
-	// unikey_t k = SYM_TO_KEY(XK_ISO_Next_Group);
-	// for(int i=0; i<8; i++) {
-		// press_mods(k.code, k.mods, 1);
-		// press_mods(k.code, k.mods, 0);
-		// usleep(delay / 2);
-		// if(keyboard_state(0).group == group) { printf("   set_group ISO: %i\n", group); return; }
-	// }
-
-    XkbLockGroup(d, XkbUseCoreKbd, group);
-    XkbStateRec state;
-    XkbGetState(d, XkbUseCoreKbd, &state);	// без этого вызова в силу переключение не вступит
-    printf("set_group: %i\n", group);
-	// TODO: Добавить задержку в опции
-	usleep(delay); // тут задержку делаем побольше
-}
-
-
-// // приводит клавиатуру в соответсвие с модификаторами (нажимает управляющие клавиши или отжимает, если нужно)
-// void sync_mods(int mods) {
-	// int active_mods = keyboard_state(0).mods;
-	// if(!(mods | active_mods)) return;
-
-	// XModifierKeymap *modifiers = XGetModifierMapping(d);
-
-    // for (int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
-		// if(!(1 << mod_index) & (LockMask|NumMask|ShiftMask)) continue;
-
-		// int maybe_press = mods & (1 << mod_index);
-		// int is_press = active_mods & (1 << mod_index);
-
-		// // если должен быть нажат и не нажат или нажат и не должен быть нажат
-        // if((maybe_press && !is_press) || (is_press && !maybe_press)) {
-
-            // for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
-                // int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
-                // if(code) {	// кейкод клавиши-модификатора найден
-					// if((is_press|maybe_press) & (LockMask|NumMask)) {
-						// press(code, 1);
-						// press(code, 0);
-					// }
-					// else press(code, maybe_press? 1: 0); // нажимаем, если не нажат или отжимаем
-
-                    // //if(delay/2) usleep(delay/2);
-					// break;
-                // }
-            // }
-
-        // }
-    // }
-
-    // XFreeModifiermap(modifiers);
-// }
-
-// Эмулирует нажатие или отжатие клавиши
 void send_key(unikey_t key, int is_press) {
-    if(key.code == 0) {
-        printf("send_key: No Key!\n");
-        return;
-    }
-
-    printf("send_key: %s %s\n", KEY_TO_STR(key), is_press == 2? "": (is_press? "PRESS": "RELEASE"));
-
-	int xdelay = delay / 2;
-	if(xdelay <= 0) xdelay = 1;
-
-	// Группу нужно переключать до нажатия шифта, иначе первую может не переключать
-	set_group(key.group);
-	set_locks(key.mods);
-    press_mods(key.code, key.mods, is_press);
-
-	if(is_press == 2) {
-		usleep(xdelay);
-		press_mods(key.code, key.mods, 0);
-		set_locks(key.mods);
-	}
-
-	usleep(xdelay);
+    keyboard_port_ensure();
+    kbd_port.send_key(&kbd_port, key, (keyboard_event_t) is_press);
 }
 
 // Эмулирует нажатие и отжатие клавиши
 void press_key(unikey_t key) {
-    send_key(key, 2);
+    keyboard_port_ensure();
+    kbd_port.press_key(&kbd_port, key);
 }
 
-int active_codes[KEYBOARD_SIZE];
-int active_len;
-unikey_t active_state;
-int active_use = 0;
-
 // Очищает активные модификаторы клавиатуры
-// keys - массив клавиш KEYBOARD_SIZE = 32*8
-// возвращает количество найденных клавиш-модификаторов
 void clear_active_mods() {
-    if(active_use) {
-        fprintf(stderr, "ABORT: Вложенный clear_active_mods\n");
-        exit(1);
-    }
-    active_use++;
-
-	printf("===== clear_active_mods START =====\n");
-
-
-    init_keyboard();
-
-    active_state = keyboard_state(0);
-
-    XModifierKeymap *modifiers = XGetModifierMapping(d);
-
-    active_len = 0;
-
-	// может быть зажат правый контрол, поэтому ищем среди соответствующих и нажатых
-    for(int mod_index = ShiftMapIndex; mod_index <= Mod5MapIndex; mod_index++) {
-        for(int mod_key = 0; mod_key < modifiers->max_keypermod; mod_key++) {
-            int code = modifiers->modifiermap[mod_index * modifiers->max_keypermod + mod_key];
-            if(code && BIT(keys, code)) active_codes[active_len++] = code;
-        }
-    }
-
-    XFreeModifiermap(modifiers);
-
-    // отжимаем модификаторы
-    for(int i = 0; i<active_len; i++) press(active_codes[i], 0);
-
-	set_locks(active_state.mods);
-
-	printf("===== clear_active_mods END =====\n");
+    keyboard_port_ensure();
+    kbd_port.clear_active_mods(&kbd_port);
 }
 
 // восстанавливаем модификаторы
 void recover_active_mods() {
-
-	printf("===== recover_active_mods START =====\n");
-
-    // снимаем нажатые модификаторы
-    unikey_t state = keyboard_state(0);
-    send_mods(state.mods, 0);
-
-    char active_keys[32];
-    XQueryKeymap(d, active_keys);
-    for(int i=0; i<active_len; i++) {
-        int code = active_codes[i];
-        // клавиша не была отжата пока происходил ввод
-        if(BIT(keys, code)==BIT(active_keys, code)) {
-            press(code, 1);
-        }
-    }
-
-	set_locks(active_state.mods);
-    set_group(active_state.group);
-
-	// хак для телеграма
-
-	// XLowerWindow(d, current_win);
-	// XRaiseWindow(d, current_win);
-	if(active_state.group == group_ru) {
-		//press_key(INT_TO_KEY(L','));
-
-		// usleep(delay);
-
-		// XEvent e;
-		// memset(&e, 0, sizeof(XEvent));
-
-		// e.xexpose = (XExposeEvent) {type: Expose, serial: 0, send_event: True, display: d, window: current_win, x: 1, y: 1, width: 10, height: 10, count: 0};
-
-		// XSendEvent(d, current_win, True, Expose, &e);
-
-		// usleep(delay);
-
-		// press_key(SYM_TO_KEY(XK_Control_L));
-
-		// unikey_t ks = SYM_TO_KEY(XK_Tab);
-		// ks.mods |= AltMask;
-		// press_key(ks);
-		// ks.mods |= ShiftMask;
-		// press_key(ks);
-	}
-
-	// char buf[1024];
-
-	// for(int i=0; i<2; i++) {
-		// sprintf(buf, "xdotool %s %lu", i==0? "windowminimize": "windowactivate", current_win);
-		// printf("%s\n", buf);
-
-		// int res = system(buf);
-		// printf("res=%i\n", res);
-	// }
-
-	// memset(&e, 0, sizeof(XEvent));
-
-	// e.xmotion = (XMotionEvent) {type: MotionNotify, state: Button1Mask, };
-
-	// XSendEvent(d, current_win, True, MotionNotify, &e);
-
-
-	// XTestGrabControl(d, True);
-	// press(SYM_TO_KEY(XK_Control_L).code, 1);
-	// usleep(delay/2);
-	// press(SYM_TO_KEY(XK_Control_L).code, 0);
-	// usleep(delay/2);
-	// XTestGrabControl(d, False);
-	// XFlush(d);
-
-	printf("===== recover_active_mods END =====\n");
-
-    active_use--;
+    keyboard_port_ensure();
+    kbd_port.recover_active_mods(&kbd_port);
 }
 
 void add_to_buffer(unikey_t key) {
-    // Если нажаты какие-то ещё модификаторы, контрол или альт - выходим
-    if(key.mods & ~(ShiftMask|LockMask|NumMask)) {
-        return;
-    }
-
-    KeySym ks = KEY_TO_SYM(key);
-
-    // Если это переход на другую строку, то начинаем ввод с начала
-    KeySym is_control[] = {XK_Home, XK_Left, XK_Up, XK_Right, XK_Down, XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down, XK_End, XK_Begin, XK_Tab, XK_Return, 0};
-    if(in_sym(ks, is_control)) {
-        pos = 0;
-        return;
-    }
-
-    wint_t cs = SYM_TO_INT(ks);
-
-    // Если символ не печатный, то пропускаем
-    KeySym is_print[] = {XK_space, XK_underscore, 0};
-    if(!iswprint(cs) && !in_sym(ks, is_print)) {
-        return;
-    }
-
-    // Записываем символ в буфер с его раскладкой клавиатуры
-    if(pos >= BUF_SIZE) pos = 0;
-    //word[pos++] = {code: code, mods: state.mods, group: state};
-    word[pos++] = key;
-
-    //printf("add_to_buffer: %S\n", word);
+    input_use_case_ensure();
+    input_use_case_handle_key(&input_uc, key);
 }
 
 // Начало последнего слова в буфере: после последнего пробела,
 // а если пробелов нет — с нуля
 int from_space() {
-    for(int from = pos - 1; from >= 0; from--) {
-        if(iswspace(KEY_TO_INT(word[from]))) return from + 1;
-    }
-    return 0;
+    input_use_case_ensure();
+    return input_use_case_from_space(&input_uc);
 }
 
 void press_key_multi(unikey_t key, int n) {
-    for(int i=0; i<n; i++) press_key(key);
-}
-
-int utf8_strlen(const char *s) {
-    int count = 0;
-    while (*s) count += (*s++ & 0xC0) != 0x80;
-    return count;
+    keyboard_port_ensure();
+    kbd_port.press_key_multi(&kbd_port, key, n);
 }
 
 #define FOR_UTF8(S)			\
@@ -913,74 +461,13 @@ void sendkeys(char* s) { // печатает с клавиатуры строк�
 }
 
 void print_translate_buffer(int from, int backspace) {
-    //word[pos] = 0;
-    //printf("print_translate_buffer: %S\n", word+from);
-
-    clear_active_mods();
-	// сразу меняем раскладку
-    active_state.group = active_state.group == group_en? group_ru: group_en;
-
-    // отправляем бекспейсы, чтобы удалить ввод
-    if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
-
-    // вводим ввод, но в альтернативной раскладке
-    for(int i=from; i<pos; i++) {
-        word[i].group = word[i].group == group_en? group_ru: word[i].group == group_ru? group_en: word[i].group;
-        press_key(word[i]);
-    }
-
-    recover_active_mods();
-
-	// в некоторых приложениях переключение клавиатуры не работает, пока не пошлёшь сигнал окну
-	//send_notify_to_current_window();
-
-
-	// printf("cur window: %li\n", w);
-
-	// Window inFocus;
-	// int rev;
-	// XGetInputFocus(d, &inFocus, &rev);
-	// printf("in focus window: %li %i\n", inFocus, rev);
-
-
-	// XSetInputFocus(d, None, RevertToNone, CurrentTime);
-	// XFlush(d);
-
-	// XGetInputFocus(d, &inFocus, &rev);
-	// printf("in focus window 2: %li %i\n", inFocus, rev);
-
-	// XSetInputFocus(d, w, RevertToParent, CurrentTime);
-	// XFlush(d);
-
-	// XGetInputFocus(d, &inFocus, &rev);
-	// printf("in focus window 3: %li %i\n", inFocus, rev);
-
-	//XSetInputFocus(d, w, RevertToNone, CurrentTime);
-	//XFlush(d);
-
-
-
-	// press(SYM_TO_KEY(XK_Control_L).code, 1);
-	// press(SYM_TO_KEY(XK_Control_L).code, 0);
-
+    keyboard_port_ensure();
+    translate_use_case_buffer(&kbd_port, input.word, input.pos, from, backspace);
 }
 
 void print_invertcase_buffer(int from, int backspace) {
-    // word[pos] = 0;
-    // printf("print_invertcase_buffer: %S\n", word+from);
-
-    clear_active_mods();
-
-    // отправляем бекспейсы, чтобы удалить ввод
-    if(backspace) press_key_multi(SYM_TO_KEY(XK_BackSpace), pos-from);
-
-    // вводим ввод, но в альтернативной раскладке
-    for(int i=from; i<pos; i++) {
-        word[i].mods = word[i].mods & ShiftMask? word[i].mods & ~ShiftMask: word[i].mods | ShiftMask;
-        press_key(word[i]);
-    }
-
-    recover_active_mods();
+    keyboard_port_ensure();
+    translate_use_case_invertcase(&kbd_port, input.word, input.pos, from, backspace);
 }
 
 char* get_event_type(int n) {
@@ -1027,77 +514,15 @@ char* get_event_type(int n) {
     return names[n];
 }
 
-// заказываем получить содержимое буфера обмена с типом response_format_atom
-// после получения произойдёт вызов обработчика on_get_selection
-void get_selection(Atom number_buf, Atom response_format_atom, void (*fn)(char*,int,Atom)) {
-
-    Window owner = XGetSelectionOwner(d, number_buf);
-    if (owner == None) {
-        char* name_buf = XGetAtomName(d, number_buf);
-        fprintf(stderr, "Буфер %s не поддерживается владельцем\n", name_buf);
-        if(name_buf) XFree(name_buf);
-
-        fn(strdup(""), 0, utf8_atom);
-        return;
-    }
-    if(DEBUG) {
-        printf("get_selection: owner = 0x%lX %s\n", owner, w == owner? "одинаков с w": "разный с w");
-        fflush(stdout);
-    }
-
-    // если владелец буфера мы же, то и отдаём что есть
-    if(w == owner) {
-        if(DEBUG) {
-            printf("get_selection: буфер - мы же\n");
-            fflush(stdout);
-        }
-        on_get_selection = NULL;
-
-        if(clipboard_s) {
-            if(DEBUG) {
-                printf("get_selection: Отдаю clipboard_s: %s\n", clipboard_s);
-                fflush(stdout);
-            }
-
-            char* s = malloc(clipboard_len);
-            memcpy(clipboard_s, s, clipboard_len);
-            fn(s, clipboard_len, clipboard_target);
-        }
-        else {
-            if(DEBUG) {
-                printf("get_selection: Отдаю пустую строку\n");
-                fflush(stdout);
-            }
-            fn(strdup(""), 0, utf8_atom);
-        }
-        return;
-    }
-
-    // требование перевода в utf8:
-    XConvertSelection(d, number_buf,
-                      response_format_atom, //utf8_atom,
-                      sel_data_atom,
-                      w,
-                      CurrentTime
-                     );
-    XSync(d, False);
-
-    on_get_selection = fn;
-
-    char* fmt = XGetAtomName(d, response_format_atom);
-    fprintf(stderr, "get_selection %s!\n", fmt);
-    XFree(fmt);
-}
-
 // переписываем строку в буфер ввода
-void to_buffer(char* s) {
-    pos = 0;
+void to_buffer(const char* s) {
+    input_buffer_reset(&input);
 
     // utf8 переводим в символы юникода, затем в символы x11, после - в сканкоды
     FOR_UTF8(s) {
         STEP_UTF8(s, ws);
-        if(pos >= BUF_SIZE) break;
-        word[pos++] = INT_TO_KEY(ws);
+        if(input.pos >= BUF_SIZE) break;
+        input_buffer_push(&input, INT_TO_KEY(ws), ws);
     }
 }
 
@@ -1109,7 +534,7 @@ void shift_leftArrow() {
     press_key(SYM_TO_KEY(XK_Left));
     send_key(shift_left, 0);
     recover_active_mods();
-    maybe_group = active_state.group;
+    kbd_port.set_layout_hint(&kbd_port, keyboard_current_group());
 }
 
 // нажимаем комбинацию Control+Insert (выделение добавить в буфер обмена (clipboard))
@@ -1120,63 +545,45 @@ void control_insert() {
     press_key(SYM_TO_KEY(XK_Insert));
     send_key(control_left, 0);
     recover_active_mods();
-    maybe_group = active_state.group;
+    kbd_port.set_layout_hint(&kbd_port, keyboard_current_group());
 }
 
 // копируем выделенное и заменяем им буфер ввода
-void copy_selection_next(char* s, int, Atom) {
+void copy_selection_next(void* context, const char* s, int len, clipboard_format_t format) {
+    (void) context;
+    (void) len;
+    (void) format;
+
     to_buffer(s);
-    free(s);
     on_copy_selection(0, 0);
 }
 void copy_selection(void (*fn)(int, int)) {
     on_copy_selection = fn;
     control_insert();
-    get_selection(clipboard_atom, utf8_atom, copy_selection_next);
+    get_clipboard(copy_selection_next, NULL);
 }
 
 // нажимаем комбинацию Shift+Insert (вставка)
 void shift_insert() {
     clear_active_mods();
-    int save = delay;
-    //delay = 0;
     unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
     send_key(shift_left, 1);
     press_key(SYM_TO_KEY(XK_Insert));
     send_key(shift_left, 0);
-    delay = save;
     recover_active_mods();
-    maybe_group = active_state.group;
+    kbd_port.set_layout_hint(&kbd_port, keyboard_current_group());
 }
 
 // очистить буфер раздачи данных клипборда
 void clipboard_free() {
-    if(clipboard_s) {
-        free(clipboard_s);
-        clipboard_s = NULL;
-    }
+    clipboard_port_ensure();
+    clipboard_port_state.clear(&clipboard_port_state);
 }
 
-// устанавливаем в clipboard данные для передачи другим приложениям
-// s должна быть в выделенной памяти, так как при новой установке или потере буфером фокуса она будет очищена
-void set_clipboard(char* s, int len, Atom target) {
-	clipboard_free();
-
-    clipboard_s = s;
-    clipboard_len = len;
-    clipboard_target = target;
-
-    if(clipboard_len > selection_chunk_size)
-        fprintf(stderr, "WARN: Размер данных для буфера обмена превышает размер куска для отправки: %u > %u. Передача будет осуществляться по протоколу INCR\n", clipboard_len, selection_chunk_size);
-
-    // делаем окно нашего приложения владельцем данных для обмена.
-    // После этого будет возбуждено событие SelectionRequest
-    XSetSelectionOwner(d, clipboard_atom, w, CurrentTime);
-    XFlush(d);
-
-    Window owner = XGetSelectionOwner(d, clipboard_atom);
-
-    if(DEBUG) fprintf(stderr, "set_clipboard `%s`, my window %s owner\n", s, w == owner? "is": "no");
+// s должна быть в выделенной памяти: порт забирает её себе
+static void set_clipboard_utf8(char* s, int len) {
+    clipboard_port_ensure();
+    clipboard_port_state.set(&clipboard_port_state, s, len, CLIPBOARD_FORMAT_UTF8);
 }
 
 void event_next() {
@@ -1187,194 +594,11 @@ void event_next() {
 
     switch(event.type) {
     case SelectionNotify: // получить данные из буфера обмена
-        if(event.xselection.selection != clipboard_atom) {
-            fprintf(stderr, "SelectionNotify: Какой-то другой буфер запрошен\n");
-            break;
-        }
-        // нет выделения
-        if(event.xselection.property == None) {
-            fprintf(stderr, "SelectionNotify: Нет выделения\n");
-
-            if(on_get_selection) {
-                void(*fn)(char*,int,Atom) = on_get_selection;
-                on_get_selection = NULL;
-                fn(NULL, 0, None);
-            }
-            if(selection_retrive) {
-                free(selection_retrive);
-                selection_retrive = NULL;
-            }
-            break;
-        }
-
-        if(incr_is) {
-            if(incr_window != event.xselection.requestor) {
-                fprintf(stderr, "SelectionNotify: Не совпал incr_window\n");
-                break;
-            }
-            if(incr_propid != event.xselection.property) {
-                fprintf(stderr, "SelectionNotify: Не совпал incr_propid\n");
-                break;
-            }
-            if(event.xproperty.state != PropertyNewValue) {
-                fprintf(stderr, "SelectionNotify: Не совпал PropertyNewValue\n");
-                break;
-            }
-        } else {
-            incr_propid = event.xselection.property;
-            incr_window = event.xselection.requestor;
-        }
-
-        int format;	// формат строки
-        unsigned long bytesafter, length;
-        unsigned char* result = NULL;
-
-        // считываем
-        XGetWindowProperty(event.xselection.display,
-                           incr_window, 	// window
-                           incr_propid, 	// некое значение
-                           0L,
-                           1024*1024*64,	// максимальный размер, который мы готовы принять
-                           incr_is, (Atom) AnyPropertyType,
-                           &selection_retrive_type, 	// тип возвращаемого значения: INCR - передача по частям
-                           &format, &length, &bytesafter,
-                           &result);
-
-        char* selection_retrive_type_name = XGetAtomName(d, selection_retrive_type);
-        printf("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s format=%i\n", result, length, bytesafter, selection_retrive_type_name, format);
-        fflush(stdout);
-        if(selection_retrive_type_name) XFree(selection_retrive_type_name);
-
-        // завершаем
-        void send_on_get_selection() {
-            fprintf(stderr, "send_on_get_selection\n");
-            if(on_get_selection) {
-                void(*fn)(char*,int,Atom) = on_get_selection;
-                on_get_selection = NULL;
-                fn(selection_retrive, selection_retrive_length, selection_retrive_type);
-            } else {
-                fprintf(stderr, "Нет on_get_selection!\n");
-                free(selection_retrive);
-            }
-            selection_retrive = NULL;
-        }
-
-        if(incr_is) {	// мы в цикле INCR
-            memcpy(selection_retrive + selection_retrive_length, result, length);
-            selection_retrive[selection_retrive_length += length] = '\0';
-
-            if(bytesafter == 0) {
-                incr_is = False;
-
-                send_on_get_selection();
-            }
-        } else {		// стандартно
-
-            if(selection_retrive) {
-                fprintf(stderr, "ALERT: selection_retrive не удалена. Такого быть не должно!\n");
-                free(selection_retrive);
-            }
-
-            selection_retrive = (char*) malloc(length + bytesafter + 1);
-            memcpy(selection_retrive, result, length);
-            selection_retrive[selection_retrive_length = length] = '\0';
-
-            if(selection_retrive_type == incr_atom) incr_is = True;
-            else {
-                send_on_get_selection();
-            }
-        }
-
-        if(result) XFree(result);
-        break;
     case SelectionClear:
-        fprintf(stderr, "SelectionClear: Утрачено право собственности на буфер обмена.\n");
-		clipboard_free();
-        break;
     case SelectionRequest: // запрос данных из буфера обмена
-
-        Window win = event.xselectionrequest.requestor;
-        Atom pty = event.xselectionrequest.property;
-        Atom target_sel = event.xselectionrequest.target;
-
-        // клиент хочет, чтобы ему сообщили в каком формате будут данные
-        if (target_sel == targets_atom) {
-            Atom types[] = { clipboard_target, targets_atom };
-
-            XChangeProperty(d,
-                            win,
-                            pty,
-                            XA_ATOM,
-                            32, PropModeReplace, (unsigned char *) types,
-                            sizeof(types) / sizeof(Atom)
-                           );
-
-            if(DEBUG) fprintf(stderr, "отправляем targets\n");
-        }
-        else if(target_sel != clipboard_target || pty == None) {
-            char* an = XGetAtomName(d, target_sel);
-            if(DEBUG) fprintf(stderr, "Запрошен clipboard в формате '%s'\n", an);
-            if(an) XFree(an);
-            pty = None;
-            break;
-        }
-        else if(clipboard_len > selection_chunk_size) {
-            // придётся отправлять по протоколу INCR, так как данные слишком велики
-            XChangeProperty(d, win, pty, incr_atom, 32, PropModeReplace, 0, 0);
-            XSelectInput(d, win, PropertyChangeMask);
-
-            clipboard_pos = clipboard_s;
-        }
-        else {
-            // отправляем строку
-            XChangeProperty(d, win,	pty,
-                            target_sel, 8, PropModeReplace,
-                            (unsigned char *) clipboard_s, (int) clipboard_len);
-            if(DEBUG) {
-                printf("отправляем clipboard_s: `%s` len=%i\n", clipboard_s, clipboard_len);
-                fflush(stdout);
-            }
-        }
-
-        XEvent res;
-        res.xselection.type = SelectionNotify;
-        res.xselection.display = event.xselectionrequest.display;
-        res.xselection.requestor = win;
-        res.xselection.property = pty;
-        res.xselection.selection = event.xselectionrequest.selection;
-        res.xselection.target = target_sel;
-        res.xselection.time = event.xselectionrequest.time;
-
-        XSendEvent(d, event.xselectionrequest.requestor, 0, 0, &res);
-        XFlush(d);
-        break;
-    case PropertyNotify:	// протокол INCR: отправка по частям
-        if(event.xproperty.state == PropertyDelete) {
-            if(!clipboard_s) break;
-            if(clipboard_len <= selection_chunk_size) break;
-
-            if(DEBUG) {
-                printf("state == PropertyDelete\n");
-                fflush(stdout);
-            }
-            Window win = event.xselectionrequest.requestor;
-            Atom pty = event.xselectionrequest.property;
-            Atom target_notify = event.xselectionrequest.target;
-
-            //if(win != ) break;
-
-            int len = clipboard_pos+selection_chunk_size < clipboard_s+clipboard_len?
-                      selection_chunk_size:
-                      clipboard_s+clipboard_len-clipboard_pos;
-
-            XChangeProperty(d, win, pty, target_notify, 8, PropModeReplace,
-                            len==0? NULL: (unsigned char*) clipboard_pos,
-                            len);
-            XFlush(d);
-
-            clipboard_pos += len;
-            //if(clipboard_pos == clipboard_s+clipboard_len) // конец
-        }
+    case PropertyNotify:   // протокол INCR: отправка по частям
+        clipboard_port_ensure();
+        clipboard_x11_handle_event(&er_clipboard, &event);
         break;
     case ClientMessage:	// окно пристыковано к системному лотку
         XWindowAttributes attr;
@@ -1438,8 +662,8 @@ void change_key(int code) {
     for(int i=0; i<32; i++) if(state & (1<<i)) printf("%i", i);
         else printf(" ");
     printf(") ");
-    if(key.group == group_en) printf("en");
-    else if(key.group == group_ru) printf("ru");
+    if(key.group == kbd_port.layout_en(&kbd_port)) printf("en");
+    else if(key.group == kbd_port.layout_ru(&kbd_port)) printf("ru");
     else printf("%i", key.group);
     printf(": ");
     print_sym(key.mods, ks);
@@ -1457,13 +681,8 @@ void change_key(int code) {
         }
     }
 
-    if(ks == XK_BackSpace && mods == 0) {
-        if(pos != 0) --pos;
-    }
-    else {
-        // заносим в буфер
-        add_to_buffer(key);
-    }
+    input_use_case_ensure();
+    input_use_case_handle_key(&input_uc, key);
 }
 
 int goto_home() {
@@ -1552,9 +771,7 @@ void check_any_instance() {
 }
 
 void insert_from_clipboard(char* s) {
-	set_clipboard(strdup(s),
-                  strlen(s),
-                  utf8_atom);	// начинаем раздавать
+    set_clipboard_utf8(strdup(s), strlen(s)); // начинаем раздавать
 
     after(0.10, shift_insert);
 }
@@ -1585,35 +802,15 @@ int is_blank(char* s) {
 }
 
 // Из формата делает путь
-char* command_fmt2ptr(char* clipboard, char* curcommand) {
+char* command_fmt2ptr(const char* clipboard, const char* curcommand) {
     FILE* f = fopen(curcommand_infile, "wb");
     if(!f) { fprintf(stderr, "Временный infile `%s` не открыт!\n", curcommand_infile); }
     fprintf(f, "%s", clipboard);
     fclose(f);
 
-    char *ptr;
-    size_t ptr_size;
-
-    f = open_memstream(&ptr, &ptr_size);
-    if(!f) { fprintf(stderr, "Файл в памяти не открыт!\n"); }
-
-    char* v, *s = curcommand;
-    while(NULL != (v = strchr(s, '%'))) {
-        fprintf(f, "%.*s", (int)(v-s), s);
-        v++;
-        if(*v == 'i') fprintf(f, "%s", curcommand_infile);
-        else if(*v == 'o') fprintf(f, "%s", curcommand_outfile);
-        else if(*v == '%') fprintf(f, "%%");
-        else {
-            fprintf(stderr, "Замена в формате не валидна! `%s`\n", curcommand);
-            fprintf(f, "%%%c", *v);
-        }
-        s = v + 1;
-    }
-    fprintf(f, "%s", s);
-
-    // hello world!
-    fclose(f);
+    int invalid = 0;
+    char* ptr = command_template_expand(curcommand, curcommand_infile, curcommand_outfile, &invalid);
+    if(invalid) fprintf(stderr, "Замена в формате не валидна! `%s`\n", curcommand);
     return ptr;
 }
 
@@ -1695,7 +892,11 @@ void _interval_run_command() {
     curcommand = NULL;
 }
 
-void on_run_command(char* clipboard, int, Atom) {
+void on_run_command(void* context, const char* clipboard, int len, clipboard_format_t format) {
+    (void) context;
+    (void) len;
+    (void) format;
+
     // Команда из формата. Не забыть очистить
     char* command_ptr = command_fmt2ptr(clipboard, curcommand);
 
@@ -1740,9 +941,9 @@ void run_command(char* s) {
 
     if(strstr(s, "%i")) {
         control_insert();
-        get_selection(clipboard_atom, utf8_atom, on_run_command);       
+        get_clipboard(on_run_command, NULL);
     }
-    else on_run_command("", 0, (Atom) NULL);
+    else on_run_command(NULL, "", 0, CLIPBOARD_FORMAT_UTF8);
 }
 
 // Нажата клавиша компосе - нужно заменить мнемонику на значение
@@ -1754,29 +955,22 @@ void cursor_back__fn() {
 }
 
 void compose(char*) {
-    if(pos == 0) return;
+    if(input.pos == 0) return;
 
-    char* to = NULL;
-    int remove_sym = 0;
-    for(int i=0; i<compose_map_size; i++) {
-        int k, n;
-        for(k = pos-1, n = compose_map[i].pos - 1; k >= 0 && n >= 0; k--, n--) {
-            if(compose_map[i].word[n] != KEY_TO_INT(word[k])) break;
-        }
+    wint_t symbols[BUF_SIZE];
+    for(int i = 0; i < input.pos; i++) symbols[i] = KEY_TO_INT(input.word[i]);
 
-        if(n == -1) {	// дошли до конца
-            to = compose_map[i].to;
-            remove_sym = compose_map[i].pos;
-            cursor_back = compose_map[i].cursor_back;
-            break;
-        }
-
-    }
-
-    if(to == NULL) {
+    int match = compose_find(compose_map, compose_map_size, symbols, input.pos);
+    if(match < 0) {
         fprintf(stderr, "compose: Ничего не найдено!\n");
         return;
     }
+
+    compose_t* entry = &compose_map[match];
+    char* to = entry->to;
+    int remove_sym = entry->pos;
+
+    cursor_back = entry->cursor_back;
 
     if(DEBUG) {
         printf("compose -> %s\n", to);
@@ -1786,7 +980,7 @@ void compose(char*) {
     // удаляем мнемонику введённую ранее
     // Модификаторов тут не нужно: раскладку берём из последнего введённого символа,
     // как при печати — так работает и под тестами, где XkbGetState не настоящий
-    unikey_t key = pos? word[pos-1]: keyboard_state(0);
+    unikey_t key = input.pos? input.word[input.pos-1]: keyboard_state(0);
     press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
     set_group(key.group);
     // подменяем буфер собой и вставляем из него композэ
@@ -2096,12 +1290,14 @@ NEXT_LINE:
         // после =
         if(fn == SEC_OPTIONS) {
             if(EQ(s, "delay")) {
-                delay = atof(v) * 1000000;
-                if(delay <= 0 ) {
+                int delay_us = atof(v) * 1000000;
+                if(delay_us <= 0 ) {
                     fprintf(stderr, "WARN: %s:%i: ошибка: delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    delay = DELAY;
+                    delay_us = DELAY;
                 }
-                else printf("delay = %i микросекунд\n", delay);
+                else printf("delay = %i микросекунд\n", delay_us);
+                keyboard_port_ensure();
+                kbd_port.set_delay(&kbd_port, delay_us);
             }
             else if(EQ(s, "loop_delay")) {
                 loop_delay = atof(v) * 1000000;
@@ -2306,7 +1502,7 @@ void app_run(int ac, char** av) {
 
     // Начальные установки
     current_win = get_current_window();
-    pos = 0;
+    input_buffer_init(&input);
     init_keyboard();
 
     // конфигурация должна загружаться после инициализации клавиатуры
@@ -2316,7 +1512,7 @@ void app_run(int ac, char** av) {
     signal(SIGCHLD, SIG_IGN);
 
     unsigned int state1, state2 = 0;
-    XQueryKeymap(d, saved);
+    XQueryKeymap(d, (char*) kbd_port.keymap_saved(&kbd_port));
 
 
     while(1) {
@@ -2324,17 +1520,19 @@ void app_run(int ac, char** av) {
         // сбросим ввод, коль нажата мышка
         state1 = get_input_state();
         state1 &= Button1MotionMask | Button2MotionMask | Button3MotionMask | Button4MotionMask | Button5MotionMask;
-        if(state1 != state2) pos = 0;
+        if(state1 != state2) input_buffer_reset(&input);
         state2 = state1;
 
         // Если сменилось окно, то начинаем ввод с начала
         Window w = get_current_window();
         if(w != current_win) {
-            pos = 0;
+            input_buffer_reset(&input);
             current_win = w;
         }
 
         // опрашиваем клавиатуру
+        char* keys = (char*) kbd_port.keymap(&kbd_port);
+        const char* saved = kbd_port.keymap_saved(&kbd_port);
         XQueryKeymap(d, keys);
         keys_pressed = -1;
         for(int i=0; i<KEYBOARD_SIZE; i++) {
@@ -2357,9 +1555,7 @@ void app_run(int ac, char** av) {
 
         }
 
-        char* char_ptr=saved;
-        saved=keys;
-        keys=char_ptr;
+        kbd_port.swap_keymap(&kbd_port);
 
         // крошим зомбиков
         int status;

@@ -8,8 +8,8 @@
  * Как это работает:
  *
  *  - Монолит подключается целиком (test.h -> #include "../../erswitcher.c"),
- *    поэтому тестам видны и static-функции, и глобалы (pos, word[], keyfn[],
- *    compose_map[], delay…).
+ *    поэтому тестам видны и static-функции, и глобалы (input, keyfn[],
+ *    compose_map[], er_kbd…).
  *  - Иксы подменены: erswitcher.c сам подключает tests/unit/mock.c, когда
  *    определён ERSWITCHER_UNIT.
  *  - Настоящий main() монолита в тестах не объявляется (всё спрятано за
@@ -37,6 +37,9 @@
 #include "test_sendkeys.c"
 #include "test_snippets.c"
 #include "test_pure.c"
+#include "test_keyboard.c"
+#include "test_clipboard.c"
+#include "test_use_cases.c"
 
 int main(void) {
     int failed = 0;
@@ -49,6 +52,9 @@ int main(void) {
         suite_sendkeys(),
         suite_snippets(),
         suite_pure(),
+        suite_keyboard(),
+        suite_clipboard(),
+        suite_use_cases(),
         NULL
     };
 

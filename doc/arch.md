@@ -88,7 +88,7 @@ main.c / app (composition root)
 src/
 ├── domain/                         # чистые правила, без I/O
 │   ├── unikey.h/.c                 # unikey_t, доменные ERS_MOD_*, операции над ключом
-│   ├── input_buffer.h/.c           # word[], pos, keys_pressed: add/reset/from_space/backspace
+│   ├── input_buffer.h/.c           # word[], symbol[], pos: init/reset/push/backspace/from_space
 │   ├── case_invert.h/.c            # инверсия ShiftMask у unikey_t
 │   ├── compose.h/.c                # compose_t, поиск мнемоники в буфере
 │   ├── config.h/.c                 # Config, Binding, ComposeEntry, Snippet, Command, Options
@@ -151,9 +151,10 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 | `unikey_t`, `KEY_TO_*`, `SYM_TO_*`, `unikey_to_keysym`, `keysym_to_unikey`, `keyboard_state`, `in_sym` | модель ключа и преобразования | `domain/unikey` + `ports/keyboard` + `infrastructure/x11/keyboard` |
 | `init_keyboard`, `groups`, `group_ru`, `group_en`, `maybe_group`, `set_group`, `set_locks` | раскладки и локи | `ports/keyboard` + `infrastructure/x11/keyboard` |
 | `press`, `send_mods`, `press_mods`, `send_key`, `press_key`, `active_codes`, `active_state`, `clear_active_mods`, `recover_active_mods` | инъекция клавиш и активные модификаторы | `infrastructure/x11/keyboard` |
-| `keyboard_buf1/2`, `saved`, `keys`, `pos`, `word`, `keys_pressed`, `add_to_buffer`, `from_space` | кольцевой буфер ввода | `domain/input_buffer` + `use_cases/input` |
-| `change_key` | классификация клавиши и диспетчеризация | `use_cases/input` (+ `ports/keyboard`) |
-| `print_translate_buffer`, `print_invertcase_buffer`, `word_*`, `text_*`, `selection_*` | сценарии трансляции/регистра | `use_cases/translate` + `domain/case_invert` |
+| `keyboard_buf1/2`, `saved`, `keys` | опрос нажатых клавиш | `infrastructure/x11/keyboard` |
+| `pos`, `word`, `keys_pressed`, `add_to_buffer`, `from_space` | кольцевой буфер ввода | `domain/input_buffer` + `use_cases/input`; `keys_pressed` остаётся состоянием опроса |
+| `change_key` | классификация клавиши и диспетчеризация | `use_cases/input` + привязки конфига |
+| `print_translate_buffer`, `print_invertcase_buffer`, `word_*`, `text_*`, `selection_*` | сценарии трансляции/регистра | `use_cases/translate` + `domain/case_invert`; `selection_*` используют clipboard-порт |
 | `sendkeys`, `to_buffer`, `utf8_strlen`, `FOR_UTF8`, `press_key_multi` | ввод UTF-8 строки | `use_cases/sendkeys` + `domain/text` |
 | `compose_map`, `compose`, `cursor_back`, `cursor_back__fn` | мнемоники и возврат курсора | `domain/compose` + `use_cases/compose_input` |
 | `get_selection`, `set_clipboard`, `clipboard_*`, `selection_*`, `incr_*`, части `event_next` | буфер обмена и INCR | `ports/clipboard` + `infrastructure/x11/clipboard` |
@@ -164,7 +165,7 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 | `run_command`, `command_fmt2ptr`, `on_run_command`, `_interval_run_command`, `curcommand*` | `[commands]` | `use_cases/commands` + `ports/command_runner` + `infrastructure/system/command_runner_fork` |
 | `send_systray_message`, окно в `open_display`, `ButtonPress`, `ClientMessage`, `ConfigureNotify` | systray | `ports/tray` + `infrastructure/x11/tray` + `presentation/tray_indicator` |
 | `goto_home`, `init_desktop`, `check_any_instance` | системная интеграция | `infrastructure/system/desktop` |
-| `print_sym`, `get_event_type`, `DEBUG`, диагностика | логирование | `ports/logger` + `presentation/console` |
+| `print_sym`, `get_event_type`, `DEBUG`, диагностика | логирование | `ports/logger` + `presentation/console`; `print_sym` пока в X11-адаптере |
 | `open_display`, атомы, `xerror` | X11-соединение | `infrastructure/x11/display` |
 | `app_run`, `main.c` | запуск и главный цикл | `app/context`, `app/app_run`, `main.c` |
 | `mock.c`, `test.h` | тестовая обвязка | `tests/unit` на фейковых портах |
@@ -179,28 +180,46 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 
 ### keyboard
 
-Нужны не только «нажать клавишу», но и:
+Сейчас контракт выглядит так:
 
+- `init()` — инициализация раскладок;
 - `state(code)` — текущие `mods`/`group`;
-- `from_keysym(ks)` / `to_keysym(key)` — преобразования;
-- `symbol(key)` — Unicode-символ для буфера и `[compose]`;
-- `group()` / `set_group(group)`;
-- `set_locks(mods)`;
-- `press(key)` / `press_multi(key, n)`;
-- `save_active()` / `restore_active()` — сохранение зажатых модификаторов.
+- `to_keysym(key)` / `from_keysym(ks)` — преобразования;
+- `to_symbol(key)` / `from_symbol(symbol)` — Unicode-символ для буфера и
+  `[compose]`;
+- `kind(key)` — Backspace / управляющая / печатная / прочая клавиша;
+- `layout_count()` / `layout_ru()` / `layout_en()` / `layout_hint()`;
+- `set_layout_hint(group)` — с какой группы начинать поиск сканкода;
+- `set_layout(group)` — переключение раскладки;
+- `set_active_group(group)` — какую группу восстановить после ввода;
+- `set_delay(us)` — задержка программных нажатий;
+- `send_key(key, event)` / `press_key(key)` / `press_key_multi(key, n)`;
+- `clear_active_mods()` / `recover_active_mods()` — сохранение и
+  восстановление зажатых модификаторов;
+- `keymap()` / `keymap_saved()` / `swap_keymap()` — текущая и предыдущая
+  карты нажатых клавиш для опроса.
 
 Доменные модификаторы (`ERS_MOD_SHIFT`, `ERS_MOD_LOCK`, …) не должны
 называться `ShiftMask`/`LockMask`. На первом этапе их числовые значения
 можно оставить совпадающими с X11, чтобы снизить риск.
 
+В монолите пока остались старые имена (`init_keyboard`, `send_key`,
+`press_key`, `keyboard_state`, `unikey_to_keysym`, `keysym_to_unikey`,
+`set_group`, `clear_active_mods`, `recover_active_mods`) — это тонкие
+обёртки над портом. Макросы совместимости над `er_kbd` убраны: раскладки,
+`delay`, `saved/keys` и `active_*` доступны только через порт или сам
+X11-адаптер. Обёртки исчезнут после переноса `app_run`.
+
 ### clipboard
 
 Контракт асинхронный:
 
-- `get(selection, callback, context)` — результат может прийти позже, в
-  том числе через INCR;
-- `set(data, len, target)` — владение памятью передаётся порту;
-- ошибка/пустой буфер — тоже вызов callback (как сейчас `fn(strdup(""), 0, …)`).
+- `get(selection, format, callback, context)` — результат может прийти
+  позже, в том числе через INCR;
+- `set(data, len, format)` — владение памятью передаётся порту;
+- `clear()` — освободить данные и перестать быть владельцем;
+- данные в callback принадлежат порту и живут только до возврата из
+  callback; ошибка/пустой буфер — тоже вызов callback с `""`.
 
 Нельзя делать вид, что это синхронные `char* get()`/`set()`: текущий код
 живёт на `SelectionNotify`/`SelectionRequest` и колбэках.
@@ -246,7 +265,8 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 ```c
 typedef struct {
     Config config;                 // options, bindings, compose, snippets, commands
-    InputBuffer input;             // word[], pos, keys_pressed
+    InputBuffer input;             // word[], symbol[], pos
+    int keys_pressed;              // опрос клавиатуры, не содержимое буфера
     int current_win;
     int need_load_config;
 
@@ -263,7 +283,9 @@ typedef struct {
 
 Правила:
 
-- `InputBuffer` владеет `word[]`, `pos`, `keys_pressed`;
+- `InputBuffer` владеет `word[]`, `symbol[]`, `pos`; `keys_pressed`
+  относится к опросу клавиатуры и остаётся в `use_cases/input`/
+  X11-адаптере;
 - `Config` — неизменяемый снимок; при перезагрузке новый конфиг
   собирается целиком и заменяет старый, старый освобождается;
 - X11 `Display`, атомы, активные модификаторы и буферы clipboard живут в
@@ -322,16 +344,56 @@ typedef struct {
 
 ### Шаг 2. Клавиатура
 
-- Ввести `ports/keyboard`.
-- Перенести Xkb/XTest-код в `infrastructure/x11/keyboard`.
-- Обернуть существующие функции адаптером, не меняя вызовы в монолите.
-- Перенести `use_cases/input` и `use_cases/translate` (вариант А).
+Сделано:
+
+- введён `ports/keyboard` с типизированными операциями вместо прямых
+  вызовов X11;
+- Xkb/XTest-код, раскладки, инъекция клавиш, активные модификаторы и
+  отладочная печать клавиш перенесены в
+  `infrastructure/x11/keyboard.c`;
+- старые функции монолита заменены тонкими обёртками, поэтому вызовы в
+  `erswitcher.c` и `tests/unit` не пришлось переписывать;
+- состояние `groups`, `group_ru`, `group_en`, `maybe_group`, `delay`,
+  `saved/keys`, `active_*` живёт в `keyboard_x11_t` (`er_kbd`); макросы
+  совместимости убраны, доступ идёт через `ports/keyboard`;
+- добавлен отдельный набор `keyboard port` в юнит-тестах: контракт
+  проверяется через мок X11;
+- `add_to_buffer`/`from_space` и обработка Backspace/управляющих клавиш
+  перенесены в `use_cases/input`; классификация клавиши идёт через
+  `keyboard->kind()`, без X11 в сценарии;
+- `print_translate_buffer`/`print_invertcase_buffer` и `word_*`/`text_*`
+  перенесены в `use_cases/translate` (вариант А);
+- глобальные `pos/word` заменены на `domain/input_buffer` (`input`):
+  `use_cases/input` пополняет `word[]` и `symbol[]`, `from_space` читает
+  сохранённые символы; `to_buffer` тоже заполняет оба массива;
+- добавлен набор `use cases` с фейковым портом клавиатуры;
+- `delay` из `[options]` устанавливается через `keyboard->set_delay()`,
+  опрос клавиатуры в `app_run` использует `keymap()/keymap_saved()/
+  swap_keymap()`; макросы совместимости над `er_kbd` удалены.
+
+Осталось в этом шаге:
+
+- убрать старые обёртки после переноса `app_run`.
 
 ### Шаг 3. Clipboard
 
-- Ввести асинхронный `ports/clipboard`.
-- Перенести Selection/INCR в `infrastructure/x11/clipboard`.
-- Перевести `translate(selected)`, snippets, compose на порт.
+- Введён асинхронный `ports/clipboard`: `get(selection, format, callback,
+  context)`, `set(data, len, format)` с передачей владения памятью и
+  `clear()`. Callback получает данные только на время вызова; пустой
+  буфер/ошибка приходят как `""`, а не как молчание.
+- Selection/INCR, атомы, `selection_chunk_size`, буферы отправки/приёма и
+  ожидающий callback перенесены в `infrastructure/x11/clipboard.c`.
+- `open_display()` создаёт атомы через `clipboard_x11_init()`;
+  `event_next()` передаёт SelectionNotify/SelectionClear/SelectionRequest/
+  PropertyNotify в `clipboard_x11_handle_event()`.
+- `selection translate`/`selection invertcase`, snippets и compose работают
+  через порт: `copy_selection()` и `insert_from_clipboard()` больше не
+  вызывают X11 напрямую.
+- В монолите остались compatibility-макросы над `er_clipboard` и обёртки
+  `clipboard_free()`/`set_clipboard_utf8()`; они исчезнут вместе с
+  `app_run`.
+- Добавлен набор `clipboard` в юнит-тестах: set/clear, собственный
+  буфер, отсутствие владельца, асинхронный callback и INCR.
 
 ### Шаг 4. Время и события
 
