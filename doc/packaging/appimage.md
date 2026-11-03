@@ -33,9 +33,13 @@ Makefile собирает из них staging-каталог `build/AppImage/App
 
 ## 3. Зависимости сборки
 
-Нужен `appimagetool`. В Arch/Manjaro отдельного пакета в официальных
-репозиториях может не быть, поэтому проще взять официальный continuous
-AppImage:
+Нужен `appimagetool`. В Arch/Manjaro его можно поставить из AUR:
+
+```sh
+yay -S appimagetool-bin
+```
+
+Либо взять официальный continuous AppImage:
 
 ```sh
 mkdir -p ~/.local/bin
