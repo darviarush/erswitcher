@@ -21,4 +21,4 @@ make appimage
 make release
 ```
 
-Подробности: [`doc/appimage.md`](../../doc/appimage.md).
+Подробности: [`doc/packaging/appimage.md`](../../doc/packaging/appimage.md).

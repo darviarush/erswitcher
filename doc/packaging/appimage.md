@@ -1,5 +1,7 @@
 # AppImage и GitHub Releases
 
+> Общие правила упаковки: [`../packaging.md`](../packaging.md).
+
 ## 1. Что собирается
 
 `make appimage` создаёт переносимый AppImage:

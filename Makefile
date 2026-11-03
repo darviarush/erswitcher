@@ -127,7 +127,7 @@ format-check:	## Проверяет форматирование C/H без из
 
 appimage: erswitcher	## Собирает AppImage в dist/
 		@test -n "$(VERSION)" || { echo "FAIL: VERSION пуст; задайте make appimage VERSION=..." >&2; exit 1; }
-		@command -v $(APPIMAGE_TOOL) >/dev/null 2>&1 || { echo "FAIL: не найден $(APPIMAGE_TOOL); см. doc/appimage.md" >&2; exit 1; }
+		@command -v $(APPIMAGE_TOOL) >/dev/null 2>&1 || { echo "FAIL: не найден $(APPIMAGE_TOOL); см. doc/packaging/appimage.md" >&2; exit 1; }
 		rm -rf $(APPIMAGE_STAGE)
 		install -d $(APPIMAGE_STAGE)/usr/bin
 		install -d $(APPIMAGE_STAGE)/usr/share/applications

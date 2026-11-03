@@ -69,7 +69,7 @@ chmod +x erswitcher-*-x86_64.AppImage
 ```
 
 Сборка и публикация: `make appimage`, `make release`. Подробнее —
-[`doc/appimage.md`](doc/appimage.md).
+[`doc/packaging/appimage.md`](doc/packaging/appimage.md).
 
 # DEPENDENCIES
 
