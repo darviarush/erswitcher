@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,11 +104,24 @@ pid_t desktop_launch_configurator(pid_t previous_pid) {
     }
 
     if(pid == 0) {
-        const char* path = ".local/bin/erswitcher-configurator.tcl";
-        char* const argv[] = {NULL};
+        char path[PATH_MAX];
+        const char* appdir = getenv("APPDIR");
+
+        if(appdir && *appdir) {
+            snprintf(path, sizeof path, "%s/usr/bin/erswitcher-configurator.tcl",
+                     appdir);
+            if(access(path, X_OK) != 0) {
+                snprintf(path, sizeof path,
+                         ".local/bin/erswitcher-configurator.tcl");
+            }
+        } else {
+            snprintf(path, sizeof path, ".local/bin/erswitcher-configurator.tcl");
+        }
+
+        char* const argv[] = {path, NULL};
         execve(path, argv, environ);
-        fprintf(stderr, "ERROR: конфигуратор %s не запущен! Ошибка: %s\n",
-                path, strerror(errno));
+        fprintf(stderr, "ERROR: конфигуратор %s не запущен! Ошибка: %s\n", path,
+                strerror(errno));
         exit(1);
     }
 

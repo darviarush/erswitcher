@@ -769,7 +769,9 @@ void app_run(int ac, char** av) {
         exit(1);
     }
 
-    char* program = realpath(av[0], NULL);
+    const char* appimage = getenv("APPIMAGE");
+    char* program = (appimage && *appimage) ? strdup(appimage)
+                                            : realpath(av[0], NULL);
     if(!program) {
         fprintf(stderr, "WARN: не найден реальный путь к программе %s\n", av[0]);
         exit(1);

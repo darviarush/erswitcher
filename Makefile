@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
@@ -52,6 +52,18 @@ PRESENTATION_OBJECTS = $(PRESENTATION_SOURCES:.c=.o)
 
 APP_OBJECTS = src/app/app.o main.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
 TEST_DOMAIN = tests/unit/test_domain
+
+# AppImage и GitHub Releases. VERSION берётся из README.md, но её можно
+# переопределить: make appimage VERSION=7.3
+VERSION ?= $(shell sed -n '/^# VERSION$$/{n;n;p;q;}' README.md | tr -d '[:space:]')
+APPIMAGE_ARCH ?= $(shell uname -m)
+APPIMAGE_NAME ?= erswitcher-$(VERSION)-$(APPIMAGE_ARCH).AppImage
+APPIMAGE_STAGE ?= build/AppImage/AppDir
+APPIMAGE_OUTDIR ?= dist
+APPIMAGE_TOOL ?= appimagetool
+GH ?= gh
+RELEASE_TAG ?= v$(VERSION)
+RELEASE_TITLE ?= erswitcher $(VERSION)
 
 erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
 		gcc $(CFLAGS) $(CLIBS) -o $@ $^
@@ -112,6 +124,41 @@ format:	## Форматирует C/H через clang-format
 format-check:	## Проверяет форматирование C/H без изменений
 		@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || { echo "FAIL: не найден $(CLANG_FORMAT); см. doc/formatting.md" >&2; exit 1; }
 		find main.c src tests -type f \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 -r $(CLANG_FORMAT) --dry-run --Werror
+
+appimage: erswitcher	## Собирает AppImage в dist/
+		@test -n "$(VERSION)" || { echo "FAIL: VERSION пуст; задайте make appimage VERSION=..." >&2; exit 1; }
+		@command -v $(APPIMAGE_TOOL) >/dev/null 2>&1 || { echo "FAIL: не найден $(APPIMAGE_TOOL); см. doc/appimage.md" >&2; exit 1; }
+		rm -rf $(APPIMAGE_STAGE)
+		install -d $(APPIMAGE_STAGE)/usr/bin
+		install -d $(APPIMAGE_STAGE)/usr/share/applications
+		install -d $(APPIMAGE_STAGE)/usr/share/icons/hicolor/256x256/apps
+		install -d $(APPIMAGE_STAGE)/usr/share/icons/hicolor/scalable/apps
+		install -m 0755 erswitcher $(APPIMAGE_STAGE)/usr/bin/erswitcher
+		install -m 0755 erswitcher-configurator.tcl $(APPIMAGE_STAGE)/usr/bin/erswitcher-configurator.tcl
+		install -m 0755 packaging/appimage/AppRun $(APPIMAGE_STAGE)/AppRun
+		install -m 0644 packaging/appimage/erswitcher.desktop $(APPIMAGE_STAGE)/erswitcher.desktop
+		install -m 0644 packaging/appimage/erswitcher.desktop $(APPIMAGE_STAGE)/usr/share/applications/erswitcher.desktop
+		install -m 0644 packaging/appimage/erswitcher.png $(APPIMAGE_STAGE)/erswitcher.png
+		ln -sf erswitcher.png $(APPIMAGE_STAGE)/.DirIcon
+		install -m 0644 packaging/appimage/erswitcher.png $(APPIMAGE_STAGE)/usr/share/icons/hicolor/256x256/apps/erswitcher.png
+		install -m 0644 packaging/appimage/erswitcher.svg $(APPIMAGE_STAGE)/usr/share/icons/hicolor/scalable/apps/erswitcher.svg
+		install -d $(APPIMAGE_OUTDIR)
+		rm -f $(APPIMAGE_OUTDIR)/$(APPIMAGE_NAME)
+		APPIMAGE_EXTRACT_AND_RUN=1 ARCH=$(APPIMAGE_ARCH) $(APPIMAGE_TOOL) --no-appstream $(APPIMAGE_STAGE) $(APPIMAGE_OUTDIR)/$(APPIMAGE_NAME)
+
+appimage-clean:	## Удаляет staging-каталог AppImage
+		rm -rf build/AppImage
+
+release: appimage	## Собирает AppImage и публикует его в GitHub Releases
+		@command -v $(GH) >/dev/null 2>&1 || { echo "FAIL: не найден $(GH); установите GitHub CLI" >&2; exit 1; }
+		@$(GH) auth status >/dev/null 2>&1 || { echo "FAIL: gh не авторизован; выполните gh auth login" >&2; exit 1; }
+		@if $(GH) release view "$(RELEASE_TAG)" >/dev/null 2>&1; then \
+			echo "Обновляю релиз $(RELEASE_TAG)"; \
+			$(GH) release upload "$(RELEASE_TAG)" "$(APPIMAGE_OUTDIR)/$(APPIMAGE_NAME)" --clobber; \
+		else \
+			echo "Создаю релиз $(RELEASE_TAG)"; \
+			$(GH) release create "$(RELEASE_TAG)" "$(APPIMAGE_OUTDIR)/$(APPIMAGE_NAME)" --title "$(RELEASE_TITLE)" --generate-notes; \
+		fi
 
 dist:	## Собирает дистрибутив (экспериментально)
 		autoscan

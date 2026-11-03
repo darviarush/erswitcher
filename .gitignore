@@ -4,3 +4,6 @@ erswitcher
 .vscode/
 tests/unit/test
 tests/unit/test_domain
+build/
+dist/
+*.AppImage

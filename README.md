@@ -58,6 +58,19 @@ $ make && make install && make launch
 
 _EN—RU Switcher_ будет скомпилирован, установлен в `~/.local/bin/erswitcher` и запущен из `~/.local/bin` в фоне.
 
+## AppImage
+
+Готовые AppImage публикуются в GitHub Releases. Скачанный файл нужно
+сделать исполняемым и запустить:
+
+```sh
+chmod +x erswitcher-*-x86_64.AppImage
+./erswitcher-*-x86_64.AppImage
+```
+
+Сборка и публикация: `make appimage`, `make release`. Подробнее —
+[`doc/appimage.md`](doc/appimage.md).
+
 # DEPENDENCIES
 
 Для сборки потребуются:

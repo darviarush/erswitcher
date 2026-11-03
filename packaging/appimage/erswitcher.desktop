@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=EN-RU Switcher
+Comment=Transliterator for keyboard input
+Comment[ru]=Транслитератор ввода с клавиатуры
+Exec=erswitcher
+Icon=erswitcher
+Terminal=false
+Categories=Utility;
+Keywords=keyboard;transliterate;erswitcher;switch
+X-GNOME-UsesNotifications=true

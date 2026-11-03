@@ -1,0 +1,11 @@
+#!/bin/sh
+# AppImage entry point. The runtime sets APPDIR/APPIMAGE; the fallback
+# makes the same AppDir runnable after manual extraction.
+set -eu
+
+if [ -z "${APPDIR:-}" ]; then
+    APPDIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+    export APPDIR
+fi
+
+exec "$APPDIR/usr/bin/erswitcher" "$@"
