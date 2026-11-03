@@ -73,29 +73,52 @@ chmod +x erswitcher-*-x86_64.AppImage
 
 # DEPENDENCIES
 
-Для сборки потребуются:
+Полный список программ и пакетов: [`Dependencies`](Dependencies).
 
-* gcc
-* make
-* libX11.so
-* libxkbcommon.so
-* libXtst.so
+Для сборки и запуска нужны:
 
-Конфигуратор _EN—RU Switcher-а_ написан на **tcl-tk**, соответственно:
+* gcc и make;
+* pkg-config/pkgconf;
+* libX11, libxkbcommon, libXtst (заголовки и библиотеки);
+* tcl и tk — для конфигуратора.
 
-* tcl
-* tk
+Для разработки и тестов дополнительно:
+
+* git;
+* check — юнит-тесты;
+* libbacktrace — стектрейсы в тестах;
+* clang/clang-format — форматирование;
+* xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
+* xdotool — ручной smoke-тест клавиатуры и окна;
+* desktop-file-utils — проверка `.desktop`-файлов.
+
+Для упаковки и релизов:
+
+* appimagetool (`appimagetool-bin` из AUR);
+* `gh` (GitHub CLI) — создание релизов;
+* `curl` — загрузка официального AppImage-инструмента, если он не установлен из AUR;
+* `librsvg` (`rsvg-convert`) — опционально, для пересборки иконки;
+* `yay` или другой AUR-helper — для `appimagetool-bin`.
 
 ## ubuntu
 
 ```sh
-sudo apt install gcc name libxkbcommon-dev libxtst-dev tcltk
+sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
+  libxtst-dev tcl tk check libbacktrace-dev clang-format clang \
+  xvfb xdotool gh librsvg2-bin desktop-file-utils curl
 ```
 
-## arhlinux
+`appimagetool` в Ubuntu/Debian отдельным пакетом обычно не ставится:
+используйте официальный AppImage или установите его вручную, см.
+[`doc/packaging/appimage.md`](doc/packaging/appimage.md).
+
+## archlinux
 
 ```sh
-sudo pacman -S make gcc libx11 libxkbcommon libxtst tcl tk
+sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
+  tcl tk check libbacktrace clang xorg-server-xvfb xdotool github-cli \
+  librsvg desktop-file-utils curl
+yay -S --needed appimagetool-bin
 ```
 
 # AUTOLOAD

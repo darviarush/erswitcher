@@ -1,5 +1,30 @@
 Список нововведений в En-Ru Switcher:
 
+7.3 (в разработке)  Wed Nov 04 2026
+
+    - Монолит erswitcher.c разобран на слои src/: domain, use_cases, ports,
+      infrastructure, presentation и app; main.c стал отдельной точкой входа
+    - Конфиг загружается в заменяемый снимок config_t; SIGHUP только выставляет
+      флаг, а разбор и применение идут в главном цикле
+    - Добавлены порты scheduler и event_loop; таймеры и ожидание X11-событий
+      вынесены из главного цикла
+    - Команды, snippets и sendkeys перенесены в use_cases; добавлен порт
+      command_runner и fork-реализация с %i/%o, таймаутом и временными файлами
+    - Трей и системная интеграция вынесены в ports/tray,
+      infrastructure/x11/tray, presentation/tray_indicator и
+      infrastructure/system/desktop
+    - Юнит-тесты линкуются с модулями, без #include монолита; добавлены наборы
+      commands, desktop, tray и config reload
+    - Добавлен clang-format (.clang-format), команды make format и
+      make format-check; astyle удалён
+    - Добавлена сборка AppImage: packaging/appimage, make appimage,
+      make appimage-clean и публикация через make release (GitHub CLI)
+    - AppImage учитывает APPIMAGE и APPDIR: autostart указывает на сам AppImage,
+      а конфигуратор запускается из встроенного каталога
+    - Добавлена документация doc/packaging.md и doc/packaging/appimage.md
+    - В README перечислены зависимости для сборки, тестов, форматирования,
+      упаковки и релизов
+
 7.2  Чт 01 авг 2024 13:22:06 MSK
 
     - Добавлены %i и %o для секции [commands]. Теперь команды могут получать выделенное и вставлять свой вывод из буфера обмена

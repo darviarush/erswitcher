@@ -45,11 +45,30 @@
 
 ## 3. Зависимости
 
+Полный список программ: [`Dependencies`](../Dependencies).
+
 Сборка:
 
-- `gcc`, `make`;
+- `gcc`, `make`, `pkg-config`/`pkgconf`;
 - заголовки и библиотеки X11, Xkbcommon, XTest;
 - Tcl/Tk — для конфигуратора и функциональных тестов.
+
+Разработка и тесты:
+
+- `git`;
+- `check` — юнит-тесты;
+- `libbacktrace` — стектрейсы в тестах;
+- `clang`/`clang-format` — форматирование;
+- `xorg-server-xvfb` — `xvfb-run` для функциональных тестов;
+- `xdotool` — ручной smoke-тест;
+- `desktop-file-utils` — проверка `.desktop`.
+
+Упаковка и релизы:
+
+- `appimagetool` (`appimagetool-bin` из AUR);
+- `gh` (GitHub CLI);
+- `curl` — запасной способ получить `appimagetool`;
+- `librsvg`/`rsvg-convert` — опционально для иконки.
 
 Время выполнения:
 

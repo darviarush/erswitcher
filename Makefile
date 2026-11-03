@@ -60,6 +60,7 @@ APPIMAGE_ARCH ?= $(shell uname -m)
 APPIMAGE_NAME ?= erswitcher-$(VERSION)-$(APPIMAGE_ARCH).AppImage
 APPIMAGE_STAGE ?= build/AppImage/AppDir
 APPIMAGE_OUTDIR ?= dist
+# appimagetool-bin из AUR устанавливает /usr/bin/appimagetool.
 APPIMAGE_TOOL ?= appimagetool
 GH ?= gh
 RELEASE_TAG ?= v$(VERSION)
