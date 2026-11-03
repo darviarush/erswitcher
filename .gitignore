@@ -7,3 +7,4 @@ tests/unit/test_domain
 build/
 dist/
 *.AppImage
+monet.md
