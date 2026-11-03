@@ -11,10 +11,10 @@
 #define COMPOSE_KEY_MAX 20
 
 typedef struct {
-    wint_t word[COMPOSE_KEY_MAX];   // левая часть (что ввели)
-    int pos;                        // длина левой части
-    int cursor_back;                // на сколько вернуть курсор после вставки
-    char* to;                       // правая часть (что вставить)
+    wint_t word[COMPOSE_KEY_MAX]; // левая часть (что ввели)
+    int pos; // длина левой части
+    int cursor_back; // на сколько вернуть курсор после вставки
+    char* to; // правая часть (что вставить)
 } compose_t;
 
 // Индекс первого совпадения в map[0..size) или -1.

@@ -31,10 +31,12 @@ int input_buffer_from_space(const input_buffer_t* buffer) {
     // «слово » word translate должен перевести «слово », а не ничего.
     // Поэтому границу слова ищем до хвостовых пробелов, но возвращаем
     // начало слова — хвостовые пробелы попадут в диапазон [from, pos).
-    while(last >= 0 && iswspace(buffer->symbol[last])) --last;
+    while(last >= 0 && iswspace(buffer->symbol[last]))
+        --last;
 
     // Начало слова — сразу после предыдущего пробела.
-    while(last >= 0 && !iswspace(buffer->symbol[last])) --last;
+    while(last >= 0 && !iswspace(buffer->symbol[last]))
+        --last;
 
     return last + 1;
 }

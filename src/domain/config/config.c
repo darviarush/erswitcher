@@ -17,13 +17,15 @@ void config_init(config_t* config) {
 void config_clear_entries(config_t* config) {
     if(!config) return;
 
-    for(int i = 0; i < config->bindings_size; i++) free(config->bindings[i].arg);
+    for(int i = 0; i < config->bindings_size; i++)
+        free(config->bindings[i].arg);
     free(config->bindings);
     config->bindings = NULL;
     config->bindings_size = 0;
     config->bindings_capacity = 0;
 
-    for(int i = 0; i < config->compose_size; i++) free(config->compose[i].to);
+    for(int i = 0; i < config->compose_size; i++)
+        free(config->compose[i].to);
     free(config->compose);
     config->compose = NULL;
     config->compose_size = 0;
@@ -50,7 +52,7 @@ int config_add_binding(config_t* config, unikey_t key, config_action_t action, c
     char* copy = arg ? strdup(arg) : NULL;
     if(arg && !copy) return 0;
 
-    config->bindings[config->bindings_size++] = (config_binding_t) {
+    config->bindings[config->bindings_size++] = (config_binding_t){
         .key = key,
         .action = action,
         .arg = copy,
@@ -117,15 +119,15 @@ config_action_t config_action_from_function(const char* value) {
 
 config_action_t config_action_for_section(config_section_t section) {
     switch(section) {
-        case CONFIG_SECTION_SENDKEYS: return CONFIG_ACTION_SENDKEYS;
-        case CONFIG_SECTION_SNIPPETS: return CONFIG_ACTION_SNIPPET;
-        case CONFIG_SECTION_COMMANDS: return CONFIG_ACTION_COMMAND;
-        default: return CONFIG_ACTION_NONE;
+    case CONFIG_SECTION_SENDKEYS: return CONFIG_ACTION_SENDKEYS;
+    case CONFIG_SECTION_SNIPPETS: return CONFIG_ACTION_SNIPPET;
+    case CONFIG_SECTION_COMMANDS: return CONFIG_ACTION_COMMAND;
+    default: return CONFIG_ACTION_NONE;
     }
 }
 
 config_options_t config_options_default(void) {
-    return (config_options_t) {
+    return (config_options_t){
         .delay = CONFIG_DEFAULT_DELAY,
         .loop_delay = CONFIG_DEFAULT_LOOP_DELAY,
         .command_timeout = CONFIG_DEFAULT_COMMAND_TIMEOUT,
@@ -137,7 +139,8 @@ config_options_t config_options_default(void) {
 // должна работать независимо от setlocale().
 static int parse_double(const char* s, double* out) {
     const char* p = s;
-    while(isspace((unsigned char) *p)) p++;
+    while(isspace((unsigned char) *p))
+        p++;
 
     int sign = 1;
     if(*p == '+' || *p == '-') {
@@ -189,7 +192,8 @@ static int parse_double(const char* s, double* out) {
             p = exponent_start;
         } else {
             if(exponent > 308) return 0;
-            while(exponent-- > 0) value *= exponent_sign > 0 ? 10 : 0.1;
+            while(exponent-- > 0)
+                value *= exponent_sign > 0 ? 10 : 0.1;
         }
     }
 
@@ -253,13 +257,20 @@ static int token_eq(const char* start, size_t len, const char* value) {
 }
 
 static int modifier_from_token(const char* start, size_t len, unsigned* mods) {
-    if(token_eq(start, len, "Shift")) *mods |= ERS_MOD_SHIFT;
-    else if(token_eq(start, len, "Control") || token_eq(start, len, "Ctrl")) *mods |= ERS_MOD_CONTROL;
-    else if(token_eq(start, len, "Alt") || token_eq(start, len, "Option")) *mods |= ERS_MOD_ALT;
-    else if(token_eq(start, len, "Meta")) *mods |= ERS_MOD_META;
-    else if(token_eq(start, len, "Super") || token_eq(start, len, "Win") || token_eq(start, len, "Command")) *mods |= ERS_MOD_SUPER;
-    else if(token_eq(start, len, "Hyper")) *mods |= ERS_MOD_HYPER;
-    else return 0;
+    if(token_eq(start, len, "Shift"))
+        *mods |= ERS_MOD_SHIFT;
+    else if(token_eq(start, len, "Control") || token_eq(start, len, "Ctrl"))
+        *mods |= ERS_MOD_CONTROL;
+    else if(token_eq(start, len, "Alt") || token_eq(start, len, "Option"))
+        *mods |= ERS_MOD_ALT;
+    else if(token_eq(start, len, "Meta"))
+        *mods |= ERS_MOD_META;
+    else if(token_eq(start, len, "Super") || token_eq(start, len, "Win") || token_eq(start, len, "Command"))
+        *mods |= ERS_MOD_SUPER;
+    else if(token_eq(start, len, "Hyper"))
+        *mods |= ERS_MOD_HYPER;
+    else
+        return 0;
 
     return 1;
 }
@@ -268,8 +279,7 @@ config_key_result_t config_parse_key_expression(
     const char* expression,
     config_key_resolver_t resolver,
     void* context,
-    unikey_t* out
-) {
+    unikey_t* out) {
     if(!expression || !out) return CONFIG_KEY_NO_KEY;
 
     unsigned mods = 0;
@@ -278,11 +288,13 @@ config_key_result_t config_parse_key_expression(
 
     const char* p = expression;
     while(*p) {
-        while(*p == '+') p++;
+        while(*p == '+')
+            p++;
         if(!*p) break;
 
         const char* start = p;
-        while(*p && *p != '+') p++;
+        while(*p && *p != '+')
+            p++;
         size_t len = (size_t) (p - start);
 
         // Как в старом парсере: после клавиши не может быть уже ничего
@@ -325,9 +337,9 @@ char* config_unescape_value(char* value, char** cursor) {
 
         char to = 0;
         switch(x[1]) {
-            case '\\': to = '\\'; break;
-            case 'n': to = '\n'; break;
-            case 't': to = '\t'; break;
+        case '\\': to = '\\'; break;
+        case 'n': to = '\n'; break;
+        case 't': to = '\t'; break;
         }
 
         if(to) {

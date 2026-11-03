@@ -10,7 +10,7 @@
 #include "command_runner_fork.h"
 #include "../../domain/command_template/command_template.h"
 
-#define COMMAND_RUNNER_INFILE  "/tmp/erswitcher-input"
+#define COMMAND_RUNNER_INFILE "/tmp/erswitcher-input"
 #define COMMAND_RUNNER_OUTFILE "/tmp/erswitcher-output"
 
 static command_runner_fork_t* state_of(command_runner_port_t* port) {

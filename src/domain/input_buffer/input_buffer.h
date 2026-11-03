@@ -16,9 +16,9 @@
 #define INPUT_BUFFER_CAPACITY 1024
 
 typedef struct {
-    int pos;                                    // позиция в буфере
-    unikey_t word[INPUT_BUFFER_CAPACITY];       // нажатые клавиши
-    wint_t symbol[INPUT_BUFFER_CAPACITY];       // их Unicode-символы
+    int pos; // позиция в буфере
+    unikey_t word[INPUT_BUFFER_CAPACITY]; // нажатые клавиши
+    wint_t symbol[INPUT_BUFFER_CAPACITY]; // их Unicode-символы
 } input_buffer_t;
 
 void input_buffer_init(input_buffer_t* buffer);

@@ -90,7 +90,7 @@ END_TEST
 //@category input_buffer
 
 static unikey_t key_of(int code) {
-    return (unikey_t) {code: code, mods: 0, group: 0};
+    return (unikey_t){code : code, mods : 0, group : 0};
 }
 
 static void push_str(input_buffer_t* buffer, const wchar_t* s) {
@@ -208,7 +208,7 @@ END_TEST
 //@category case_invert
 
 START_TEST(case_invert_toggles_shift) {
-    unikey_t key = {code: 30, mods: ERS_MOD_CONTROL, group: 0};
+    unikey_t key = {code : 30, mods : ERS_MOD_CONTROL, group : 0};
 
     key = unikey_invert_shift(key);
     ck_assert_int_eq(key.mods, ERS_MOD_CONTROL | ERS_MOD_SHIFT);
@@ -220,7 +220,7 @@ START_TEST(case_invert_toggles_shift) {
 END_TEST
 
 START_TEST(case_invert_preserves_other_mods) {
-    unikey_t key = {code: 31, mods: ERS_MOD_SHIFT | ERS_MOD_LOCK | ERS_MOD_ALT, group: 2};
+    unikey_t key = {code : 31, mods : ERS_MOD_SHIFT | ERS_MOD_LOCK | ERS_MOD_ALT, group : 2};
 
     key = unikey_invert_shift(key);
     ck_assert_int_eq(key.mods, ERS_MOD_LOCK | ERS_MOD_ALT);
@@ -233,7 +233,8 @@ END_TEST
 static void compose_set(compose_t* entry, const wchar_t* word, const char* to, int cursor_back) {
     memset(entry, 0, sizeof(*entry));
     entry->pos = (int) wcslen(word);
-    for(int i = 0; i < entry->pos; i++) entry->word[i] = word[i];
+    for(int i = 0; i < entry->pos; i++)
+        entry->word[i] = word[i];
     entry->to = (char*) to;
     entry->cursor_back = cursor_back;
 }

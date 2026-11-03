@@ -14,7 +14,8 @@ static int append(string_buf_t* buf, const char* s, size_t n) {
     size_t need = buf->len + n + 1;
     if(need > buf->cap) {
         size_t cap = buf->cap ? buf->cap : 64;
-        while(cap < need) cap *= 2;
+        while(cap < need)
+            cap *= 2;
 
         char* data = realloc(buf->data, cap);
         if(!data) return 0;

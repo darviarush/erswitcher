@@ -21,9 +21,9 @@ static void snippets_after_shift_insert(void* context) {
 }
 
 void snippets_use_case_init(snippets_use_case_t* self,
-                             clipboard_port_t* clipboard,
-                             scheduler_port_t* scheduler,
-                             keyboard_port_t* keyboard) {
+                            clipboard_port_t* clipboard,
+                            scheduler_port_t* scheduler,
+                            keyboard_port_t* keyboard) {
     self->clipboard = clipboard;
     self->scheduler = scheduler;
     self->keyboard = keyboard;

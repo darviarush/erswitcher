@@ -63,34 +63,34 @@
 #include "../infrastructure/system/desktop.h"
 #include "../presentation/tray_indicator.h"
 
-#define DELAY       10000
-#define USEC_TO_DBL(U)  (U / 1000000.0)
-#define BUF_SIZE    INPUT_BUFFER_CAPACITY
+#define DELAY 10000
+#define USEC_TO_DBL(U) (U / 1000000.0)
+#define BUF_SIZE INPUT_BUFFER_CAPACITY
 
-#define BIT(VECTOR, BIT_IDX) (((char*)VECTOR)[BIT_IDX/8] & (1 << (BIT_IDX%8)))
+#define BIT(VECTOR, BIT_IDX) (((char*) VECTOR)[BIT_IDX / 8] & (1 << (BIT_IDX % 8)))
 
-#define KEY_TO_SYM(K)   unikey_to_keysym(K)
-#define KEY_TO_INT(K)   xkb_keysym_to_utf32(unikey_to_keysym(K))
-#define SYM_TO_KEY(K)   keysym_to_unikey(K)
-#define SYM_TO_INT(S)   xkb_keysym_to_utf32(S)
-#define INT_TO_SYM(S)   xkb_utf32_to_keysym(S)
-#define INT_TO_KEY(K)   keysym_to_unikey(xkb_utf32_to_keysym(K))
+#define KEY_TO_SYM(K) unikey_to_keysym(K)
+#define KEY_TO_INT(K) xkb_keysym_to_utf32(unikey_to_keysym(K))
+#define SYM_TO_KEY(K) keysym_to_unikey(K)
+#define SYM_TO_INT(S) xkb_keysym_to_utf32(S)
+#define INT_TO_SYM(S) xkb_utf32_to_keysym(S)
+#define INT_TO_KEY(K) keysym_to_unikey(xkb_utf32_to_keysym(K))
 
-#define SYM_TO_STR(K)   XKeysymToString(K)
-#define KEY_TO_STR(K)   XKeysymToString(KEY_TO_SYM(K))
-#define INT_TO_STR(K)   XKeysymToString(INT_TO_SYM(K))
+#define SYM_TO_STR(K) XKeysymToString(K)
+#define KEY_TO_STR(K) XKeysymToString(KEY_TO_SYM(K))
+#define INT_TO_STR(K) XKeysymToString(INT_TO_SYM(K))
 
-#define STR_TO_SYM(K)   XStringToKeysym(K)
-#define STR_TO_INT(K)   SYM_TO_INT(XStringToKeysym(K))
-#define STR_TO_KEY(K)   SYM_TO_KEY(XStringToKeysym(K))
+#define STR_TO_SYM(K) XStringToKeysym(K)
+#define STR_TO_INT(K) SYM_TO_INT(XStringToKeysym(K))
+#define STR_TO_KEY(K) SYM_TO_KEY(XStringToKeysym(K))
 
-#define EQ(S1, S2)      (strcmp(S1, S2) == 0)
+#define EQ(S1, S2) (strcmp(S1, S2) == 0)
 
-#define AltMask     Mod1Mask
-#define NumMask     Mod2Mask
-#define MetaMask    Mod3Mask
-#define SuperMask   Mod4Mask
-#define HyperMask   Mod5Mask
+#define AltMask Mod1Mask
+#define NumMask Mod2Mask
+#define MetaMask Mod3Mask
+#define SuperMask Mod4Mask
+#define HyperMask Mod5Mask
 
 extern input_buffer_t input;
 extern int keys_pressed;
@@ -110,9 +110,9 @@ extern Atom insert_from_clipboard_save_target;
 extern config_t current_config;
 extern int keyfn_active;
 
-#define keyfn           current_config.bindings
-#define keyfn_size      current_config.bindings_size
-#define compose_map     current_config.compose
+#define keyfn current_config.bindings
+#define keyfn_size current_config.bindings_size
+#define compose_map current_config.compose
 #define compose_map_size current_config.compose_size
 
 extern keyboard_port_t kbd_port;

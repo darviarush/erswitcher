@@ -41,16 +41,16 @@ typedef enum {
     CONFIG_ACTION_COMMAND,
 } config_action_t;
 
-#define CONFIG_DEFAULT_DELAY            0.01
-#define CONFIG_DEFAULT_LOOP_DELAY       0.01
-#define CONFIG_DEFAULT_COMMAND_TIMEOUT  13.0
+#define CONFIG_DEFAULT_DELAY 0.01
+#define CONFIG_DEFAULT_LOOP_DELAY 0.01
+#define CONFIG_DEFAULT_COMMAND_TIMEOUT 13.0
 #define CONFIG_DEFAULT_COMMAND_INTERVAL 0.1
 
 typedef struct {
-    double delay;               // секунды
-    double loop_delay;          // секунды
-    double command_timeout;     // секунды
-    double command_interval;    // секунды
+    double delay; // секунды
+    double loop_delay; // секунды
+    double command_timeout; // секунды
+    double command_interval; // секунды
 } config_options_t;
 
 typedef struct {
@@ -129,8 +129,7 @@ config_key_result_t config_parse_key_expression(
     const char* expression,
     config_key_resolver_t resolver,
     void* context,
-    unikey_t* out
-);
+    unikey_t* out);
 
 // Раскрывает \n, \t, \\ и маркер курсора \^ прямо в value.
 // cursor (может быть NULL) указывает на символ сразу после маркера.

@@ -34,8 +34,7 @@ int config_reload_parse(
     const char* text,
     const char* path,
     const config_reload_parse_context_t* context,
-    config_t* out
-);
+    config_t* out);
 
 typedef struct {
     config_store_port_t* store;

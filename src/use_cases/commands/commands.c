@@ -168,6 +168,7 @@ int commands_use_case_is_blank(const char* command) {
     if(!command) return 1;
 
     const unsigned char* s = (const unsigned char*) command;
-    while(isspace(*s)) s++;
+    while(isspace(*s))
+        s++;
     return *s == '\0';
 }

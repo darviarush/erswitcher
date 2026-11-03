@@ -59,8 +59,8 @@ static void tick_impl(scheduler_port_t* port) {
             // из callback, не должен занять его раньше времени.
             state->timers[i].fn = NULL;
             state->timers[i].context = NULL;
-        }
-        else last = i;
+        } else
+            last = i;
     }
 
     state->size = last + 1;

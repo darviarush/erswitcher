@@ -46,8 +46,10 @@ static void er_layout_abc() {
 
 // Сканкод буквы — по таблице мока (KEY_A, KEY_B, KEY_C не подряд)
 static unikey_t er_key(char ch) {
-    int code = ch == 'a' ? KEY_A : ch == 'b' ? KEY_B : ch == 'c' ? KEY_C : 0;
-    return (unikey_t) {code: code, mods: 0, group: 0};
+    int code = ch == 'a' ? KEY_A : ch == 'b' ? KEY_B
+                               : ch == 'c'   ? KEY_C
+                                             : 0;
+    return (unikey_t){code : code, mods : 0, group : 0};
 }
 
 static void er_input(char const* s) {
@@ -64,8 +66,7 @@ START_TEST(er_compose_single_letter) {
     er_load(
         "[compose]\n"
         "a=б\n"
-        "b=в\n"
-    );
+        "b=в\n");
 
     ck_assert_int_eq(compose_map_size, 2);
     ck_assert_str_eq(compose_map[0].to, "б");
@@ -78,8 +79,7 @@ END_TEST
 START_TEST(er_compose_two_letter) {
     er_load(
         "[compose]\n"
-        "ab=аб\n"
-    );
+        "ab=аб\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_int_eq(compose_map[0].pos, 2);
@@ -92,8 +92,7 @@ END_TEST
 START_TEST(er_compose_cyrillic_key_is_utf32) {
     er_load(
         "[compose]\n"
-        "ы=і\n"
-    );
+        "ы=і\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_int_eq(compose_map[0].pos, 1);
@@ -107,8 +106,7 @@ START_TEST(er_compose_sorted_by_key_length) {
         "[compose]\n"
         "a=1\n"
         "ab=2\n"
-        "abc=3\n"
-    );
+        "abc=3\n");
 
     ck_assert_int_eq(compose_map_size, 3);
     ck_assert_int_eq(compose_map[0].pos, 3);
@@ -122,8 +120,7 @@ START_TEST(er_compose_escaped_equal_in_key) {
     er_load(
         "[compose]\n"
         "\\==±\n"
-        "<\\==≤\n"
-    );
+        "<\\==≤\n");
 
     ck_assert_int_eq(compose_map_size, 2);
     ck_assert_int_eq(compose_map[0].word[0], L'<');
@@ -136,8 +133,7 @@ END_TEST
 START_TEST(er_compose_cursor_back) {
     er_load(
         "[compose]\n"
-        "if=if(\\^) {\\n\\t\\n}\n"
-    );
+        "if=if(\\^) {\\n\\t\\n}\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_int_eq(compose_map[0].pos, 2);
@@ -153,8 +149,7 @@ START_TEST(er_compose_escapes) {
         "[compose]\n"
         "pr=print \\^, \"\\\\n\";\n"
         "t=a\\tb\n"
-        "n=a\\nb\n"
-    );
+        "n=a\\nb\n");
 
     ck_assert_int_eq(compose_map_size, 3);
     ck_assert_str_eq(compose_map[0].to, "print , \"\\n\";");
@@ -177,8 +172,7 @@ START_TEST(er_compose_too_long_key_is_skipped) {
     er_load(
         "[compose]\n"
         "aaaaaaaaaaaaaaaaaaaaa=длинно\n"
-        "a=коротко\n"
-    );
+        "a=коротко\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_str_eq(compose_map[0].to, "коротко");
@@ -212,8 +206,7 @@ START_TEST(er_compose_applies_longest_match) {
         "[compose]\n"
         "a=один\n"
         "ab=два\n"
-        "abc=три\n"
-    );
+        "abc=три\n");
 
     er_input("abc");
     mock_reset();
@@ -301,7 +294,7 @@ START_TEST(er_compose_key_with_switched_layout) {
 
     er_load("[compose]\na=б\n");
 
-    unikey_t key = (unikey_t) {code: CODE_A, mods: 0, group: 1};
+    unikey_t key = (unikey_t){code : CODE_A, mods : 0, group : 1};
     input_buffer_push(&input, key, KEY_TO_INT(key));
     mock_reset();
     compose(NULL);

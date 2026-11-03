@@ -26,7 +26,7 @@ START_TEST(er_keyboard_port_converts_symbols) {
     ck_assert_int_eq(kbd_port.layout_en(&kbd_port), 0);
     ck_assert_int_eq(kbd_port.layout_ru(&kbd_port), 1);
 
-    unikey_t key = {code: KEY_A, mods: 0, group: 0};
+    unikey_t key = {code : KEY_A, mods : 0, group : 0};
     ck_assert_int_eq(kbd_port.to_keysym(&kbd_port, key), XK_a);
     ck_assert_int_eq(kbd_port.to_symbol(&kbd_port, key), 'a');
 
@@ -43,10 +43,10 @@ START_TEST(er_keyboard_port_classifies_keys) {
     mock_keymap_set_all_groups(KEY_LEFT, XK_Left);
     keyboard_port_ensure();
 
-    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t) {code: KEY_A, mods: 0, group: 0}), KEYBOARD_KEY_PRINTABLE);
-    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t) {code: KEY_BACKSPACE, mods: 0, group: 0}), KEYBOARD_KEY_BACKSPACE);
-    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t) {code: KEY_LEFT, mods: 0, group: 0}), KEYBOARD_KEY_CONTROL);
-    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t) {code: 255, mods: 0, group: 0}), KEYBOARD_KEY_OTHER);
+    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t){code : KEY_A, mods : 0, group : 0}), KEYBOARD_KEY_PRINTABLE);
+    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t){code : KEY_BACKSPACE, mods : 0, group : 0}), KEYBOARD_KEY_BACKSPACE);
+    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t){code : KEY_LEFT, mods : 0, group : 0}), KEYBOARD_KEY_CONTROL);
+    ck_assert_int_eq(kbd_port.kind(&kbd_port, (unikey_t){code : 255, mods : 0, group : 0}), KEYBOARD_KEY_OTHER);
 }
 END_TEST
 
@@ -121,7 +121,7 @@ START_TEST(er_keyboard_port_presses_key) {
     keyboard_port_ensure();
     mock_reset();
 
-    unikey_t key = {code: KEY_A, mods: 0, group: 0};
+    unikey_t key = {code : KEY_A, mods : 0, group : 0};
     kbd_port.press_key(&kbd_port, key);
 
     // Одно нажатие и одно отжатие.

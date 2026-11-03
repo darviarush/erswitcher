@@ -90,7 +90,7 @@ static void get_impl(clipboard_x11_t* state, clipboard_selection_t selection,
 
     if(CLIPBOARD_DEBUG) {
         printf("get_selection: owner = 0x%lX %s\n", owner,
-               state->window == owner? "одинаков с w": "разный с w");
+               state->window == owner ? "одинаков с w" : "разный с w");
         fflush(stdout);
     }
 
@@ -103,14 +103,14 @@ static void get_impl(clipboard_x11_t* state, clipboard_selection_t selection,
 
         if(state->send_data) {
             char* copy = malloc((size_t) state->send_len + 1);
-            if(!copy) copy = strdup("");
+            if(!copy)
+                copy = strdup("");
             else {
                 memcpy(copy, state->send_data, (size_t) state->send_len);
                 copy[state->send_len] = '\0';
             }
             deliver(state, copy, state->send_len, state->send_target);
-        }
-        else {
+        } else {
             deliver(state, strdup(""), 0, state->utf8_atom);
         }
         return;
@@ -145,7 +145,7 @@ static void set_impl(clipboard_x11_t* state, char* data, int len,
     Window owner = XGetSelectionOwner(state->display, state->clipboard_atom);
     if(CLIPBOARD_DEBUG)
         fprintf(stderr, "set_clipboard `%s`, my window %s owner\n",
-                data ? data : "", state->window == owner? "is": "no");
+                data ? data : "", state->window == owner ? "is" : "no");
 }
 
 static void clear_impl(clipboard_x11_t* state) {
@@ -178,8 +178,7 @@ static void selection_notify(clipboard_x11_t* state, XEvent* event) {
             fprintf(stderr, "SelectionNotify: Не совпал incr_propid\n");
             return;
         }
-    }
-    else {
+    } else {
         state->incr_property = property;
         state->incr_window = requestor;
     }
@@ -193,7 +192,7 @@ static void selection_notify(clipboard_x11_t* state, XEvent* event) {
                        state->incr_window,
                        state->incr_property,
                        0L,
-                       1024*1024*64,
+                       1024 * 1024 * 64,
                        state->incr_is, (Atom) AnyPropertyType,
                        &state->receive_type,
                        &format, &length, &bytesafter,
@@ -227,8 +226,7 @@ static void selection_notify(clipboard_x11_t* state, XEvent* event) {
             state->receive_len = 0;
             deliver(state, data, len, type);
         }
-    }
-    else {
+    } else {
         Atom type = state->receive_type;
 
         clear_receive_data(state);
@@ -243,8 +241,7 @@ static void selection_notify(clipboard_x11_t* state, XEvent* event) {
 
         if(type == state->incr_atom) {
             state->incr_is = True;
-        }
-        else {
+        } else {
             char* data = state->receive_data;
             int len = state->receive_len;
             state->receive_data = NULL;
@@ -262,29 +259,26 @@ static void selection_request(clipboard_x11_t* state, XEvent* event) {
     Atom target_sel = event->xselectionrequest.target;
 
     if(target_sel == state->targets_atom) {
-        Atom types[] = { state->send_target, state->targets_atom };
+        Atom types[] = {state->send_target, state->targets_atom};
 
         XChangeProperty(state->display, win, pty, XA_ATOM, 32, PropModeReplace,
                         (unsigned char*) types, sizeof(types) / sizeof(Atom));
 
         if(CLIPBOARD_DEBUG) fprintf(stderr, "отправляем targets\n");
-    }
-    else if(target_sel != state->send_target || pty == None) {
+    } else if(target_sel != state->send_target || pty == None) {
         if(CLIPBOARD_DEBUG) {
             char* name = XGetAtomName(state->display, target_sel);
             fprintf(stderr, "Запрошен clipboard в формате '%s'\n", name ? name : "(none)");
             if(name) XFree(name);
         }
         return;
-    }
-    else if(state->send_len > state->selection_chunk_size) {
+    } else if(state->send_len > state->selection_chunk_size) {
         XChangeProperty(state->display, win, pty, state->incr_atom, 32,
                         PropModeReplace, 0, 0);
         XSelectInput(state->display, win, PropertyChangeMask);
 
         state->send_pos = state->send_data;
-    }
-    else {
+    } else {
         XChangeProperty(state->display, win, pty, target_sel, 8, PropModeReplace,
                         (unsigned char*) state->send_data, state->send_len);
         if(CLIPBOARD_DEBUG) {
@@ -318,16 +312,14 @@ static void property_notify(clipboard_x11_t* state, XEvent* event) {
         fflush(stdout);
     }
 
-    int len = state->send_pos + state->selection_chunk_size < state->send_data + state->send_len?
-              state->selection_chunk_size:
-              (int) (state->send_data + state->send_len - state->send_pos);
+    int len = state->send_pos + state->selection_chunk_size < state->send_data + state->send_len ? state->selection_chunk_size : (int) (state->send_data + state->send_len - state->send_pos);
 
     XChangeProperty(state->display,
                     event->xproperty.window,
                     event->xproperty.atom,
                     state->send_target,
                     8, PropModeReplace,
-                    len == 0? NULL: (unsigned char*) state->send_pos,
+                    len == 0 ? NULL : (unsigned char*) state->send_pos,
                     len);
     XFlush(state->display);
 

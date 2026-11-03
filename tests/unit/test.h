@@ -38,22 +38,22 @@
 // Тестовые имена полей clipboard-адаптера: в приложении они не нужны,
 // но тесты проверяют Selection/INCR напрямую.
 #define selection_chunk_size er_clipboard.selection_chunk_size
-#define clipboard_s          er_clipboard.send_data
-#define clipboard_pos        er_clipboard.send_pos
-#define clipboard_len        er_clipboard.send_len
-#define clipboard_target     er_clipboard.send_target
-#define selection_retrive    er_clipboard.receive_data
+#define clipboard_s er_clipboard.send_data
+#define clipboard_pos er_clipboard.send_pos
+#define clipboard_len er_clipboard.send_len
+#define clipboard_target er_clipboard.send_target
+#define selection_retrive er_clipboard.receive_data
 #define selection_retrive_length er_clipboard.receive_len
-#define selection_retrive_type   er_clipboard.receive_type
-#define on_get_selection     er_clipboard.pending_callback
-#define incr_is              er_clipboard.incr_is
-#define incr_propid          er_clipboard.incr_property
-#define incr_window          er_clipboard.incr_window
-#define sel_data_atom        er_clipboard.sel_data_atom
-#define utf8_atom            er_clipboard.utf8_atom
-#define clipboard_atom       er_clipboard.clipboard_atom
-#define targets_atom         er_clipboard.targets_atom
-#define incr_atom            er_clipboard.incr_atom
+#define selection_retrive_type er_clipboard.receive_type
+#define on_get_selection er_clipboard.pending_callback
+#define incr_is er_clipboard.incr_is
+#define incr_propid er_clipboard.incr_property
+#define incr_window er_clipboard.incr_window
+#define sel_data_atom er_clipboard.sel_data_atom
+#define utf8_atom er_clipboard.utf8_atom
+#define clipboard_atom er_clipboard.clipboard_atom
+#define targets_atom er_clipboard.targets_atom
+#define incr_atom er_clipboard.incr_atom
 
 // Тестовое окружение: подменённый HOME, из которого load_config() читает
 // .config/erswitcher.conf
@@ -61,7 +61,7 @@ typedef struct {
     char root[PATH_MAX];
     char home[PATH_MAX];
     char config[PATH_MAX];
-    char original[PATH_MAX];    // HOME до теста, восстанавливается в teardown
+    char original[PATH_MAX]; // HOME до теста, восстанавливается в teardown
 } er_test_env_t;
 
 static er_test_env_t er_env;
@@ -210,7 +210,7 @@ static void er_fixture() {
     er_fixture_setup();
     er_reset_state();
     mock_keymap_clear();
-    mock_keymap_set(75,0,0,0xff13);
+    mock_keymap_set(75, 0, 0, 0xff13);
     er_kbd.groups = 1;
     er_kbd.maybe_group = 0;
 }
@@ -223,8 +223,8 @@ static void er_load(char const* text) {
 
 // Минимальный [options]: без него проверки delay ничего не докажут
 #define ER_MINIMAL_OPTIONS \
-    "[options]\n" \
-    "delay=0,01\n" \
+    "[options]\n"          \
+    "delay=0,01\n"         \
     "loop_delay=0,02\n"
 
 #endif /* __ERSWITCHER_TESTS_UNIT_TEST__H__ */

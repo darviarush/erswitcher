@@ -15,8 +15,7 @@ START_TEST(er_options_delay_in_seconds) {
     er_load(
         ER_MINIMAL_OPTIONS
         "command_timeout=13,20\n"
-        "command_interval=0,1\n"
-    );
+        "command_interval=0,1\n");
 
     ck_assert_int_eq(er_kbd.delay_us, 10000);
     ck_assert_int_eq(loop_delay, 20000);
@@ -48,8 +47,7 @@ START_TEST(er_options_unknown_option_is_skipped) {
     er_load(
         "[options]\n"
         "no_such_option=1\n"
-        "delay=0,5\n"
-    );
+        "delay=0,5\n");
 
     ck_assert_int_eq(er_kbd.delay_us, 500000);
     ck_assert_int_eq(loop_delay, DELAY);
@@ -87,8 +85,7 @@ START_TEST(er_config_unknown_section_is_skipped) {
         "[no_such_section]\n"
         "Pause=word translate\n"
         "[functions]\n"
-        "Pause=word translate\n"
-    );
+        "Pause=word translate\n");
 
     ck_assert_int_eq(keyfn_size, 1);
 }
@@ -98,8 +95,7 @@ START_TEST(er_config_line_without_equal_is_skipped) {
     er_load(
         "[functions]\n"
         "Pause word translate\n"
-        "Pause=word translate\n"
-    );
+        "Pause=word translate\n");
 
     ck_assert_int_eq(keyfn_size, 1);
 }
@@ -111,8 +107,7 @@ START_TEST(er_config_comments_and_spaces) {
         "   # тоже комментарий\n"
         "\n"
         "[functions]\n"
-        "Pause=word translate   \n"
-    );
+        "Pause=word translate   \n");
 
     ck_assert_int_eq(keyfn_size, 1);
 }
@@ -125,8 +120,7 @@ START_TEST(er_config_last_section_wins) {
         "[options]\n"
         "delay=0,5\n"
         "[functions]\n"
-        "Control+Pause=text translate\n"
-    );
+        "Control+Pause=text translate\n");
 
     ck_assert_int_eq(keyfn_size, 2);
     ck_assert_int_eq(er_kbd.delay_us, 500000);

@@ -15,7 +15,7 @@
 * [x] Разбить монолит в src/ по doc/arch.md
 * [ ] Юнит-тесты перенести на фреймворк Criterion (колоризация) с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address` (для стектрейса вместо libbacktrace, проверить, что поддерживается gcc и clang). Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
 * [ ] Динамический анализ (санитайзеры) и фаззинг-тесты / doc/test-metodology.md
-* [ ] Добавить Clang-Format для форматирования кода, отформатировать код. Убрать astyle
+* [x] Добавить Clang-Format для форматирования кода, отформатировать код. Убрать astyle
 * [ ] Добавить чекер Clang-Tidy и CFLAGS += -fanalyzer, чекнуть код
 * [ ] Добавить юнит-тесты, покрытие, линтер и форматтер в github CI. Отладить `.github/workflows/test.yml`. Запуск локально `act -j test-linux`. См. https://github.com/actions/runner-images, https://github.com/cross-platform-actions/action
 * [ ] ERSWITCHER_DEBUG=1 – включает вывод отладки и нажатых комбинаций клавишь на консоль. Сейчас выдаётся постоянно. Добавить временные метки, чтобы можно было посчитать время между событиями

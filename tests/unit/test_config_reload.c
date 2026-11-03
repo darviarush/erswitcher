@@ -22,13 +22,18 @@ static int er_config_resolve(const char* name, unikey_t* key, void* context) {
     (void) context;
 
     unsigned code = 0;
-    if(strcmp(name, "Pause") == 0) code = 70;
-    else if(strcmp(name, "F1") == 0) code = 74;
-    else if(strcmp(name, "F2") == 0) code = 75;
-    else if(strcmp(name, "F3") == 0) code = 76;
-    else return 0;
+    if(strcmp(name, "Pause") == 0)
+        code = 70;
+    else if(strcmp(name, "F1") == 0)
+        code = 74;
+    else if(strcmp(name, "F2") == 0)
+        code = 75;
+    else if(strcmp(name, "F3") == 0)
+        code = 76;
+    else
+        return 0;
 
-    *key = (unikey_t) {.code = code};
+    *key = (unikey_t){.code = code};
     return 1;
 }
 
@@ -54,21 +59,21 @@ START_TEST(er_config_reload_builds_model) {
 
     config_t config;
     ck_assert_int_eq(config_reload_parse(
-        "[functions]\n"
-        "Pause=word translate\n"
-        "Control+Pause=text translate\n"
-        "[options]\n"
-        "loop_delay=0,02\n"
-        "[compose]\n"
-        "ab=аб\n"
-        "[sendkeys]\n"
-        "F1=hello\n"
-        "[snippets]\n"
-        "F2=текст\n"
-        "[commands]\n"
-        "F3=echo hi\n",
-        "test.conf", &context, &config
-    ), 1);
+                         "[functions]\n"
+                         "Pause=word translate\n"
+                         "Control+Pause=text translate\n"
+                         "[options]\n"
+                         "loop_delay=0,02\n"
+                         "[compose]\n"
+                         "ab=аб\n"
+                         "[sendkeys]\n"
+                         "F1=hello\n"
+                         "[snippets]\n"
+                         "F2=текст\n"
+                         "[commands]\n"
+                         "F3=echo hi\n",
+                         "test.conf", &context, &config),
+                     1);
 
     // Секция [options] не задаёт delay — значение из base сохраняется.
     ck_assert_double_eq_tol(config.options.delay, 0.25, 1e-9);
@@ -115,12 +120,12 @@ START_TEST(er_config_reload_unescapes_values_and_cursor) {
 
     config_t config;
     ck_assert_int_eq(config_reload_parse(
-        "[compose]\n"
-        "ab=x\\^y\n"
-        "[snippets]\n"
-        "F1=a\\n\\t\\\\b\n",
-        "test.conf", &context, &config
-    ), 1);
+                         "[compose]\n"
+                         "ab=x\\^y\n"
+                         "[snippets]\n"
+                         "F1=a\\n\\t\\\\b\n",
+                         "test.conf", &context, &config),
+                     1);
 
     ck_assert_int_eq(config.compose_size, 1);
     ck_assert_str_eq(config.compose[0].to, "xy");
@@ -143,16 +148,16 @@ START_TEST(er_config_reload_reports_bad_lines) {
 
     config_t config;
     ck_assert_int_eq(config_reload_parse(
-        "[no_such_section]\n"
-        "Pause=word translate\n"
-        "[functions]\n"
-        "Pause word translate\n"
-        "Pause=no such function\n"
-        "NoSuchKey=word translate\n"
-        "[compose]\n"
-        "123456789012345678901=too long\n",
-        "test.conf", &context, &config
-    ), 1);
+                         "[no_such_section]\n"
+                         "Pause=word translate\n"
+                         "[functions]\n"
+                         "Pause word translate\n"
+                         "Pause=no such function\n"
+                         "NoSuchKey=word translate\n"
+                         "[compose]\n"
+                         "123456789012345678901=too long\n",
+                         "test.conf", &context, &config),
+                     1);
 
     ck_assert_int_eq(config.bindings_size, 0);
     ck_assert_int_eq(config.compose_size, 0);
@@ -172,12 +177,12 @@ START_TEST(er_config_reload_sorts_compose_by_length) {
 
     config_t config;
     ck_assert_int_eq(config_reload_parse(
-        "[compose]\n"
-        "a=1\n"
-        "abc=3\n"
-        "ab=2\n",
-        "test.conf", &context, &config
-    ), 1);
+                         "[compose]\n"
+                         "a=1\n"
+                         "abc=3\n"
+                         "ab=2\n",
+                         "test.conf", &context, &config),
+                     1);
 
     ck_assert_int_eq(config.compose_size, 3);
     ck_assert_int_eq(config.compose[0].pos, 3);
@@ -204,11 +209,11 @@ START_TEST(er_config_reload_invalid_option_falls_back_to_default) {
 
     config_t config;
     ck_assert_int_eq(config_reload_parse(
-        "[options]\n"
-        "delay=abc\n"
-        "command_timeout=0\n",
-        "test.conf", &context, &config
-    ), 1);
+                         "[options]\n"
+                         "delay=abc\n"
+                         "command_timeout=0\n",
+                         "test.conf", &context, &config),
+                     1);
 
     ck_assert_double_eq_tol(config.options.delay, CONFIG_DEFAULT_DELAY, 1e-9);
     ck_assert_double_eq_tol(config.options.command_timeout, CONFIG_DEFAULT_COMMAND_TIMEOUT, 1e-9);

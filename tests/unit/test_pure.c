@@ -10,7 +10,7 @@
 // достаёт utf32-символ, по которому и работают iswspace/печать
 static unikey_t pure_key(int ch) {
     int code = ch == ' ' ? KEY_SPACE : KEY_A + (ch - 'a');
-    return (unikey_t) {code: code, mods: 0, group: 0};
+    return (unikey_t){code : code, mods : 0, group : 0};
 }
 
 // Раскладка для буфера ввода: буквы и пробел

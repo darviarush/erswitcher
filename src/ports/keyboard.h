@@ -16,14 +16,14 @@
  * моком, поэтому те же обёртки работают без живого X-сервера.
  */
 
-#define KEYBOARD_SIZE        (32 * 8)
+#define KEYBOARD_SIZE (32 * 8)
 #define KEYBOARD_BUFFER_SIZE (KEYBOARD_SIZE / 8)
 
 // Значения совпадают с X11 KeySym: на первом этапе это снижает риск.
 // Сценарии используют их через порт и не включают X11-заголовки.
 #define KEYBOARD_SYMBOL_BACKSPACE 0xff08u
-#define KEYBOARD_SYMBOL_SHIFT_L   0xffe1u
-#define KEYBOARD_SYMBOL_INSERT    0xff63u
+#define KEYBOARD_SYMBOL_SHIFT_L 0xffe1u
+#define KEYBOARD_SYMBOL_INSERT 0xff63u
 
 typedef enum {
     KEYBOARD_RELEASE = 0,

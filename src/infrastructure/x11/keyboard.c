@@ -25,8 +25,10 @@ static void print_sym_impl(int mods, KeySym ks) {
     for(int i = 0; i < 32; i++) {
         int mask = mods & (1 << i);
         if(!mask) continue;
-        if(begin) printf("+");
-        else begin = 1;
+        if(begin)
+            printf("+");
+        else
+            begin = 1;
         switch(mask) {
         case ShiftMask:
             printf("⇧Shift");
@@ -102,23 +104,26 @@ static void init_impl(keyboard_x11_t* s) {
 static unikey_t state_impl(keyboard_x11_t* s, int code) {
     XkbStateRec state;
     XkbGetState(s->display, XkbUseCoreKbd, &state);
-    return (unikey_t) {code: code, mods: state.mods, group: state.group};
+    return (unikey_t){code : code, mods : state.mods, group : state.group};
 }
 
 static KeySym to_keysym_impl(keyboard_x11_t* s, unikey_t key) {
-    KeySym ks = XkbKeycodeToKeysym(s->display, key.code, key.group, key.mods & ShiftMask? 1: 0);
-    if(ks == NoSymbol) ks = XkbKeycodeToKeysym(s->display, key.code, s->group_en, key.mods & ShiftMask? 1: 0);
+    KeySym ks = XkbKeycodeToKeysym(s->display, key.code, key.group, key.mods & ShiftMask ? 1 : 0);
+    if(ks == NoSymbol) ks = XkbKeycodeToKeysym(s->display, key.code, s->group_en, key.mods & ShiftMask ? 1 : 0);
     if(key.mods & LockMask) {
         KeySym lower, upper;
         XConvertCase(ks, &lower, &upper);
-        if(key.mods & ShiftMask) ks = lower;
-        else ks = upper;
+        if(key.mods & ShiftMask)
+            ks = lower;
+        else
+            ks = upper;
     }
     return ks;
 }
 
 static int keysym_in(KeySym symbol, const KeySym* symbols) {
-    while(*symbols) if(symbol == *symbols++) return 1;
+    while(*symbols)
+        if(symbol == *symbols++) return 1;
     return 0;
 }
 
@@ -130,8 +135,7 @@ static keyboard_key_kind_t kind_impl(keyboard_x11_t* s, unikey_t key) {
     const KeySym is_control[] = {
         XK_Home, XK_Left, XK_Up, XK_Right, XK_Down,
         XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down,
-        XK_End, XK_Begin, XK_Tab, XK_Return, 0
-    };
+        XK_End, XK_Begin, XK_Tab, XK_Return, 0};
     if(keysym_in(ks, is_control)) return KEYBOARD_KEY_CONTROL;
 
     wint_t cs = xkb_keysym_to_utf32(ks);
@@ -146,7 +150,7 @@ static unikey_t from_keysym_impl(keyboard_x11_t* s, KeySym ks) {
         for(int code = 0; code < KEYBOARD_SIZE; ++code)
             for(int shift = 0; shift < 2; ++shift) {
                 KeySym search_ks = XkbKeycodeToKeysym(s->display, code, s->maybe_group, shift);
-                if(ks == search_ks) return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: s->maybe_group};
+                if(ks == search_ks) return (unikey_t){code : code, mods : shift ? ShiftMask : 0, group : s->maybe_group};
             }
     }
 
@@ -156,19 +160,19 @@ static unikey_t from_keysym_impl(keyboard_x11_t* s, KeySym ks) {
                 KeySym search_ks = XkbKeycodeToKeysym(s->display, code, group, shift);
                 if(ks == search_ks) {
                     s->maybe_group = group;
-                    return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: group};
+                    return (unikey_t){code : code, mods : shift ? ShiftMask : 0, group : group};
                 }
             }
 
-    return (unikey_t) {code: 0, mods: 0, group: 0};
+    return (unikey_t){code : 0, mods : 0, group : 0};
 }
 
 static void press_code(keyboard_x11_t* s, int code, int is_press) {
     unikey_t key = state_impl(s, code);
-    printf("   %s: %i ", is_press? "press": "release", code);
+    printf("   %s: %i ", is_press ? "press" : "release", code);
     print_sym_impl(key.mods, to_keysym_impl(s, key));
     printf("\n");
-    XTestFakeKeyEvent(s->display, code, is_press? 1: 0, CurrentTime);
+    XTestFakeKeyEvent(s->display, code, is_press ? 1 : 0, CurrentTime);
     XSync(s->display, False);
 }
 
@@ -240,7 +244,7 @@ static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press) {
 
     KeySym ks = to_keysym_impl(s, key);
     const char* name = XKeysymToString(ks);
-    printf("send_key: %s %s\n", name ? name : "(null)", is_press == 2? "": (is_press? "PRESS": "RELEASE"));
+    printf("send_key: %s %s\n", name ? name : "(null)", is_press == 2 ? "" : (is_press ? "PRESS" : "RELEASE"));
 
     int xdelay = s->delay_us / 2;
     if(xdelay <= 0) xdelay = 1;
@@ -263,7 +267,8 @@ static void press_key_impl(keyboard_x11_t* s, unikey_t key) {
 }
 
 static void press_key_multi_impl(keyboard_x11_t* s, unikey_t key, int n) {
-    for(int i = 0; i < n; i++) press_key_impl(s, key);
+    for(int i = 0; i < n; i++)
+        press_key_impl(s, key);
 }
 
 static void clear_active_mods_impl(keyboard_x11_t* s) {
@@ -290,7 +295,8 @@ static void clear_active_mods_impl(keyboard_x11_t* s) {
 
     XFreeModifiermap(modifiers);
 
-    for(int i = 0; i < s->active_len; i++) press_code(s, s->active_codes[i], 0);
+    for(int i = 0; i < s->active_len; i++)
+        press_code(s, s->active_codes[i], 0);
 
     set_locks(s, s->active_state.mods);
 
@@ -322,27 +328,67 @@ static void recover_active_mods_impl(keyboard_x11_t* s) {
     s->active_use--;
 }
 
-static void cb_init(keyboard_port_t* port) { init_impl(state_of(port)); }
-static unikey_t cb_state(keyboard_port_t* port, int code) { return state_impl(state_of(port), code); }
-static uint32_t cb_to_keysym(keyboard_port_t* port, unikey_t key) { return (uint32_t) to_keysym_impl(state_of(port), key); }
-static unikey_t cb_from_keysym(keyboard_port_t* port, uint32_t keysym) { return from_keysym_impl(state_of(port), (KeySym) keysym); }
-static uint32_t cb_to_symbol(keyboard_port_t* port, unikey_t key) { return xkb_keysym_to_utf32(to_keysym_impl(state_of(port), key)); }
-static unikey_t cb_from_symbol(keyboard_port_t* port, uint32_t symbol) { return from_keysym_impl(state_of(port), xkb_utf32_to_keysym(symbol)); }
-static keyboard_key_kind_t cb_kind(keyboard_port_t* port, unikey_t key) { return kind_impl(state_of(port), key); }
+static void cb_init(keyboard_port_t* port) {
+    init_impl(state_of(port));
+}
+static unikey_t cb_state(keyboard_port_t* port, int code) {
+    return state_impl(state_of(port), code);
+}
+static uint32_t cb_to_keysym(keyboard_port_t* port, unikey_t key) {
+    return (uint32_t) to_keysym_impl(state_of(port), key);
+}
+static unikey_t cb_from_keysym(keyboard_port_t* port, uint32_t keysym) {
+    return from_keysym_impl(state_of(port), (KeySym) keysym);
+}
+static uint32_t cb_to_symbol(keyboard_port_t* port, unikey_t key) {
+    return xkb_keysym_to_utf32(to_keysym_impl(state_of(port), key));
+}
+static unikey_t cb_from_symbol(keyboard_port_t* port, uint32_t symbol) {
+    return from_keysym_impl(state_of(port), xkb_utf32_to_keysym(symbol));
+}
+static keyboard_key_kind_t cb_kind(keyboard_port_t* port, unikey_t key) {
+    return kind_impl(state_of(port), key);
+}
 
-static int cb_layout_count(keyboard_port_t* port) { return state_of(port)->groups; }
-static int cb_layout_ru(keyboard_port_t* port) { return state_of(port)->group_ru; }
-static int cb_layout_en(keyboard_port_t* port) { return state_of(port)->group_en; }
-static int cb_layout_hint(keyboard_port_t* port) { return state_of(port)->maybe_group; }
-static void cb_set_layout_hint(keyboard_port_t* port, int group) { state_of(port)->maybe_group = group; }
-static void cb_set_layout(keyboard_port_t* port, int group) { set_group_impl(state_of(port), group); }
-static void cb_set_active_group(keyboard_port_t* port, int group) { set_active_group_impl(state_of(port), group); }
-static void cb_set_delay(keyboard_port_t* port, int microseconds) { state_of(port)->delay_us = microseconds; }
-static void cb_send_key(keyboard_port_t* port, unikey_t key, keyboard_event_t event) { send_key_impl(state_of(port), key, (int) event); }
-static void cb_press_key(keyboard_port_t* port, unikey_t key) { press_key_impl(state_of(port), key); }
-static void cb_press_key_multi(keyboard_port_t* port, unikey_t key, int n) { press_key_multi_impl(state_of(port), key, n); }
-static void cb_clear_active_mods(keyboard_port_t* port) { clear_active_mods_impl(state_of(port)); }
-static void cb_recover_active_mods(keyboard_port_t* port) { recover_active_mods_impl(state_of(port)); }
+static int cb_layout_count(keyboard_port_t* port) {
+    return state_of(port)->groups;
+}
+static int cb_layout_ru(keyboard_port_t* port) {
+    return state_of(port)->group_ru;
+}
+static int cb_layout_en(keyboard_port_t* port) {
+    return state_of(port)->group_en;
+}
+static int cb_layout_hint(keyboard_port_t* port) {
+    return state_of(port)->maybe_group;
+}
+static void cb_set_layout_hint(keyboard_port_t* port, int group) {
+    state_of(port)->maybe_group = group;
+}
+static void cb_set_layout(keyboard_port_t* port, int group) {
+    set_group_impl(state_of(port), group);
+}
+static void cb_set_active_group(keyboard_port_t* port, int group) {
+    set_active_group_impl(state_of(port), group);
+}
+static void cb_set_delay(keyboard_port_t* port, int microseconds) {
+    state_of(port)->delay_us = microseconds;
+}
+static void cb_send_key(keyboard_port_t* port, unikey_t key, keyboard_event_t event) {
+    send_key_impl(state_of(port), key, (int) event);
+}
+static void cb_press_key(keyboard_port_t* port, unikey_t key) {
+    press_key_impl(state_of(port), key);
+}
+static void cb_press_key_multi(keyboard_port_t* port, unikey_t key, int n) {
+    press_key_multi_impl(state_of(port), key, n);
+}
+static void cb_clear_active_mods(keyboard_port_t* port) {
+    clear_active_mods_impl(state_of(port));
+}
+static void cb_recover_active_mods(keyboard_port_t* port) {
+    recover_active_mods_impl(state_of(port));
+}
 static void cb_poll(keyboard_port_t* port) {
     keyboard_x11_t* s = state_of(port);
     XQueryKeymap(s->display, s->keys);
@@ -351,8 +397,12 @@ static void cb_poll_saved(keyboard_port_t* port) {
     keyboard_x11_t* s = state_of(port);
     XQueryKeymap(s->display, s->saved);
 }
-static const char* cb_keymap(keyboard_port_t* port) { return state_of(port)->keys; }
-static const char* cb_keymap_saved(keyboard_port_t* port) { return state_of(port)->saved; }
+static const char* cb_keymap(keyboard_port_t* port) {
+    return state_of(port)->keys;
+}
+static const char* cb_keymap_saved(keyboard_port_t* port) {
+    return state_of(port)->saved;
+}
 static void cb_swap_keymap(keyboard_port_t* port) {
     keyboard_x11_t* s = state_of(port);
     char* swap = s->saved;

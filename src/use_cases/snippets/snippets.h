@@ -19,9 +19,9 @@ typedef struct {
 } snippets_use_case_t;
 
 void snippets_use_case_init(snippets_use_case_t* self,
-                             clipboard_port_t* clipboard,
-                             scheduler_port_t* scheduler,
-                             keyboard_port_t* keyboard);
+                            clipboard_port_t* clipboard,
+                            scheduler_port_t* scheduler,
+                            keyboard_port_t* keyboard);
 
 void snippets_use_case_insert(snippets_use_case_t* self, const char* text);
 

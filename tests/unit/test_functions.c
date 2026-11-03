@@ -12,7 +12,8 @@
  */
 
 static int er_find_action(config_action_t action) {
-    for(int i = 0; i < keyfn_size; i++) if(keyfn[i].action == action) return i;
+    for(int i = 0; i < keyfn_size; i++)
+        if(keyfn[i].action == action) return i;
     return -1;
 }
 
@@ -36,8 +37,7 @@ START_TEST(er_functions_default_config) {
         "Alt+Control+Pause=text invertcase\n"
         "Alt+Pause=selected invertcase\n"
         "KP_Begin=compose\n"
-        "Scroll_Lock=compose\n"
-    );
+        "Scroll_Lock=compose\n");
 
     ck_assert_int_eq(keyfn_size, 8);
     ck_assert(mock_has("XStringToKeysym(Pause"));
@@ -66,12 +66,14 @@ START_TEST(er_functions_modifier_aliases) {
         "Win+Pause=selected translate\n"
         "Meta+Pause=selected invertcase\n"
         "Hyper+Pause=text translate\n"
-        "Command+Pause=text invertcase\n"
-    );
+        "Command+Pause=text invertcase\n");
 
     ck_assert_int_eq(keyfn_size, 6);
 
-    struct { char const* name; int mods; } aliases[] = {
+    struct {
+        char const* name;
+        int mods;
+    } aliases[] = {
         {"Ctrl", ControlMask},
         {"Option", AltMask},
         {"Win", SuperMask},
@@ -95,8 +97,7 @@ START_TEST(er_functions_multiple_modifiers_order_is_free) {
     er_load(
         "[functions]\n"
         "Alt+Control+Shift+Break=text translate\n"
-        "Shift+Super+Pause=selected invertcase\n"
-    );
+        "Shift+Super+Pause=selected invertcase\n");
 
     ck_assert_int_eq(keyfn_size, 2);
     ck_assert(er_find_mods(STR_TO_KEY("Break").code, AltMask | ControlMask | ShiftMask) >= 0);
@@ -111,8 +112,7 @@ START_TEST(er_functions_unknown_function_is_skipped) {
     er_load(
         "[functions]\n"
         "Pause=word translate\n"
-        "Control+Pause=make coffee\n"
-    );
+        "Control+Pause=make coffee\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
@@ -124,8 +124,7 @@ START_TEST(er_functions_unknown_key_is_skipped) {
     er_load(
         "[functions]\n"
         "NoSuchKey=word translate\n"
-        "Pause=word translate\n"
-    );
+        "Pause=word translate\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
@@ -137,8 +136,7 @@ START_TEST(er_functions_only_modifiers_is_skipped) {
     er_load(
         "[functions]\n"
         "Control+Alt=word translate\n"
-        "Pause=word translate\n"
-    );
+        "Pause=word translate\n");
 
     ck_assert_int_eq(keyfn_size, 1);
 }
@@ -149,8 +147,7 @@ START_TEST(er_functions_two_keys_is_skipped) {
     er_load(
         "[functions]\n"
         "Break+Pause=word translate\n"
-        "Pause=word translate\n"
-    );
+        "Pause=word translate\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);

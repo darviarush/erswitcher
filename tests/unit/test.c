@@ -59,8 +59,7 @@ int main(void) {
         suite_config_reload(),
         suite_desktop(),
         suite_tray(),
-        NULL
-    };
+        NULL};
 
     for(int i = 0; suites[i]; i++) {
         SRunner* runner = srunner_create(suites[i]);

@@ -19,7 +19,7 @@ START_TEST(er_snippets_inserts_text_into_clipboard) {
 
     ck_assert_ptr_nonnull(clipboard_s);
     ck_assert_str_eq(clipboard_s, "Готово.");
-    ck_assert_int_eq(clipboard_len, 13);   // «Готово.» — 13 байт в utf8
+    ck_assert_int_eq(clipboard_len, 13); // «Готово.» — 13 байт в utf8
 
     // Буфер принадлежит окну erswitcher-а, а вставка — по таймеру
     ck_assert(mock_find("XSetSelectionOwner(") >= 0);
@@ -48,8 +48,7 @@ END_TEST
 START_TEST(er_snippets_from_config) {
     er_load(
         "[snippets]\n"
-        "Super+Shift+Pause=Готово.\n"
-    );
+        "Super+Shift+Pause=Готово.\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "Готово.");
@@ -60,8 +59,7 @@ END_TEST
 START_TEST(er_snippets_from_config_keeps_multiline) {
     er_load(
         "[snippets]\n"
-        "Control+Shift+Pause=строка\\n\\tс табуляцией\n"
-    );
+        "Control+Shift+Pause=строка\\n\\tс табуляцией\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "строка\n\tс табуляцией");

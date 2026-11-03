@@ -17,8 +17,7 @@ static void wait_impl(event_loop_port_t* port, double seconds) {
 
     struct timeval tv = {
         (int) seconds,
-        (int) ((seconds - (int) seconds) * 1000000)
-    };
+        (int) ((seconds - (int) seconds) * 1000000)};
 
     fd_set readset;
     FD_ZERO(&readset);

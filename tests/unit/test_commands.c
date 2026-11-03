@@ -76,7 +76,8 @@ START_TEST(er_commands_long_command_is_not_truncated) {
     // должен вмещать, иначе bash получит обрезанную команду
     char command[4096];
     size_t n = 0;
-    for(int i = 0; i < 2; i++) n += snprintf(command + n, sizeof command - n, "echo %%i %%o ");
+    for(int i = 0; i < 2; i++)
+        n += snprintf(command + n, sizeof command - n, "echo %%i %%o ");
 
     char* s = command_fmt2ptr("", command);
     ck_assert_msg(strlen(s) > 90, "команда обрезана: %zu символов", strlen(s));
@@ -99,8 +100,7 @@ START_TEST(er_commands_parse_into_keyfn) {
     er_load(
         "[commands]\n"
         "Alt+Control+d=date > %o\n"
-        "Control+F1=bash < %i\n"
-    );
+        "Control+F1=bash < %i\n");
 
     ck_assert_int_eq(keyfn_size, 2);
     // В [commands] значение — часть строки после первого `=`,

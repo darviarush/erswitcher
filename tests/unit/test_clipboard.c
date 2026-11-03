@@ -177,9 +177,9 @@ START_TEST(er_clipboard_selection_request_sends_data) {
 
     mock_call_t* change = er_clipboard_find_call("XChangeProperty(");
     ck_assert_ptr_nonnull(change);
-    ck_assert_int_eq(change->ints[0], 7);   // property
-    ck_assert_int_eq(change->ints[1], 8);   // format
-    ck_assert_int_eq(change->ints[3], 3);   // nelements
+    ck_assert_int_eq(change->ints[0], 7); // property
+    ck_assert_int_eq(change->ints[1], 8); // format
+    ck_assert_int_eq(change->ints[3], 3); // nelements
     ck_assert(mock_find("XSendEvent(") >= 0);
 }
 END_TEST
@@ -204,7 +204,7 @@ START_TEST(er_clipboard_selection_request_incr) {
 
     mock_call_t* change = er_clipboard_find_call("XChangeProperty(");
     ck_assert_ptr_nonnull(change);
-    ck_assert_int_eq(change->ints[3], 0);   // INCR: пока без данных
+    ck_assert_int_eq(change->ints[3], 0); // INCR: пока без данных
     ck_assert(mock_find("XSelectInput(") >= 0);
 
     // После PropertyDelete отправляется следующий кусок ровно на chunk

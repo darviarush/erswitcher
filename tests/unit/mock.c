@@ -30,7 +30,8 @@
 #define MOCK_KEYMAP_MAX (KEYBOARD_SIZE * 4 * 2)
 
 typedef struct {
-    enum { MOCK_CALL_INT, MOCK_CALL_STR } type;
+    enum { MOCK_CALL_INT,
+           MOCK_CALL_STR } type;
     int ints[4];
     char str[256];
 } mock_call_t;
@@ -68,7 +69,9 @@ static void mock_push_str(char const* name, char const* s) {
     snprintf(call->str, sizeof call->str, "%s%s", name, s ? s : "(null)");
 }
 
-static void mock_reset() { mock_n = 0; }
+static void mock_reset() {
+    mock_n = 0;
+}
 
 // Есть ли в очереди вызов с таким префиксом
 static int mock_has(char const* prefix) {
@@ -101,7 +104,8 @@ static char* mock_strjoin(char const* prefix, char* out, size_t out_size) {
     for(int i = 0; i < mock_n; i++) {
         if(strncmp(mock_calls[i].str, prefix, strlen(prefix)) != 0) continue;
         char const* s = mock_calls[i].str + strlen(prefix);
-        while(*s && pos + 1 < out_size) out[pos++] = *s++;
+        while(*s && pos + 1 < out_size)
+            out[pos++] = *s++;
     }
     if(out_size) out[pos] = '\0';
     return out;
@@ -129,7 +133,7 @@ typedef struct {
 static mock_keymap_entry_t mock_keymap[MOCK_KEYMAP_MAX];
 static int mock_keymap_n = 0;
 
-static int mock_keyboard_group = 0;         // активная группа, как раскладка в X11
+static int mock_keyboard_group = 0; // активная группа, как раскладка в X11
 static unsigned int mock_keyboard_mods = 0;
 
 // Выставляется тестом: если не NULL, XStringToKeysym идёт сюда первым.
@@ -147,11 +151,16 @@ static void mock_keymap_clear() {
     mock_property_after = 0;
 }
 
-static int mock_keymap_count() { return mock_keymap_n; }
+static int mock_keymap_count() {
+    return mock_keymap_n;
+}
 static void mock_keymap_set(int code, int group, int shift, KeySym ks) {
     if(mock_keymap_n >= MOCK_KEYMAP_MAX) return;
-    mock_keymap[mock_keymap_n++] = (mock_keymap_entry_t) {
-        code: code, group: group, shift: shift, ks: ks
+    mock_keymap[mock_keymap_n++] = (mock_keymap_entry_t){
+        code : code,
+        group : group,
+        shift : shift,
+        ks : ks
     };
 }
 
@@ -164,8 +173,12 @@ static void mock_keymap_set_all_groups(int code, KeySym ks) {
 }
 
 // Что тест «нажал» на клавиатуре: активная группа и модификаторы
-static void mock_keyboard(int group) { mock_keyboard_group = group; }
-static void mock_keyboard_mods_set(unsigned int mods) { mock_keyboard_mods = mods; }
+static void mock_keyboard(int group) {
+    mock_keyboard_group = group;
+}
+static void mock_keyboard_mods_set(unsigned int mods) {
+    mock_keyboard_mods = mods;
+}
 
 
 // @category Слой 1: имена настоящих X-функций
@@ -180,8 +193,9 @@ XkbDescPtr XkbAllocKeyboard(void) {
 
 int XkbGetNames(Display* dpy, unsigned int which, XkbDescPtr xkb) {
     mock_push_int("XkbGetNames(", (int) which, 0, 0, 0);
-    (void) dpy; (void) xkb;
-    return BadAlloc;   // «не удалось»: нулевая kb->names не разыменуется
+    (void) dpy;
+    (void) xkb;
+    return BadAlloc; // «не удалось»: нулевая kb->names не разыменуется
 }
 
 char* XGetAtomName(Display* dpy, Atom atom) {
@@ -300,9 +314,14 @@ int XkbLockGroup(Display* dpy, unsigned int deviceSpec, unsigned int group) {
 
 void XConvertCase(KeySym sym, KeySym* lower, KeySym* upper) {
     mock_push_int("XConvertCase(", (int) sym, 0, 0, 0);
-    if(sym >= XK_A && sym <= XK_Z) { *lower = sym - XK_A + XK_a; *upper = sym; }
-    else if(sym >= XK_a && sym <= XK_z) { *lower = sym; *upper = sym - XK_a + XK_A; }
-    else *lower = *upper = sym;
+    if(sym >= XK_A && sym <= XK_Z) {
+        *lower = sym - XK_A + XK_a;
+        *upper = sym;
+    } else if(sym >= XK_a && sym <= XK_z) {
+        *lower = sym;
+        *upper = sym - XK_a + XK_A;
+    } else
+        *lower = *upper = sym;
 }
 
 int XTestFakeKeyEvent(Display* dpy, unsigned int keycode, Bool is_press, unsigned long fake_delay) {
@@ -314,7 +333,8 @@ int XTestFakeKeyEvent(Display* dpy, unsigned int keycode, Bool is_press, unsigne
 
 void XkbFreeNames(XkbDescPtr xkb, unsigned int which, Bool freeMap) {
     mock_push_int("XkbFreeNames(", (int) which, 0, 0, 0);
-    (void) xkb; (void) freeMap;
+    (void) xkb;
+    (void) freeMap;
 }
 
 int XFree(void* data) {
@@ -364,13 +384,15 @@ XErrorHandler XSetErrorHandler(XErrorHandler handler) {
 
 Atom XInternAtom(Display* dpy, char const* atom_name, Bool only_if_exists) {
     mock_push_str("XInternAtom(", atom_name);
-    (void) dpy; (void) only_if_exists;
-    return 1 + mock_n;  // любой ненулевой: None зарезервирован за отсутствующим атомом
+    (void) dpy;
+    (void) only_if_exists;
+    return 1 + mock_n; // любой ненулевой: None зарезервирован за отсутствующим атомом
 }
 
 int XSelectInput(Display* dpy, Window win, long mask) {
     mock_push_int("XSelectInput(", (int) mask, 0, 0, 0);
-    (void) dpy; (void) win;
+    (void) dpy;
+    (void) win;
     return 1;
 }
 
@@ -390,14 +412,18 @@ Window XGetSelectionOwner(Display* dpy, Atom selection) {
 int XConvertSelection(Display* dpy, Atom selection, Atom target, Atom property,
                       Window requestor, Time time) {
     mock_push_int("XConvertSelection(", (int) selection, (int) target, (int) property, (int) requestor);
-    (void) dpy; (void) time;
+    (void) dpy;
+    (void) time;
     return 1;
 }
 
 int XChangeProperty(Display* dpy, Window win, Atom property, Atom type, int format,
                     int mode, const unsigned char* data, int nelements) {
     mock_push_int("XChangeProperty(", (int) property, format, mode, nelements);
-    (void) dpy; (void) win; (void) type; (void) data;
+    (void) dpy;
+    (void) win;
+    (void) type;
+    (void) data;
     return 1;
 }
 
@@ -407,7 +433,10 @@ int XGetWindowProperty(Display* dpy, Window win, Atom property, long long_offset
                        int* actual_format, unsigned long* nitems,
                        unsigned long* bytes_after, unsigned char** prop) {
     mock_push_int("XGetWindowProperty(", (int) property, (int) long_length, del, 0);
-    (void) dpy; (void) win; (void) long_offset; (void) req_type;
+    (void) dpy;
+    (void) win;
+    (void) long_offset;
+    (void) req_type;
 
     size_t len = mock_property_data ? strlen(mock_property_data) : 0;
 
@@ -474,7 +503,11 @@ Window XCreateSimpleWindow(Display* dpy, Window parent, int x, int y,
                            unsigned int border_width, unsigned long border,
                            unsigned long background) {
     mock_push_int("XCreateSimpleWindow(", (int) parent, x, y, (int) width);
-    (void) dpy; (void) height; (void) border_width; (void) border; (void) background;
+    (void) dpy;
+    (void) height;
+    (void) border_width;
+    (void) border;
+    (void) background;
     return (Window) 42;
 }
 
@@ -494,19 +527,19 @@ Window XDefaultRootWindow(Display* dpy) {
  * что и в X11. Без Shift/Control внутри Mod1..Mod5, иначе маски съедутся.
  */
 
-#define MOCK_MODIFIER_SLOTS      8
-#define MOCK_MODIFIER_PER_SLOT   2
+#define MOCK_MODIFIER_SLOTS 8
+#define MOCK_MODIFIER_PER_SLOT 2
 
 static KeyCode mock_modifier_codes[MOCK_MODIFIER_SLOTS][MOCK_MODIFIER_PER_SLOT];
 
-#define MOCK_SHIFT_INDEX      0
-#define MOCK_LOCK_INDEX       1
-#define MOCK_CONTROL_INDEX    2
-#define MOCK_MOD1_INDEX       3
-#define MOCK_MOD2_INDEX       4
-#define MOCK_MOD3_INDEX       5
-#define MOCK_MOD4_INDEX       6
-#define MOCK_MOD5_INDEX       7
+#define MOCK_SHIFT_INDEX 0
+#define MOCK_LOCK_INDEX 1
+#define MOCK_CONTROL_INDEX 2
+#define MOCK_MOD1_INDEX 3
+#define MOCK_MOD2_INDEX 4
+#define MOCK_MOD3_INDEX 5
+#define MOCK_MOD4_INDEX 6
+#define MOCK_MOD5_INDEX 7
 
 static KeyCode mock_keycode_for(KeySym ks) {
     for(int i = 0; i < mock_keymap_n; i++) {
@@ -525,7 +558,10 @@ static KeyCode mock_keycode_for(KeySym ks) {
 static void mock_modifiers_fill() {
     memset(mock_modifier_codes, 0, sizeof mock_modifier_codes);
 
-    struct { int index; KeySym ks; } slots[] = {
+    struct {
+        int index;
+        KeySym ks;
+    } slots[] = {
         {MOCK_SHIFT_INDEX, XK_Shift_L},
         {MOCK_LOCK_INDEX, XK_Caps_Lock},
         {MOCK_CONTROL_INDEX, XK_Control_L},
@@ -539,7 +575,7 @@ static void mock_modifiers_fill() {
     for(size_t i = 0; i < sizeof slots / sizeof slots[0]; i++) {
         KeyCode code = mock_keycode_for(slots[i].ks);
         if(!code) {
-            code = 200 + i;	// свободные сканкоды: выше всех обычных клавиш
+            code = 200 + i; // свободные сканкоды: выше всех обычных клавиш
             mock_keymap_set_all_groups(code, slots[i].ks);
         }
         mock_modifier_codes[slots[i].index][0] = code;
@@ -559,7 +595,7 @@ XModifierKeymap* XGetModifierMapping(Display* dpy) {
 
 int XFreeModifiermap(XModifierKeymap* map) {
     mock_push_int("XFreeModifiermap(", 0, 0, 0, 0);
-    (void) map;   // карта односторонняя, в куче не живёт
+    (void) map; // карта односторонняя, в куче не живёт
     return 1;
 }
 
@@ -572,7 +608,8 @@ int XNextEvent(Display* dpy, XEvent* event) {
 
 Status XSendEvent(Display* dpy, Window win, Bool propagate, long mask, XEvent* event) {
     mock_push_int("XSendEvent(", (int) win, propagate, (int) mask, 0);
-    (void) dpy; (void) event;
+    (void) dpy;
+    (void) event;
     return 1;
 }
 

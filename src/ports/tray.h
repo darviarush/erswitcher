@@ -20,8 +20,8 @@ typedef enum {
 } tray_event_t;
 
 #define TRAY_MESSAGE_REQUEST_DOCK 0
-#define TRAY_MESSAGE_BEGIN        1
-#define TRAY_MESSAGE_CANCEL       2
+#define TRAY_MESSAGE_BEGIN 1
+#define TRAY_MESSAGE_CANCEL 2
 
 struct tray_port {
     void* context;

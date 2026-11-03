@@ -18,7 +18,8 @@ static int er_keys_n = 0;
 
 // Перехват эмуляции нажатий: только сами клавиши, без модификаторов
 static int er_record_key(Display* dpy, unsigned int code, Bool is_press, unsigned long fake_delay) {
-    (void) dpy; (void) fake_delay;
+    (void) dpy;
+    (void) fake_delay;
     if(is_press && er_keys_n < 64) er_keys[er_keys_n++] = code;
     return 1;
 }
@@ -30,9 +31,9 @@ static void er_layout() {
     mock_keymap_set(KEY_A, 0, 0, XK_a);
     mock_keymap_set(KEY_B, 0, 0, XK_b);
     mock_keymap_set(KEY_C, 0, 0, XK_c);
-    mock_keymap_set(KEY_A, 1, 0, 0x06C1);   // а
-    mock_keymap_set(KEY_B, 1, 0, 0x06C2);   // б
-    mock_keymap_set(KEY_C, 1, 0, 0x06C3);   // в
+    mock_keymap_set(KEY_A, 1, 0, 0x06C1); // а
+    mock_keymap_set(KEY_B, 1, 0, 0x06C2); // б
+    mock_keymap_set(KEY_C, 1, 0, 0x06C3); // в
 
     mock_keymap_set_all_groups(KEY_LEFTSHIFT, XK_Shift_L);
     mock_keymap_set_all_groups(KEY_LEFTCTRL, XK_Control_L);
@@ -110,8 +111,7 @@ END_TEST
 START_TEST(er_sendkeys_from_config) {
     er_load(
         "[sendkeys]\n"
-        "Pause=abc\n"
-    );
+        "Pause=abc\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_SENDKEYS);
@@ -122,8 +122,7 @@ END_TEST
 START_TEST(er_sendkeys_escapes) {
     er_load(
         "[sendkeys]\n"
-        "Pause=Готово.\\n\\tКонец\n"
-    );
+        "Pause=Готово.\\n\\tКонец\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "Готово.\n\tКонец");

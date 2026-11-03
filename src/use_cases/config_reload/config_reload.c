@@ -13,8 +13,7 @@ static void report_at(
     const char* path,
     int lineno,
     const char* format,
-    ...
-) {
+    ...) {
     if(!context || !context->log) return;
 
     char text[768];
@@ -31,7 +30,8 @@ static void report_at(
 
 static void trim_trailing(char* s) {
     char* end = s + strlen(s);
-    while(end > s && isspace((unsigned char) end[-1])) end--;
+    while(end > s && isspace((unsigned char) end[-1]))
+        end--;
     *end = '\0';
 }
 
@@ -41,8 +41,7 @@ static void report_option_error(
     int lineno,
     const char* name,
     const char* value,
-    config_option_result_t result
-) {
+    config_option_result_t result) {
     if(result == CONFIG_OPTION_UNKNOWN) {
         report_at(context, path, lineno,
                   "ошибка: неизвестная опция `%s`. Пропущено", name);
@@ -59,8 +58,7 @@ static int add_binding_checked(
     const char* arg,
     const config_reload_parse_context_t* context,
     const char* path,
-    int lineno
-) {
+    int lineno) {
     if(config_add_binding(out, key, action, arg)) return 1;
     report_at(context, path, lineno, "ошибка: не хватает памяти. Пропущено");
     return 0;
@@ -70,8 +68,7 @@ int config_reload_parse(
     const char* text,
     const char* path,
     const config_reload_parse_context_t* context,
-    config_t* out
-) {
+    config_t* out) {
     if(!out) return 0;
 
     config_init(out);
@@ -98,7 +95,8 @@ int config_reload_parse(
         // Как в старом парсере: комментарии и пустые строки ищем после
         // ведущих пробелов, но дальше работаем с исходной строкой.
         char* s = line;
-        while(isspace((unsigned char) *s)) s++;
+        while(isspace((unsigned char) *s))
+            s++;
         if(*s == '#' || *s == '\0') {
             line = next;
             continue;
@@ -190,29 +188,28 @@ int config_reload_parse(
             s,
             context ? context->resolve_key : NULL,
             context ? context->resolver_context : NULL,
-            &key
-        );
+            &key);
 
         switch(key_result) {
-            case CONFIG_KEY_OK:
-                break;
-            case CONFIG_KEY_NO_KEY:
-                report_at(context, path, lineno,
-                          "ошибка синтаксиса: нет клавиши-немодификатора (в выражении %s). Пропущено",
-                          s);
-                line = next;
-                continue;
-            case CONFIG_KEY_MULTIPLE_KEYS:
-                report_at(context, path, lineno,
-                          "ошибка синтаксиса: несколько клавишь-немодификаторов подряд (в выражении %s). Пропущено",
-                          s);
-                line = next;
-                continue;
-            case CONFIG_KEY_UNKNOWN_KEY:
-                report_at(context, path, lineno,
-                          "не распознан символ в выражении %s. Пропущено", s);
-                line = next;
-                continue;
+        case CONFIG_KEY_OK:
+            break;
+        case CONFIG_KEY_NO_KEY:
+            report_at(context, path, lineno,
+                      "ошибка синтаксиса: нет клавиши-немодификатора (в выражении %s). Пропущено",
+                      s);
+            line = next;
+            continue;
+        case CONFIG_KEY_MULTIPLE_KEYS:
+            report_at(context, path, lineno,
+                      "ошибка синтаксиса: несколько клавишь-немодификаторов подряд (в выражении %s). Пропущено",
+                      s);
+            line = next;
+            continue;
+        case CONFIG_KEY_UNKNOWN_KEY:
+            report_at(context, path, lineno,
+                      "не распознан символ в выражении %s. Пропущено", s);
+            line = next;
+            continue;
         }
 
         config_action_t action;

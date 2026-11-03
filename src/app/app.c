@@ -11,24 +11,24 @@
 
 #define DEBUG 1
 
-input_buffer_t input;		// буфер ввода: word[], symbol[], pos
-int keys_pressed;			// нажато клавишь
+input_buffer_t input; // буфер ввода: word[], symbol[], pos
+int keys_pressed; // нажато клавишь
 
 
-int loop_delay = DELAY;			// задержка между опросами клавиатуры
-pid_t config_window_pid = 0;	// pid конфигуратора
+int loop_delay = DELAY; // задержка между опросами клавиатуры
+pid_t config_window_pid = 0; // pid конфигуратора
 
 //@category Иксы
 
-Display *d;					// текущий дисплей
-Window w;					// окно этого приложения
-Window current_win;			// окно устанавливается при вводе с клавиатуры
+Display* d; // текущий дисплей
+Window w; // окно этого приложения
+Window current_win; // окно устанавливается при вводе с клавиатуры
 
-void (*on_copy_selection)(int,int) = NULL;			// обработчик завершения копирования буфера обмена в буфер ввода
+void (*on_copy_selection)(int, int) = NULL; // обработчик завершения копирования буфера обмена в буфер ввода
 
 // для шагов ввода через буфер
-char* insert_from_clipboard_data;		// что нужно ввести (compose)
-char* insert_from_clipboard_save_data;	// что было в буфере обмена
+char* insert_from_clipboard_data; // что нужно ввести (compose)
+char* insert_from_clipboard_save_data; // что было в буфере обмена
 int insert_from_clipboard_save_len;
 Atom insert_from_clipboard_save_target;
 
@@ -80,9 +80,9 @@ static void clipboard_port_ensure(void) {
 static void get_clipboard(clipboard_get_callback_t fn, void* context) {
     clipboard_port_ensure();
     clipboard_port_state.get(&clipboard_port_state,
-                              CLIPBOARD_SELECTION_CLIPBOARD,
-                              CLIPBOARD_FORMAT_UTF8,
-                              fn, context);
+                             CLIPBOARD_SELECTION_CLIPBOARD,
+                             CLIPBOARD_FORMAT_UTF8,
+                             fn, context);
 }
 
 static int keyboard_current_group(void) {
@@ -130,7 +130,8 @@ void print_sym(int mods, KeySym ks) {
 
 // входит в массив
 int in_sym(KeySym symbol, KeySym* symbols) {
-    while(*symbols) if(symbol == *symbols++) return 1;
+    while(*symbols)
+        if(symbol == *symbols++) return 1;
     return 0;
 }
 
@@ -175,9 +176,9 @@ static void tray_indicator_ensure(void) {
 
 // Обработка ошибок
 int xerror = 0;
-static int null_X_error(Display *d, XErrorEvent *err) {
+static int null_X_error(Display* d, XErrorEvent* err) {
     xerror = True;
-	#define BUFLEN		(1024*64)
+#define BUFLEN (1024 * 64)
     char buf[BUFLEN];
     XGetErrorText(d, err->error_code, buf, BUFLEN);
     printf("!!!!!!!!!!!!! X ERROR !!!!!!!!!!!!! %s\n", buf);
@@ -207,11 +208,11 @@ void open_display() {
     clipboard_x11_init(&er_clipboard, d, w);
     // подписываемся на события окна
     XSelectInput(d, w,
-		  PropertyChangeMask 	// Работа с буфером
-		| ButtonPressMask 		// Слушаем клики мышкой на окно
-		| ExposureMask			// разрешаем запрос на перерисовку
-		| StructureNotifyMask	// сработает, когда станут видны ширина и высота окна
-	);
+                 PropertyChangeMask // Работа с буфером
+                     | ButtonPressMask // Слушаем клики мышкой на окно
+                     | ExposureMask // разрешаем запрос на перерисовку
+                     | StructureNotifyMask // сработает, когда станут видны ширина и высота окна
+    );
 
     // стыкуем окно с системным лотком
     tray_indicator_ensure();
@@ -281,19 +282,17 @@ void press_key_multi(unikey_t key, int n) {
     kbd_port.press_key_multi(&kbd_port, key, n);
 }
 
-#define FOR_UTF8(S)			\
-	mbstate_t mbs_UTF8 = {0}; 	\
-	for(size_t charlen_UTF8, i_UTF8 = 0;	\
-        (charlen_UTF8 = mbrlen(S+i_UTF8, MB_CUR_MAX, &mbs_UTF8)) != 0	\
-        && charlen_UTF8 > 0;			\
-        i_UTF8 += charlen_UTF8			\
-    )
+#define FOR_UTF8(S)                                                                          \
+    mbstate_t mbs_UTF8 = {0};                                                                \
+    for(size_t charlen_UTF8, i_UTF8 = 0;                                                     \
+        (charlen_UTF8 = mbrlen(S + i_UTF8, MB_CUR_MAX, &mbs_UTF8)) != 0 && charlen_UTF8 > 0; \
+        i_UTF8 += charlen_UTF8)
 
-#define STEP_UTF8(S, W)		\
-		wchar_t ws_UTF8[4];		\
-        int res_UTF8 = mbstowcs(ws_UTF8, S+i_UTF8, 1);		\
-        if(res_UTF8 != 1) break; \
-		wint_t W = ws_UTF8[0];
+#define STEP_UTF8(S, W)                              \
+    wchar_t ws_UTF8[4];                              \
+    int res_UTF8 = mbstowcs(ws_UTF8, S + i_UTF8, 1); \
+    if(res_UTF8 != 1) break;                         \
+    wint_t W = ws_UTF8[0];
 
 // TODO: зажатие управляющих клавишь {\Control+Alt}abc{/Control} и {Ctrl+Alt+a}
 void sendkeys(char* s) { // печатает с клавиатуры строку в utf8
@@ -314,43 +313,45 @@ void print_invertcase_buffer(int from, int backspace) {
 char* get_event_type(int n) {
     if(n < 2 || n > LASTEvent) return NULL;
 
-    char* names[] = {NULL, NULL,
-                     "KeyPress",
-                     "KeyRelease",
-                     "ButtonPress",
-                     "ButtonRelease",
-                     "MotionNotify",
-                     "EnterNotify",
-                     "LeaveNotify",
-                     "FocusIn",
-                     "FocusOut",
-                     "KeymapNotify",
-                     "Expose",
-                     "GraphicsExpose",
-                     "NoExpose",
-                     "VisibilityNotify",
-                     "CreateNotify",
-                     "DestroyNotify",
-                     "UnmapNotify",
-                     "MapNotify",
-                     "MapRequest",
-                     "ReparentNotify",
-                     "ConfigureNotify",
-                     "ConfigureRequest",
-                     "GravityNotify",
-                     "ResizeRequest",
-                     "CirculateNotify",
-                     "CirculateRequest",
-                     "PropertyNotify",
-                     "SelectionClear",
-                     "SelectionRequest",
-                     "SelectionNotify",
-                     "ColormapNotify",
-                     "ClientMessage",
-                     "MappingNotify",
-                     "GenericEvent",
-                     "LASTEvent",
-                    };
+    char* names[] = {
+        NULL,
+        NULL,
+        "KeyPress",
+        "KeyRelease",
+        "ButtonPress",
+        "ButtonRelease",
+        "MotionNotify",
+        "EnterNotify",
+        "LeaveNotify",
+        "FocusIn",
+        "FocusOut",
+        "KeymapNotify",
+        "Expose",
+        "GraphicsExpose",
+        "NoExpose",
+        "VisibilityNotify",
+        "CreateNotify",
+        "DestroyNotify",
+        "UnmapNotify",
+        "MapNotify",
+        "MapRequest",
+        "ReparentNotify",
+        "ConfigureNotify",
+        "ConfigureRequest",
+        "GravityNotify",
+        "ResizeRequest",
+        "CirculateNotify",
+        "CirculateRequest",
+        "PropertyNotify",
+        "SelectionClear",
+        "SelectionRequest",
+        "SelectionNotify",
+        "ColormapNotify",
+        "ClientMessage",
+        "MappingNotify",
+        "GenericEvent",
+        "LASTEvent",
+    };
 
     return names[n];
 }
@@ -429,12 +430,11 @@ static void handle_x_event(void* context, const void* native_event) {
     case SelectionNotify: // получить данные из буфера обмена
     case SelectionClear:
     case SelectionRequest: // запрос данных из буфера обмена
-    case PropertyNotify:   // протокол INCR: отправка по частям
+    case PropertyNotify: // протокол INCR: отправка по частям
         clipboard_port_ensure();
         clipboard_x11_handle_event(&er_clipboard, event);
         break;
     }
-
 }
 
 void event_delay(double seconds) {
@@ -451,21 +451,27 @@ void change_key(int code) {
     // XkbKeysymToModifiers()
     unsigned int state = get_input_state();
     printf("change_key %i (", code);
-    for(int i=0; i<32; i++) if(state & (1<<i)) printf("%i", i);
-        else printf(" ");
+    for(int i = 0; i < 32; i++)
+        if(state & (1 << i))
+            printf("%i", i);
+        else
+            printf(" ");
     printf(") ");
-    if(key.group == kbd_port.layout_en(&kbd_port)) printf("en");
-    else if(key.group == kbd_port.layout_ru(&kbd_port)) printf("ru");
-    else printf("%i", key.group);
+    if(key.group == kbd_port.layout_en(&kbd_port))
+        printf("en");
+    else if(key.group == kbd_port.layout_ru(&kbd_port))
+        printf("ru");
+    else
+        printf("%i", key.group);
     printf(": ");
     print_sym(key.mods, ks);
     printf("\n");
     fflush(stdout);
     // нажата комбинация? выполняем действие
-    int mods = key.mods & ~(LockMask|NumMask);
+    int mods = key.mods & ~(LockMask | NumMask);
 
     // ищем соответствие среди функций
-    for(int i=0; i<keyfn_size; i++) {
+    for(int i = 0; i < keyfn_size; i++) {
         if(keyfn[i].key.mods == mods && keyfn[i].key.code == code) {
             keyfn_active = i;
             return;
@@ -507,8 +513,8 @@ void insert_from_clipboard(const char* s) {
 
 const char* curcommand_infile = "/tmp/erswitcher-input";
 const char* curcommand_outfile = "/tmp/erswitcher-output";
-float command_timeout = 13;    // В секундах
-float command_interval = 0.1;  // Интервал, через который опрашивается команда
+float command_timeout = 13; // В секундах
+float command_interval = 0.1; // Интервал, через который опрашивается команда
 
 static command_runner_port_t command_runner_port_state;
 static command_runner_fork_t command_runner_state;
@@ -576,7 +582,8 @@ void compose(char*) {
     if(input.pos == 0) return;
 
     wint_t symbols[BUF_SIZE];
-    for(int i = 0; i < input.pos; i++) symbols[i] = KEY_TO_INT(input.word[i]);
+    for(int i = 0; i < input.pos; i++)
+        symbols[i] = KEY_TO_INT(input.word[i]);
 
     int match = compose_find(compose_map, compose_map_size, symbols, input.pos);
     if(match < 0) {
@@ -598,11 +605,11 @@ void compose(char*) {
     // удаляем мнемонику введённую ранее
     // Модификаторов тут не нужно: раскладку берём из последнего введённого символа,
     // как при печати — так работает и под тестами, где XkbGetState не настоящий
-    unikey_t key = input.pos? input.word[input.pos-1]: keyboard_state(0);
+    unikey_t key = input.pos ? input.word[input.pos - 1] : keyboard_state(0);
     press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
     set_group(key.group);
     // подменяем буфер собой и вставляем из него композэ
-	insert_from_clipboard(to);
+    insert_from_clipboard(to);
 
     if(cursor_back) after(0.30, cursor_back__fn, NULL);
 }
@@ -733,20 +740,20 @@ static void execute_config_action(const config_binding_t* binding) {
     if(!binding) return;
 
     switch(binding->action) {
-        case CONFIG_ACTION_WORD_TRANSLATE: word_translate(binding->arg); break;
-        case CONFIG_ACTION_TEXT_TRANSLATE: text_translate(binding->arg); break;
-        case CONFIG_ACTION_SELECTED_TRANSLATE: selection_translate(binding->arg); break;
+    case CONFIG_ACTION_WORD_TRANSLATE: word_translate(binding->arg); break;
+    case CONFIG_ACTION_TEXT_TRANSLATE: text_translate(binding->arg); break;
+    case CONFIG_ACTION_SELECTED_TRANSLATE: selection_translate(binding->arg); break;
 
-        case CONFIG_ACTION_WORD_INVERTCASE: word_invertcase(binding->arg); break;
-        case CONFIG_ACTION_TEXT_INVERTCASE: text_invertcase(binding->arg); break;
-        case CONFIG_ACTION_SELECTED_INVERTCASE: selection_invertcase(binding->arg); break;
+    case CONFIG_ACTION_WORD_INVERTCASE: word_invertcase(binding->arg); break;
+    case CONFIG_ACTION_TEXT_INVERTCASE: text_invertcase(binding->arg); break;
+    case CONFIG_ACTION_SELECTED_INVERTCASE: selection_invertcase(binding->arg); break;
 
-        case CONFIG_ACTION_COMPOSE: compose(binding->arg); break;
-        case CONFIG_ACTION_SENDKEYS: sendkeys(binding->arg); break;
-        case CONFIG_ACTION_SNIPPET: insert_from_clipboard(binding->arg); break;
-        case CONFIG_ACTION_COMMAND: run_command(binding->arg); break;
+    case CONFIG_ACTION_COMPOSE: compose(binding->arg); break;
+    case CONFIG_ACTION_SENDKEYS: sendkeys(binding->arg); break;
+    case CONFIG_ACTION_SNIPPET: insert_from_clipboard(binding->arg); break;
+    case CONFIG_ACTION_COMMAND: run_command(binding->arg); break;
 
-        case CONFIG_ACTION_NONE: break;
+    case CONFIG_ACTION_NONE: break;
     }
 }
 
@@ -768,7 +775,7 @@ void app_run(int ac, char** av) {
         exit(1);
     }
 
-	// меняет директорию на дир. пользователя
+    // меняет директорию на дир. пользователя
     if(!desktop_goto_home()) exit(1);
 
     desktop_init(program); // создаёт десктопный файл, если его нет
@@ -776,7 +783,7 @@ void app_run(int ac, char** av) {
 
     open_display();
     desktop_check_any_instance();
-    scheduler_system_reset(&er_scheduler);	// инициализируем таймеры
+    scheduler_system_reset(&er_scheduler); // инициализируем таймеры
 
     // Начальные установки
     current_win = get_current_window();
@@ -814,24 +821,24 @@ void app_run(int ac, char** av) {
         const char* saved = kbd_port.keymap_saved(&kbd_port);
         kbd_port.poll(&kbd_port);
         keys_pressed = -1;
-        for(int i=0; i<KEYBOARD_SIZE; i++) {
+        for(int i = 0; i < KEYBOARD_SIZE; i++) {
 
             if(keys_pressed < 0) {
                 keys_pressed = 0;
-                for(int i=0; i<KEYBOARD_SIZE; i++) if(BIT(keys, i) != 0) keys_pressed++;
+                for(int i = 0; i < KEYBOARD_SIZE; i++)
+                    if(BIT(keys, i) != 0) keys_pressed++;
             }
 
             if(BIT(keys, i) != BIT(saved, i)) {
                 if(BIT(keys, i) != 0) { // клавиша нажата
                     change_key(i);
-                } else {	// клавиша отжата
+                } else { // клавиша отжата
                     if(keys_pressed == 0 && keyfn_active != -1) {
                         execute_config_action(&keyfn[keyfn_active]);
                         keyfn_active = -1;
                     }
                 }
             }
-
         }
 
         kbd_port.swap_keymap(&kbd_port);
@@ -845,11 +852,11 @@ void app_run(int ac, char** av) {
 
         event_delay(USEC_TO_DBL(loop_delay));
 
-		// обработка сигналов
-		if(load_config_requested) {
-			load_config_requested = 0;
-			load_config();
-		}
+        // обработка сигналов
+        if(load_config_requested) {
+            load_config_requested = 0;
+            load_config();
+        }
     }
 }
 
