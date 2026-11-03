@@ -26,12 +26,14 @@ jobs:
         if: matrix.distro == 'ubuntu'
         run: |
           apt-get update
-          apt-get install -y build-essential check pkg-config
+          apt-get install -y build-essential check pkg-config \
+            libx11-dev libxkbcommon-dev libxtst-dev tcl tk xvfb xauth
 
       - name: Install dependencies (Arch Linux)
         if: matrix.distro == 'archlinux'
         run: |
-          pacman -Sy --noconfirm --needed base-devel check pkgconf
+          pacman -Sy --noconfirm --needed base-devel check pkgconf \
+            libx11 libxkbcommon libxtst tcl tk xorg-server-xvfb xorg-xauth
 
       - name: Run Test
         run: make test

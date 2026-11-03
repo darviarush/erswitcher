@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill astyle dist help test test-unit
+.PHONY: clean install launch s kill astyle dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
@@ -52,7 +52,7 @@ dist:	## Собирает дистрибутив (экспериментальн
 		autoconf
 		./configure
 
-test: test-unit	## Все тесты
+test: test-unit test-functional	## Все тесты
 
 # Один бинарник на все наборы: монолит подключается #include-ом из test.h
 # (-DERSWITCHER_UNIT), поэтому main() только один
@@ -60,6 +60,25 @@ test-unit:	## Юнит-тесты на Check
 		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
 		cd tests/unit && ./test
+
+# Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
+# виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate
+# доставляет в виджеты синтетические события. Если нет ни дисплея, ни
+# xvfb-run, пробуем Tk напрямую (Aqua на macOS). Если и это не выйдет —
+# это ОШИБКА, а не пропуск: зелёный прогон не должен скрывать, что
+# функциональные тесты не выполнялись. Юнит-тесты от X11 не зависят
+# и запускаются отдельно через `make test-unit`.
+test-functional:	## Функциональные тесты окна конфигуратора (Tcl/Tk)
+		@if ! command -v tclsh >/dev/null 2>&1; then \
+			echo "FAIL: нет tclsh — функциональные тесты не выполнены" >&2; \
+			exit 1; \
+		elif [ -n "$$DISPLAY" ]; then \
+			cd tests/functional && ./run.tcl; \
+		elif command -v xvfb-run >/dev/null 2>&1; then \
+			cd tests/functional && xvfb-run -a ./run.tcl; \
+		else \
+			cd tests/functional && ./run.tcl; \
+		fi
 
 help:	## Справка
 		@grep -E -h '\s##\s' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
