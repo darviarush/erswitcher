@@ -1,6 +1,6 @@
 Список нововведений в En-Ru Switcher:
 
-7.3 (в разработке)  Wed Nov 04 2026
+8.0 Ср 04 ноя 2026 00:30:06 MSK
 
     - Монолит erswitcher.c разобран на слои src/: domain, use_cases, ports,
       infrastructure, presentation и app; main.c стал отдельной точкой входа
