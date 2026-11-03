@@ -6,17 +6,11 @@
  **************************************************************/
 
 /*
- * Точка входа. Подключается из erswitcher.c (см. ERSWITCHER_APPLICATION_MAIN),
- * потому что main() в монолите объявлен раньше app_run():
- *
- *     int main(int ac, char** av);
- *     #ifdef ERSWITCHER_APPLICATION_MAIN
- *     #include "main.c"
- *     #endif
- *     void app_run(int ac, char** av) { ... }
- *
- * В юнит-тестах (ERSWITCHER_UNIT) этот файл не подключается.
+ * Точка входа. Собирает зависимости приложения и запускает app_run().
+ * Сам главный цикл и порты живут в erswitcher.c (до шага 8) / src/app.
  */
+
+void app_run(int ac, char** av);
 
 int main(int ac, char** av) {
     app_run(ac, av);

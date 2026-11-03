@@ -5,11 +5,6 @@
  * Местонахождение: https://github.com/darviarush/erswitcher  *
  **************************************************************/
 
-// Юнит-тесты подключают этот файл через #include: main() в тестах свой
-#ifndef ERSWITCHER_UNIT
-#define ERSWITCHER_APPLICATION_MAIN 1
-#endif
-
 #define _GNU_SOURCE
 
 #include <X11/X.h>
@@ -60,6 +55,7 @@ extern char** environ;
 #include "src/ports/event_loop.h"
 #include "src/ports/config_store.h"
 #include "src/ports/command_runner.h"
+#include "src/ports/tray.h"
 #include "src/use_cases/config_reload/config_reload.h"
 #include "src/use_cases/sendkeys/sendkeys.h"
 #include "src/use_cases/snippets/snippets.h"
@@ -67,9 +63,12 @@ extern char** environ;
 #include "src/infrastructure/x11/keyboard.h"
 #include "src/infrastructure/x11/clipboard.h"
 #include "src/infrastructure/x11/events.h"
+#include "src/infrastructure/x11/tray.h"
+#include "src/presentation/tray_indicator.h"
 #include "src/infrastructure/system/scheduler_time.h"
 #include "src/infrastructure/system/config_store_fs.h"
 #include "src/infrastructure/system/command_runner_fork.h"
+#include "src/infrastructure/system/desktop.h"
 
 #define KEY_TO_SYM(K)		unikey_to_keysym(K)
 #define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
@@ -113,9 +112,6 @@ pid_t config_window_pid = 0;	// pid конфигуратора
 Display *d;					// текущий дисплей
 Window w;					// окно этого приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
-
-int w_width = -1;			// ширина окна
-int w_height = -1;			// высота окна
 
 // Временные макросы совместимости: состояние буфера обмена уже принадлежит
 // X11-адаптеру. Они исчезнут вместе с монолитом после переноса app_run.
@@ -279,31 +275,21 @@ static void scheduler_tick(void) {
 
 //@category Иксы
 
-#define SYSTEM_TRAY_REQUEST_DOCK    0
-#define SYSTEM_TRAY_BEGIN_MESSAGE   1
-#define SYSTEM_TRAY_CANCEL_MESSAGE  2
+static tray_x11_t tray_state;
+static tray_port_t tray_port_state;
+static tray_indicator_t tray_indicator_state;
 
-void send_systray_message(Display* d, long message, long data1, long data2, long data3) {
-    XEvent ev;
+static void on_tray_click(void* context) {
+    (void) context;
+    config_window_pid = desktop_launch_configurator(config_window_pid);
+}
 
-    Atom selection_atom = XInternAtom(d, "_NET_SYSTEM_TRAY_S0", False);
-    Window tray = XGetSelectionOwner(d, selection_atom);
+static void tray_indicator_ensure(void) {
+    if(tray_indicator_state.tray) return;
 
-    if(tray != None) XSelectInput(d, tray, StructureNotifyMask);
-
-    memset(&ev, 0, sizeof(ev));
-    ev.xclient.type = ClientMessage;
-    ev.xclient.window = tray;
-    ev.xclient.message_type = XInternAtom(d, "_NET_SYSTEM_TRAY_OPCODE", False);
-    ev.xclient.format = 32;
-    ev.xclient.data.l[0] = CurrentTime;
-    ev.xclient.data.l[1] = message;
-    ev.xclient.data.l[2] = data1; // <--- your window is only here
-    ev.xclient.data.l[3] = data2;
-    ev.xclient.data.l[4] = data3;
-
-    XSendEvent(d, tray, False, NoEventMask, &ev);
-    XSync(d, False);
+    tray_x11_port(&tray_port_state, &tray_state);
+    tray_indicator_init(&tray_indicator_state, &tray_port_state,
+                        on_tray_click, NULL);
 }
 
 // Обработка ошибок
@@ -347,7 +333,8 @@ void open_display() {
 	);
 
     // стыкуем окно с системным лотком
-    send_systray_message(d, SYSTEM_TRAY_REQUEST_DOCK, w, 0, 0);
+    tray_indicator_ensure();
+    tray_indicator_attach(&tray_indicator_state, d, w);
 }
 
 // возвращает текущее окно
@@ -555,6 +542,8 @@ static void handle_x_event(void* context, const void* native_event) {
 
     if(DEBUG) fprintf(stderr, "[%i %s], ", event->type, get_event_type(event->type));
 
+    if(tray_indicator_handle_event(&tray_indicator_state, event)) return;
+
     switch(event->type) {
     case SelectionNotify: // получить данные из буфера обмена
     case SelectionClear:
@@ -563,40 +552,6 @@ static void handle_x_event(void* context, const void* native_event) {
         clipboard_port_ensure();
         clipboard_x11_handle_event(&er_clipboard, event);
         break;
-    case ClientMessage:	// окно пристыковано к системному лотку
-        XWindowAttributes attr;
-        XGetWindowAttributes(d, w, &attr);
-
-        printf("win = %i x %i\n", attr.width, attr.height);
-        break;
-    case ButtonPress: // нажали на иконке в систрее
-        // если окно tcl запущено - закрываем его
-		//system("killall -9 erswitcher-configurator.tcl");
-        if(config_window_pid) {
-			int res = kill(config_window_pid, SIGKILL);
-			if(DEBUG) { printf("config_window_pid=%i kill %i res=%i\n", config_window_pid, SIGKILL, res); fflush(stdout); }
-		}
-        // запускаем новое
-        config_window_pid = fork();
-        if(config_window_pid < 0) {
-            perror("ERROR: fork не запустился");
-        } else if(config_window_pid == 0) {
-			const char* path = ".local/bin/erswitcher-configurator.tcl";
-			char* const argv[] = {NULL};
-            execve(path, argv, environ);
-            fprintf(stderr, "ERROR: конфигуратор %s не запущен! Ошибка: %s\n", path, strerror(errno));
-            exit(1);
-        }
-        break;
-	case ConfigureNotify:	// размер окна
-		w_width = event->xconfigure.width;
-		w_height = event->xconfigure.height;
-		printf("width: %i height: %i\n", w_width, w_height); fflush(stdout);
-		break;
-	case Expose:		// запрос на перерисовку окна ⌘
-		if(event->xexpose.count != 0) break;
-
-		break;
     }
 
 }
@@ -638,91 +593,6 @@ void change_key(int code) {
 
     input_use_case_ensure();
     input_use_case_handle_key(&input_uc, key);
-}
-
-int goto_home() {
-    const char* home = getenv("HOME");
-    if(!home) {
-        fprintf(stderr, "WARN: нет getenv(HOME)\n");
-        return 0;
-    }
-    if(chdir(home)) {
-        fprintf(stderr, "WARN: не могу перейти в каталог пользователя %s\n", home);
-        return 0;
-    }
-    setenv("PWD", home, 1);
-    return 1;
-}
-
-void init_desktop(char* program) {
-
-	const char* app = ".local/share/applications/erswitcher.desktop";
-
-	if(access(app, R_OK) != 0) {
-
-		mkdir(".local", 0700);
-		mkdir(".local/share", 0700);
-		mkdir(".local/share/applications", 0700);
-
-		FILE* f = fopen(app, "wb");
-		if(!f) fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), app);
-		else {
-			fprintf(f,
-					"[Desktop Entry]\n"
-					"Encoding=UTF-8\n"
-					"Terminal=false\n"
-					"Type=Application\n"
-					"Name=EN-RU Switcher\n"
-					"Comment=Transliterator for keyboard input\n"
-					"GenericName[ru]=Русско-английский клавиатурный переключатель\n"
-					"Comment[ru]=Транслитератор ввода с клавиатуры\n"
-					"Exec=%s\n"
-					"X-GNOME-Autostart-enabled=true\n"
-					"Icon=preferences-desktop-keyboard\n"
-					"Categories=Keyboard;Transliterate;Development;System;\n",
-					program
-				   );
-
-			fclose(f);
-		}
-	}
-
-	const char* autostart = ".config/autostart/erswitcher.desktop";
-
-	if(access(autostart, R_OK) != 0) {
-		mkdir(".config", 0700);
-		mkdir(".config/autostart", 0700);
-
-		FILE* f = fopen(autostart, "wb");
-		if(!f) {
-			fprintf(stderr, "WARN: не могу создать %s/%s\n", getenv("HOME"), autostart);
-			return;
-		}
-
-		fprintf(f,
-			"[Desktop Entry]\n"
-			"Name=EN-RU Switcher\n"
-			"Comment=Transliterator for keyboard input\n"
-			"Exec=%s\n"
-			"Icon=preferences-desktop-keyboard\n"
-			"Terminal=false\n"
-			"Type=Application\n"
-			"Categories=Keyboard;Transliterate;Development;System;\n"
-			"Keywords=keyboard;transliterate;erswitcher;switch\n"
-			"X-GNOME-UsesNotifications=t\n",
-			program
-	   );
-
-		fclose(f);
-	}
-}
-
-void check_any_instance() {
-    // TODO: килять другой экземпляр процесса, если он есть программно
-    // char* s = NULL;
-    // asprintf(&s, "ps aux | grep erswitcher | awk '{print $2}' | grep -v '^%i$' | xargs kill -9", getpid());
-    // int rc = system(s);
-    // if(rc) fprintf(stderr, "%s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
 }
 
 static snippets_use_case_t snippets_uc;
@@ -1001,12 +871,6 @@ static void execute_config_action(const config_binding_t* binding) {
 
 void app_run(int ac, char** av);
 
-#ifdef ERSWITCHER_APPLICATION_MAIN
-int main(int ac, char** av);
-#include "main.c"
-#endif
-#undef main	// у тестов свой main(), см. ERSWITCHER_UNIT
-
 void app_run(int ac, char** av) {
 
     if(!ac) fprintf(stderr, "ERROR: а где путь к программе?\n");
@@ -1024,13 +888,13 @@ void app_run(int ac, char** av) {
     }
 
 	// меняет директорию на дир. пользователя
-    if(!goto_home()) exit(1);
+    if(!desktop_goto_home()) exit(1);
 
-    init_desktop(program); // создаёт десктопный файл, если его нет
+    desktop_init(program); // создаёт десктопный файл, если его нет
     free(program);
 
     open_display();
-    check_any_instance();
+    desktop_check_any_instance();
     scheduler_system_reset(&er_scheduler);	// инициализируем таймеры
 
     // Начальные установки

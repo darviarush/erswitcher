@@ -478,9 +478,26 @@ typedef struct {
 
 ### Шаг 7. Трей и системная интеграция
 
-- `ports/tray`, X11-реализация, `presentation/tray_indicator`;
-- `infrastructure/system/desktop`;
-- composition root в `main.c`.
+Сделано:
+
+- введён `ports/tray` (`dock`/`send`/`event`/`size`) и X11-адаптер
+  `infrastructure/x11/tray` (`_NET_SYSTEM_TRAY_S0`,
+  `_NET_SYSTEM_TRAY_OPCODE`, ClientMessage/ButtonPress/ConfigureNotify/
+  Expose);
+- `presentation/tray_indicator` хранит размер иконки и вызывает callback
+  клика, не зная про X11; в приложении этот callback запускает
+  конфигуратор;
+- `infrastructure/system/desktop` владеет `goto_home`, desktop/autostart
+  файлами, проверкой экземпляра и fork/exec конфигуратора;
+- `main.c` больше не подключается через `#include` из монолита: это
+  отдельная точка входа, которая вызывает `app_run`;
+- добавлены наборы `desktop` (файлы, `$HOME`, запуск конфигуратора) и
+  `tray` (X11-события и presentation-callback);
+- ручной smoke: запуск приложения, команда, sendkeys, таймаут команды.
+
+Осталось:
+
+- перенести `app_run` и оставшиеся обёртки в `src/app/` (шаг 8).
 
 ### Шаг 8. Удаление монолита
 

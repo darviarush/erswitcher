@@ -10,8 +10,8 @@ TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -DERSWITCHER_UNIT
 TEST_LIBS = check libbacktrace
 TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
 
-# Приложение пока — erswitcher.c (подключает main.c) плюс чистые модули
-# и X11-адаптеры инфраструктуры.
+# Приложение — erswitcher.c + main.c плюс чистые модули,
+# X11-адаптеры инфраструктуры и presentation.
 
 # Чистые доменные модули: без X11, файлов и процессов.
 DOMAIN_SOURCES = \
@@ -38,19 +38,29 @@ INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/keyboard.c \
 	src/infrastructure/x11/clipboard.c \
 	src/infrastructure/x11/events.c \
+	src/infrastructure/x11/tray.c \
 	src/infrastructure/system/scheduler_time.c \
 	src/infrastructure/system/config_store_fs.c \
-	src/infrastructure/system/command_runner_fork.c
+	src/infrastructure/system/command_runner_fork.c \
+	src/infrastructure/system/desktop.c
 INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
 
-APP_OBJECTS = erswitcher.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)
+# Слой представления: состояние иконки поверх ports/tray.
+PRESENTATION_SOURCES = \
+	src/presentation/tray_indicator.c
+PRESENTATION_OBJECTS = $(PRESENTATION_SOURCES:.c=.o)
+
+APP_OBJECTS = erswitcher.o main.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
 TEST_DOMAIN = tests/unit/test_domain
 
 erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
 		gcc $(CFLAGS) $(CLIBS) -o $@ $^
 
-erswitcher.o: erswitcher.c main.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h)
+erswitcher.o: erswitcher.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h) $(wildcard src/presentation/*.h)
 		gcc $(CFLAGS) -c -o $@ erswitcher.c
+
+main.o: main.c
+		gcc $(CFLAGS) -c -o $@ main.c
 
 $(DOMAIN_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
@@ -59,6 +69,9 @@ $(USE_CASE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/
 		gcc $(CFLAGS) -c -o $@ $<
 
 $(INFRASTRUCTURE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h)
+		gcc $(CFLAGS) -c -o $@ $<
+
+$(PRESENTATION_OBJECTS): %.o: %.c $(wildcard src/ports/*.h) $(wildcard src/presentation/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
 
 clean:	## Удаляет исходники
@@ -104,9 +117,9 @@ test: test-unit test-functional	## Все тесты
 
 # Один бинарник на все наборы: монолит подключается #include-ом из test.h
 # (-DERSWITCHER_UNIT), поэтому main() только один
-test-unit: $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)	## Юнит-тесты на Check
+test-unit: $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)	## Юнит-тесты на Check
 		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
-			$(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)) \
+			$(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
 		cd tests/unit && ./test
 		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test_domain.c \

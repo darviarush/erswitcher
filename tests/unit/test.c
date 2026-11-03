@@ -42,6 +42,8 @@
 #include "test_use_cases.c"
 #include "test_scheduler.c"
 #include "test_config_reload.c"
+#include "test_desktop.c"
+#include "test_tray.c"
 
 int main(void) {
     int failed = 0;
@@ -59,6 +61,8 @@ int main(void) {
         suite_use_cases(),
         suite_scheduler(),
         suite_config_reload(),
+        suite_desktop(),
+        suite_tray(),
         NULL
     };
 
