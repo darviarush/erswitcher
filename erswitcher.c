@@ -5,7 +5,12 @@
  * Местонахождение: https://github.com/darviarush/erswitcher  *
  **************************************************************/
 
-//#define _GNU_SOURCE
+// Юнит-тесты подключают этот файл через #include: main() в тестах свой
+#ifndef ERSWITCHER_UNIT
+#define ERSWITCHER_APPLICATION_MAIN 1
+#endif
+
+#define _GNU_SOURCE
 
 #include <X11/X.h>
 #include <X11/XKBlib.h>
@@ -2249,29 +2254,39 @@ NEXT_LINE:
     int compose_map_cmp(const void* a, const void *b) {
         return ((compose_t*) b)->pos - ((compose_t*) a)->pos;
     }
-    qsort(compose_map, compose_map_size, sizeof(compose_t), compose_map_cmp);
+    // Пустой массив: compose_map == NULL, но qsort с пустым массивом
+    // всё равно может вызвать сравнение и разыменовать NULL
+    if(compose_map_size > 1) qsort(compose_map, compose_map_size, sizeof(compose_t), compose_map_cmp);
 
     if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
 }
 
-int main(int ac, char** av) {
+void app_run(int ac, char** av);
+
+#ifdef ERSWITCHER_APPLICATION_MAIN
+int main(int ac, char** av);
+#include "main.c"
+#endif
+#undef main	// у тестов свой main(), см. ERSWITCHER_UNIT
+
+void app_run(int ac, char** av) {
 
     if(!ac) fprintf(stderr, "ERROR: а где путь к программе?\n");
 
     char* locale = "ru_RU.UTF-8";
     if(!setlocale(LC_ALL, locale)) {
         fprintf(stderr, "setlocale(LC_ALL, \"%s\") failed!\n", locale);
-        return 1;
+        exit(1);
     }
 
     char* program = realpath(av[0], NULL);
     if(!program) {
         fprintf(stderr, "WARN: не найден реальный путь к программе %s\n", av[0]);
-        return 1;
+        exit(1);
     }
 
 	// меняет директорию на дир. пользователя
-    if(!goto_home()) return 1;
+    if(!goto_home()) exit(1);
 
     init_desktop(program); // создаёт десктопный файл, если его нет
     free(program);
@@ -2352,6 +2367,13 @@ int main(int ac, char** av) {
 			load_config();
 		}
     }
-
-    return 0;
 }
+
+//@category Заглушки для юнит-тестов
+
+// Мок подключается последним: ему нужны уже описанные выше set_group(),
+// keyboard_state() и прочие функции монолита. Иксы заменяются целиком,
+// поэтому тестам не нужен живой X-сервер
+#ifdef ERSWITCHER_UNIT
+#include "tests/unit/mock.c"
+#endif

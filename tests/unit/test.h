@@ -170,6 +170,10 @@ static void er_reset_state() {
 static void er_fixture() {
     er_fixture_setup();
     er_reset_state();
+    mock_keymap_clear();
+    mock_keymap_set(75,0,0,0xff13);
+    groups = 1;
+    maybe_group = 0;
 }
 
 // Загружает конфиг из текста (пишет в $HOME/.config/erswitcher.conf)
