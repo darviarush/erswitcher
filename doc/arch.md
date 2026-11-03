@@ -391,9 +391,8 @@ typedef struct {
 - `selection translate`/`selection invertcase`, snippets и compose работают
   через порт: `copy_selection()` и `insert_from_clipboard()` больше не
   вызывают X11 напрямую.
-- В монолите остались compatibility-макросы над `er_clipboard` и обёртки
-  `clipboard_free()`/`set_clipboard_utf8()`; они исчезнут вместе с
-  `app_run`.
+- В монолите остались compatibility-макросы над `er_clipboard` и обёртка
+  `clipboard_free()`; они исчезнут вместе с `app_run`.
 - Добавлен набор `clipboard` в юнит-тестах: set/clear, собственный
   буфер, отсутствие владельца, асинхронный callback и INCR.
 
@@ -446,13 +445,36 @@ typedef struct {
 
 Осталось:
 
-- команды, snippets и sendkeys пока остаются в монолите (шаг 6).
+- команды, snippets и sendkeys перенесены на шаге 6.
 
 ### Шаг 6. Команды, snippets, sendkeys
 
-- `ports/command_runner` и fork-реализация;
-- `use_cases/commands`, `use_cases/snippets`, `use_cases/sendkeys`;
-- сохранить таймауты и временные файлы.
+Сделано:
+
+- введён `ports/command_runner` (`prepare`/`start`/`poll`/`cancel`/
+  `output`) и fork-реализация
+  `infrastructure/system/command_runner_fork`: подстановки `%i`/`%o`/`%%`,
+  временные файлы, `system`, `waitpid` и убийство группы процессов;
+- `use_cases/commands` хранит только состояние сценария: запрет
+  параллельного запуска, ожидание clipboard для `%i`, интервал опроса,
+  таймаут и вставку вывода; время идёт через `ports/scheduler`, процессы —
+  через `ports/command_runner`;
+- `use_cases/sendkeys` вводит UTF-8 строку через `ports/keyboard`, без
+  X11 и без старых макросов `FOR_UTF8`;
+- `use_cases/snippets` кладёт текст в `ports/clipboard` и ставит
+  отложенный Shift+Insert через `ports/scheduler`/`ports/keyboard`;
+- монолит оставил только compatibility-обёртки `sendkeys()`,
+  `insert_from_clipboard()`, `run_command()`, `command_fmt2ptr()`;
+- добавлены тесты сценария `commands` на фейковых портах: `%i`/`%o`,
+  таймаут, запрет параллельного запуска и пустая команда;
+- ручной smoke: команда с `%o`, команда с `%i`/`%o`, таймаут, snippet,
+  sendkeys, SIGHUP и `word translate`.
+
+Осталось:
+
+- `shift_leftArrow`, `control_insert` и `copy_selection` пока остаются
+  обёртками над clipboard/keyboard в монолите;
+- удалить compatibility-обёртки при переносе `app_run` (шаг 8).
 
 ### Шаг 7. Трей и системная интеграция
 

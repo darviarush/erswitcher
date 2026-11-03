@@ -27,6 +27,9 @@ DOMAIN_OBJECTS = $(DOMAIN_SOURCES:.c=.o)
 USE_CASE_SOURCES = \
 	src/use_cases/input/input.c \
 	src/use_cases/translate/translate.c \
+	src/use_cases/sendkeys/sendkeys.c \
+	src/use_cases/snippets/snippets.c \
+	src/use_cases/commands/commands.c \
 	src/use_cases/config_reload/config_reload.c
 USE_CASE_OBJECTS = $(USE_CASE_SOURCES:.c=.o)
 
@@ -36,7 +39,8 @@ INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/clipboard.c \
 	src/infrastructure/x11/events.c \
 	src/infrastructure/system/scheduler_time.c \
-	src/infrastructure/system/config_store_fs.c
+	src/infrastructure/system/config_store_fs.c \
+	src/infrastructure/system/command_runner_fork.c
 INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
 
 APP_OBJECTS = erswitcher.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)

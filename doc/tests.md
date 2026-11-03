@@ -11,8 +11,9 @@
   состояние. К нему линкуются `src/use_cases/**/*.o` и
   `src/infrastructure/x11/keyboard.o`, `src/infrastructure/x11/clipboard.o`,
   `src/infrastructure/x11/events.o`,
-  `src/infrastructure/system/scheduler_time.o` и
-  `src/infrastructure/system/config_store_fs.o`; X11-вызовы подменены
+  `src/infrastructure/system/scheduler_time.o`,
+  `src/infrastructure/system/config_store_fs.o` и
+  `src/infrastructure/system/command_runner_fork.o`; X11-вызовы подменены
   `tests/unit/mock.c`;
 * `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
@@ -37,6 +38,12 @@ make test-unit
 `config reload`: модель `[functions]`/`[options]`/`[compose]`/
 `[sendkeys]`/`[snippets]`/`[commands]`, сохранение base-опций,
 escape-последовательности и предупреждения о битых строках.
+
+Сценарий `commands` проверяется набором `[commands]` на фейковых
+`command_runner`, `clipboard` и `scheduler`: `%i`/`%o`, вставка вывода,
+таймаут, пустая команда и запрет параллельного запуска. `sendkeys` и
+`snippets` проверяются существующими наборами через compatibility-обёртки
+монолита; их реализация уже вынесена в `src/use_cases/`.
 
 Буфер обмена проверяется набором `clipboard`: `set`/`clear`, отдача
 собственного буфера, вызов callback при отсутствии владельца,

@@ -59,12 +59,17 @@ extern char** environ;
 #include "src/ports/scheduler.h"
 #include "src/ports/event_loop.h"
 #include "src/ports/config_store.h"
+#include "src/ports/command_runner.h"
 #include "src/use_cases/config_reload/config_reload.h"
+#include "src/use_cases/sendkeys/sendkeys.h"
+#include "src/use_cases/snippets/snippets.h"
+#include "src/use_cases/commands/commands.h"
 #include "src/infrastructure/x11/keyboard.h"
 #include "src/infrastructure/x11/clipboard.h"
 #include "src/infrastructure/x11/events.h"
 #include "src/infrastructure/system/scheduler_time.h"
 #include "src/infrastructure/system/config_store_fs.h"
+#include "src/infrastructure/system/command_runner_fork.h"
 
 #define KEY_TO_SYM(K)		unikey_to_keysym(K)
 #define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
@@ -424,15 +429,8 @@ void press_key_multi(unikey_t key, int n) {
 
 // TODO: зажатие управляющих клавишь {\Control+Alt}abc{/Control} и {Ctrl+Alt+a}
 void sendkeys(char* s) { // печатает с клавиатуры строку в utf8
-    clear_active_mods();
-
-    FOR_UTF8(s) {
-        STEP_UTF8(s, ws);
-
-        press_key(INT_TO_KEY(ws));
-    }
-
-    recover_active_mods();
+    keyboard_port_ensure();
+    sendkeys_use_case_run(&kbd_port, s);
 }
 
 void print_translate_buffer(int from, int backspace) {
@@ -538,27 +536,10 @@ void copy_selection(void (*fn)(int, int)) {
     get_clipboard(copy_selection_next, NULL);
 }
 
-// нажимаем комбинацию Shift+Insert (вставка)
-void shift_insert() {
-    clear_active_mods();
-    unikey_t shift_left = SYM_TO_KEY(XK_Shift_L);
-    send_key(shift_left, 1);
-    press_key(SYM_TO_KEY(XK_Insert));
-    send_key(shift_left, 0);
-    recover_active_mods();
-    kbd_port.set_layout_hint(&kbd_port, keyboard_current_group());
-}
-
 // очистить буфер раздачи данных клипборда
 void clipboard_free() {
     clipboard_port_ensure();
     clipboard_port_state.clear(&clipboard_port_state);
-}
-
-// s должна быть в выделенной памяти: порт забирает её себе
-static void set_clipboard_utf8(char* s, int len) {
-    clipboard_port_ensure();
-    clipboard_port_state.set(&clipboard_port_state, s, len, CLIPBOARD_FORMAT_UTF8);
 }
 
 static event_loop_port_t event_loop_state;
@@ -744,15 +725,22 @@ void check_any_instance() {
     // if(rc) fprintf(stderr, "%s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
 }
 
-static void after_shift_insert(void* context) {
-    (void) context;
-    shift_insert();
+static snippets_use_case_t snippets_uc;
+
+static void snippets_use_case_ensure(void) {
+    if(snippets_uc.clipboard) return;
+
+    clipboard_port_ensure();
+    scheduler_port_ensure();
+    keyboard_port_ensure();
+
+    snippets_use_case_init(&snippets_uc, &clipboard_port_state,
+                           &scheduler_state, &kbd_port);
 }
 
-void insert_from_clipboard(char* s) {
-    set_clipboard_utf8(strdup(s), strlen(s)); // начинаем раздавать
-
-    after(0.10, after_shift_insert, NULL);
+void insert_from_clipboard(const char* s) {
+    snippets_use_case_ensure();
+    snippets_use_case_insert(&snippets_uc, s);
 }
 
 /*
@@ -766,164 +754,62 @@ void insert_from_clipboard(char* s) {
 
 */
 
-char* curcommand = NULL;
-char* curcommand_infile = "/tmp/erswitcher-input";
-char* curcommand_outfile = "/tmp/erswitcher-output";
-pid_t curcommand_pid = 0;
+const char* curcommand_infile = "/tmp/erswitcher-input";
+const char* curcommand_outfile = "/tmp/erswitcher-output";
 float command_timeout = 13;    // В секундах
-float command_interval = 0.1;  // Интервал через который будет запущена _interval_run_command
-float curcommand_progress = 0;
+float command_interval = 0.1;  // Интервал, через который опрашивается команда
 
+static command_runner_port_t command_runner_port_state;
+static command_runner_fork_t command_runner_state;
+static commands_use_case_t commands_uc;
+
+static void command_runner_ensure(void) {
+    if(command_runner_port_state.prepare) return;
+
+    command_runner_state.infile = curcommand_infile;
+    command_runner_state.outfile = curcommand_outfile;
+    command_runner_fork_port(&command_runner_port_state, &command_runner_state);
+}
 
 int is_blank(char* s) {
-    while(isspace(*s)) s++;
-    return *s == '\0';
+    return commands_use_case_is_blank(s);
 }
 
 // Из формата делает путь
-char* command_fmt2ptr(const char* clipboard, const char* curcommand) {
-    FILE* f = fopen(curcommand_infile, "wb");
-    if(!f) { fprintf(stderr, "Временный infile `%s` не открыт!\n", curcommand_infile); }
-    fprintf(f, "%s", clipboard);
-    fclose(f);
-
-    int invalid = 0;
-    char* ptr = command_template_expand(curcommand, curcommand_infile, curcommand_outfile, &invalid);
-    if(invalid) fprintf(stderr, "Замена в формате не валидна! `%s`\n", curcommand);
-    return ptr;
+char* command_fmt2ptr(const char* clipboard, const char* command) {
+    command_runner_ensure();
+    return command_runner_port_state.prepare(
+        &command_runner_port_state, command, clipboard ? clipboard : "",
+        clipboard ? (int) strlen(clipboard) : 0);
 }
 
-// Запускается каждые 0.1с и выводит \ | /
-void _interval_run_command(void* context) {
+static void commands_request_selection(void* context) {
     (void) context;
-
-    int status;
-    pid_t completed = waitpid(curcommand_pid, &status, WNOHANG);
-    if(DEBUG) fprintf(stderr, "completed %i exited %i signaled %i\n", completed, WIFEXITED(status), WIFSIGNALED(status));
-
-    curcommand_progress += command_interval;
-
-    // Не завершился
-    if(completed == 0) {
-        // Проверка таймаута
-        if (curcommand_progress >= command_timeout) {
-            fprintf(stderr, "TIMEOUT(%gs): pid=%i для команды `%s`\n", command_timeout, curcommand_pid, curcommand);
-            kill(-curcommand_pid, SIGKILL);
-            // Удаляем зомби
-            while(waitpid(-1, NULL, WNOHANG) > 0);
-            curcommand = NULL;
-            curcommand_pid = 0;
-
-            char* s = NULL;
-            int result = asprintf(&s, "TIMEOUT %gs!", command_timeout);
-            if(result == -1) {
-                insert_from_clipboard("TIMEOUT!");
-            } else {
-                insert_from_clipboard(s);
-                free(s);
-            }
-            return;
-        }
-
-        // printf("%g - %i = %g\n", curcommand_progress, (int) curcommand_progress, curcommand_progress - ((int) curcommand_progress));
-        // if(curcommand_progress - ((int) curcommand_progress) < 0.02) {
-        //     int x = ((int) curcommand_progress) % 4;
-        //     insert_from_clipboard(
-        //         x == 0? "/": (x == 1? "-": (x == 2? "\\": "|"))
-        //     );
-        //     shift_leftArrow();
-        // }
-
-        fprintf(stderr, "new after\n");
-
-        after(command_interval, _interval_run_command, NULL);
-        return;
-    }
-
-    if(strstr(curcommand, "%o")) {
-        fprintf(stderr, "end cmd with %%o\n");
-
-        FILE* f = fopen(curcommand_outfile, "rb");
-        if(!f) {
-            fprintf(stderr, "Файл команды не открыт\n");
-        }
-        else { // Отправляем в клипборд файл вывода
-            fseek(f, 0L, SEEK_END);
-            size_t size = ftell(f);
-            char* buf_ptr = (char*) malloc(size + 1);
-            fseek(f, 0L, SEEK_SET);
-            fread(buf_ptr, size, 1, f);
-            fclose(f);
-
-            buf_ptr[size] = '\0';
-            if(size) {
-                if(buf_ptr[size-1] == '\n') buf_ptr[size-1] = '\0';
-            }
-
-            insert_from_clipboard(buf_ptr);
-            free(buf_ptr);
-        }
-    }
-
-    fprintf(stderr, "end cmd real\n");
-
-    unlink(curcommand_outfile);
-    unlink(curcommand_infile);
-    curcommand = NULL;
+    control_insert();
 }
 
-void on_run_command(void* context, const char* clipboard, int len, clipboard_format_t format) {
+static void commands_insert_text(void* context, const char* text) {
     (void) context;
-    (void) len;
-    (void) format;
+    insert_from_clipboard(text);
+}
 
-    // Команда из формата. Не забыть очистить
-    char* command_ptr = command_fmt2ptr(clipboard, curcommand);
+static void commands_use_case_ensure(void) {
+    if(commands_uc.runner) return;
 
-    if(DEBUG) fprintf(stderr, "on_run_command: %s\n", command_ptr);
+    command_runner_ensure();
+    clipboard_port_ensure();
+    scheduler_port_ensure();
 
-    curcommand_pid = fork();
-    if(curcommand_pid == 0) {
-        setpgid(0, 0);
-        int status = system(command_ptr);
-        exit(status);
-    }
-
-    if(curcommand_pid < 0) {
-        fprintf(stderr, "ERROR: команда %s не форкнулась! Ошибка: %s\n", command_ptr, strerror(errno));
-        free(command_ptr);
-        return;
-    }
-
-    free(command_ptr);
-
-    curcommand_progress = 0;
-    after(command_interval, _interval_run_command, NULL);
+    commands_use_case_init(&commands_uc, &command_runner_port_state,
+                           &clipboard_port_state, &scheduler_state,
+                           commands_request_selection, NULL,
+                           commands_insert_text, NULL,
+                           command_timeout, command_interval);
 }
 
 void run_command(char* s) {
-    if(!s) {
-        fprintf(stderr, "Нет команды!\n");
-        return;
-    }
-
-    if(is_blank(s)) {
-        fprintf(stderr, "Пустая команда!\n");
-        return;
-    }
-
-    if(curcommand) {
-        fprintf(stderr, "Команда выполняется!\n");
-        return;
-    }
-
-    curcommand = s;
-
-    if(strstr(s, "%i")) {
-        control_insert();
-        get_clipboard(on_run_command, NULL);
-    }
-    else on_run_command(NULL, "", 0, CLIPBOARD_FORMAT_UTF8);
+    commands_use_case_ensure();
+    commands_use_case_run(&commands_uc, s);
 }
 
 // Нажата клавиша компосе - нужно заменить мнемонику на значение
@@ -1022,6 +908,7 @@ static void apply_config_options(const config_options_t* options) {
     loop_delay = (int) (options->loop_delay * 1000000.0);
     command_timeout = options->command_timeout;
     command_interval = options->command_interval;
+    commands_use_case_set_options(&commands_uc, command_timeout, command_interval);
 
     if(DEBUG) {
         printf("delay = %i микросекунд\n", delay_us);

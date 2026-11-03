@@ -137,12 +137,14 @@ static void er_reset_state() {
     command_timeout = 13;
     command_interval = 0.1;
 
+    commands_use_case_reset(&commands_uc);
+    command_runner_fork_reset(&command_runner_state);
+
     er_kbd.groups = 0;
     er_kbd.group_ru = -1;
     er_kbd.group_en = -1;
     er_kbd.maybe_group = -1;
 
-    curcommand = NULL;
     scheduler_system_reset(&er_scheduler);
 
     d = NULL;
