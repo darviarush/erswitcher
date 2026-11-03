@@ -397,9 +397,28 @@ typedef struct {
 
 ### Шаг 4. Время и события
 
-- `ports/scheduler` + системная реализация;
-- `ports/event_loop` + X11-реализация;
-- главный цикл постепенно переезжает в `app/app_run`.
+Сделано:
+
+- введён `ports/scheduler`: `after(seconds, fn, context)` и `tick()`;
+  системная реализация `infrastructure/system/scheduler_time` хранит
+  очередь из 256 одноразовых таймеров и по-прежнему использует
+  `gettimeofday`, поэтому задержки команд и snippets не изменились;
+- введён `ports/event_loop`: `wait(timeout)` и `drain(handler)`;
+  X11-реализация `infrastructure/x11/events` делает `select` по
+  `ConnectionNumber`, затем `XPending`/`XNextEvent`;
+- обработка конкретных X11-событий (трей, clipboard, configure/expose)
+  пока осталась в `erswitcher.c` отдельным callback'ом; сам цикл
+  `app_run` по-прежнему в монолите;
+- опрос `XQueryKeymap` перенесён в `keyboard->poll()`/`poll_saved()`;
+  `app_run` больше не вызывает X11 напрямую для клавиатуры;
+- добавлен набор `scheduler port` и проверка опроса карт клавиатуры в
+  `keyboard port`;
+- ручной smoke: команда по горячей клавише (таймер опроса процесса) и
+  snippet (таймер Shift+Insert + асинхронный clipboard) работают.
+
+Осталось:
+
+- перенести `app_run` и контекст приложения в `app/` (шаги 7–8).
 
 ### Шаг 5. Конфиг
 

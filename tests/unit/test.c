@@ -40,6 +40,7 @@
 #include "test_keyboard.c"
 #include "test_clipboard.c"
 #include "test_use_cases.c"
+#include "test_scheduler.c"
 
 int main(void) {
     int failed = 0;
@@ -55,6 +56,7 @@ int main(void) {
         suite_keyboard(),
         suite_clipboard(),
         suite_use_cases(),
+        suite_scheduler(),
         NULL
     };
 

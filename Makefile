@@ -32,7 +32,9 @@ USE_CASE_OBJECTS = $(USE_CASE_SOURCES:.c=.o)
 # Инфраструктурные адаптеры. В доменных тестах не участвуют.
 INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/keyboard.c \
-	src/infrastructure/x11/clipboard.c
+	src/infrastructure/x11/clipboard.c \
+	src/infrastructure/x11/events.c \
+	src/infrastructure/system/scheduler_time.c
 INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
 
 APP_OBJECTS = erswitcher.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)
@@ -41,7 +43,7 @@ TEST_DOMAIN = tests/unit/test_domain
 erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
 		gcc $(CFLAGS) $(CLIBS) -o $@ $^
 
-erswitcher.o: erswitcher.c main.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h)
+erswitcher.o: erswitcher.c main.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h)
 		gcc $(CFLAGS) -c -o $@ erswitcher.c
 
 $(DOMAIN_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h)
@@ -50,7 +52,7 @@ $(DOMAIN_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h)
 $(USE_CASE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/use_cases/*/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
 
-$(INFRASTRUCTURE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h)
+$(INFRASTRUCTURE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
 
 clean:	## Удаляет исходники

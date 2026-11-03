@@ -343,6 +343,14 @@ static void cb_press_key(keyboard_port_t* port, unikey_t key) { press_key_impl(s
 static void cb_press_key_multi(keyboard_port_t* port, unikey_t key, int n) { press_key_multi_impl(state_of(port), key, n); }
 static void cb_clear_active_mods(keyboard_port_t* port) { clear_active_mods_impl(state_of(port)); }
 static void cb_recover_active_mods(keyboard_port_t* port) { recover_active_mods_impl(state_of(port)); }
+static void cb_poll(keyboard_port_t* port) {
+    keyboard_x11_t* s = state_of(port);
+    XQueryKeymap(s->display, s->keys);
+}
+static void cb_poll_saved(keyboard_port_t* port) {
+    keyboard_x11_t* s = state_of(port);
+    XQueryKeymap(s->display, s->saved);
+}
 static const char* cb_keymap(keyboard_port_t* port) { return state_of(port)->keys; }
 static const char* cb_keymap_saved(keyboard_port_t* port) { return state_of(port)->saved; }
 static void cb_swap_keymap(keyboard_port_t* port) {
@@ -376,6 +384,8 @@ void keyboard_x11_port(keyboard_port_t* port, keyboard_x11_t* state) {
     port->press_key_multi = cb_press_key_multi;
     port->clear_active_mods = cb_clear_active_mods;
     port->recover_active_mods = cb_recover_active_mods;
+    port->poll = cb_poll;
+    port->poll_saved = cb_poll_saved;
     port->keymap = cb_keymap;
     port->keymap_saved = cb_keymap_saved;
     port->swap_keymap = cb_swap_keymap;

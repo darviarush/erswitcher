@@ -9,8 +9,9 @@
 * `tests/unit/test` — старые тесты монолита. `erswitcher.c` подключается
   через `#include`, поэтому тесты видят и `static`-функции, и глобальное
   состояние. К нему линкуются `src/use_cases/**/*.o` и
-  `src/infrastructure/x11/keyboard.o` и
-  `src/infrastructure/x11/clipboard.o`; X11-вызовы подменены
+  `src/infrastructure/x11/keyboard.o`, `src/infrastructure/x11/clipboard.o`,
+  `src/infrastructure/x11/events.o` и
+  `src/infrastructure/system/scheduler_time.o`; X11-вызовы подменены
   `tests/unit/mock.c`;
 * `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
@@ -25,8 +26,13 @@ make test-unit
 `config` пока покрыт только отдельными тестами. Клавиатурный X11-адаптер
 проверяется набором `keyboard port` через тот же мок: преобразования
 сканкодов и символов, переключение раскладки, инъекция клавиш и опрос
-`keymap`/`keymap_saved`. Сценарии `input`/`translate` проверяются набором
-`use cases` с фейковым портом — без X11 и без `erswitcher.c`.
+`keymap`/`keymap_saved`, `poll`/`poll_saved`. Сценарии `input`/`translate`
+проверяются набором `use cases` с фейковым портом — без X11 и без
+`erswitcher.c`.
+
+Системный scheduler проверяется набором `scheduler port`: просроченный
+таймер срабатывает один раз, будущий остаётся в очереди, контекст
+передаётся каждому callback'у.
 
 Буфер обмена проверяется набором `clipboard`: `set`/`clear`, отдача
 собственного буфера, вызов callback при отсутствии владельца,

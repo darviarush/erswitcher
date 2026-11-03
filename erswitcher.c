@@ -56,8 +56,12 @@ extern char** environ;
 #include "src/use_cases/translate/translate.h"
 #include "src/ports/keyboard.h"
 #include "src/ports/clipboard.h"
+#include "src/ports/scheduler.h"
+#include "src/ports/event_loop.h"
 #include "src/infrastructure/x11/keyboard.h"
 #include "src/infrastructure/x11/clipboard.h"
+#include "src/infrastructure/x11/events.h"
+#include "src/infrastructure/system/scheduler_time.h"
 
 #define KEY_TO_SYM(K)		unikey_to_keysym(K)
 #define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
@@ -245,56 +249,22 @@ int in_sym(KeySym symbol, KeySym* symbols) {
 
 //@category Задержки
 
-typedef struct {
-    double time; 			// время в секундах, когда таймер должен сработать
-    void(*fn)();
-} mytimer_t;
+static scheduler_port_t scheduler_state;
 
-#define MAX_TIMERS			256
-mytimer_t timers[MAX_TIMERS];
-int timers_size = 0;
-
-#define TIMEVAL_TO_DBL(T)   (T.tv_sec + USEC_TO_DBL(T.tv_usec))
-
-int after(double interval, void(*fn)()) {
-    int i;
-    for(i=0; i<MAX_TIMERS; i++) {
-        if(timers[i].fn == NULL) break;
-    }
-
-    if(i==MAX_TIMERS) {
-        fprintf(stderr, "Очередь таймеров переполнена. Установка таймера не удалась\n");
-        return -1;
-    }
-
-    timers[i].fn = fn;
-
-    struct timeval curtime;
-    gettimeofday(&curtime, 0);
-    timers[i].time = TIMEVAL_TO_DBL(curtime) + interval;
-
-    if(timers_size <= i) timers_size = i+1;
-
-    return i;
+static void scheduler_port_ensure(void) {
+    if(!scheduler_state.after) scheduler_system_port(&scheduler_state, &er_scheduler);
+    er_scheduler.debug = DEBUG;
 }
 
-void timers_apply() {
-    struct timeval curtime;
-    gettimeofday(&curtime, 0);
-    double now = TIMEVAL_TO_DBL(curtime);
+// Единая точка постановки таймера: лениво инициализирует порт.
+static int after(double interval, scheduler_callback_t fn, void* context) {
+    scheduler_port_ensure();
+    return scheduler_state.after(&scheduler_state, interval, fn, context);
+}
 
-    int i;
-    int last = 0;
-    for(i=0; i<timers_size; i++) {
-        if(timers[i].fn == NULL) continue;
-        if(timers[i].time < now) {
-            if(DEBUG) fprintf(stderr, "fn by timer %p\n", timers[i].fn);
-            timers[i].fn();
-            timers[i].fn = NULL;
-        } else last = i;
-    }
-
-    timers_size = last+1;
+static void scheduler_tick(void) {
+    scheduler_port_ensure();
+    scheduler_state.tick(&scheduler_state);
 }
 
 //@category Иксы
@@ -586,19 +556,26 @@ static void set_clipboard_utf8(char* s, int len) {
     clipboard_port_state.set(&clipboard_port_state, s, len, CLIPBOARD_FORMAT_UTF8);
 }
 
-void event_next() {
-    XEvent event;
-    XNextEvent(d, &event);
+static event_loop_port_t event_loop_state;
 
-    if(DEBUG) fprintf(stderr, "[%i %s], ", event.type, get_event_type(event.type));
+static void event_loop_port_ensure(void) {
+    if(!event_loop_state.wait) event_loop_x11_port(&event_loop_state, &er_event_loop);
+    er_event_loop.display = d;
+}
 
-    switch(event.type) {
+static void handle_x_event(void* context, const void* native_event) {
+    (void) context;
+    XEvent* event = (XEvent*) native_event;
+
+    if(DEBUG) fprintf(stderr, "[%i %s], ", event->type, get_event_type(event->type));
+
+    switch(event->type) {
     case SelectionNotify: // получить данные из буфера обмена
     case SelectionClear:
     case SelectionRequest: // запрос данных из буфера обмена
     case PropertyNotify:   // протокол INCR: отправка по частям
         clipboard_port_ensure();
-        clipboard_x11_handle_event(&er_clipboard, &event);
+        clipboard_x11_handle_event(&er_clipboard, event);
         break;
     case ClientMessage:	// окно пристыковано к системному лотку
         XWindowAttributes attr;
@@ -626,12 +603,12 @@ void event_next() {
         }
         break;
 	case ConfigureNotify:	// размер окна
-		w_width = event.xconfigure.width;
-		w_height = event.xconfigure.height;
+		w_width = event->xconfigure.width;
+		w_height = event->xconfigure.height;
 		printf("width: %i height: %i\n", w_width, w_height); fflush(stdout);
 		break;
 	case Expose:		// запрос на перерисовку окна ⌘
-		if(event.xexpose.count != 0) break;
+		if(event->xexpose.count != 0) break;
 
 		break;
     }
@@ -640,16 +617,9 @@ void event_next() {
 
 void event_delay(double seconds) {
     // задержка, но коль пришли события иксов - сразу выходим
-    struct timeval tv = { (int) seconds, (int) ((seconds - (int) seconds) * 1000000) };
-
-    fd_set readset;
-    FD_ZERO(&readset);
-    int fd_display = ConnectionNumber(d);
-    FD_SET(fd_display, &readset);
-    select(fd_display + 1, &readset, NULL, NULL, &tv);
-
-    // обрабатываем события окна, пока они есть
-    while(XPending(d)) event_next();
+    event_loop_port_ensure();
+    event_loop_state.wait(&event_loop_state, seconds);
+    event_loop_state.drain(&event_loop_state, handle_x_event, NULL);
 }
 
 void change_key(int code) {
@@ -770,10 +740,15 @@ void check_any_instance() {
     // if(rc) fprintf(stderr, "%s завершилась с кодом %i - %s\n", s, rc, strerror(rc));
 }
 
+static void after_shift_insert(void* context) {
+    (void) context;
+    shift_insert();
+}
+
 void insert_from_clipboard(char* s) {
     set_clipboard_utf8(strdup(s), strlen(s)); // начинаем раздавать
 
-    after(0.10, shift_insert);
+    after(0.10, after_shift_insert, NULL);
 }
 
 /*
@@ -815,7 +790,8 @@ char* command_fmt2ptr(const char* clipboard, const char* curcommand) {
 }
 
 // Запускается каждые 0.1с и выводит \ | /
-void _interval_run_command() {
+void _interval_run_command(void* context) {
+    (void) context;
 
     int status;
     pid_t completed = waitpid(curcommand_pid, &status, WNOHANG);
@@ -856,7 +832,7 @@ void _interval_run_command() {
 
         fprintf(stderr, "new after\n");
 
-        after(command_interval, _interval_run_command);
+        after(command_interval, _interval_run_command, NULL);
         return;
     }
 
@@ -918,7 +894,7 @@ void on_run_command(void* context, const char* clipboard, int len, clipboard_for
     free(command_ptr);
 
     curcommand_progress = 0;
-    after(command_interval, _interval_run_command);
+    after(command_interval, _interval_run_command, NULL);
 }
 
 void run_command(char* s) {
@@ -948,7 +924,8 @@ void run_command(char* s) {
 
 // Нажата клавиша компосе - нужно заменить мнемонику на значение
 int cursor_back = 0;
-void cursor_back__fn() {
+void cursor_back__fn(void* context) {
+    (void) context;
     fprintf(stderr, "Курсор влево на %i позиций\n", cursor_back);
     press_key_multi(SYM_TO_KEY(XK_Left), cursor_back);
     cursor_back = 0;
@@ -986,7 +963,7 @@ void compose(char*) {
     // подменяем буфер собой и вставляем из него композэ
 	insert_from_clipboard(to);
 
-    if(cursor_back) after(0.30, cursor_back__fn);
+    if(cursor_back) after(0.30, cursor_back__fn, NULL);
 }
 
 void word_translate(char*) {
@@ -1498,7 +1475,7 @@ void app_run(int ac, char** av) {
 
     open_display();
     check_any_instance();
-    memset(timers, 0, sizeof timers);	// инициализируем таймеры
+    scheduler_system_reset(&er_scheduler);	// инициализируем таймеры
 
     // Начальные установки
     current_win = get_current_window();
@@ -1512,7 +1489,7 @@ void app_run(int ac, char** av) {
     signal(SIGCHLD, SIG_IGN);
 
     unsigned int state1, state2 = 0;
-    XQueryKeymap(d, (char*) kbd_port.keymap_saved(&kbd_port));
+    kbd_port.poll_saved(&kbd_port);
 
 
     while(1) {
@@ -1531,9 +1508,9 @@ void app_run(int ac, char** av) {
         }
 
         // опрашиваем клавиатуру
-        char* keys = (char*) kbd_port.keymap(&kbd_port);
+        const char* keys = kbd_port.keymap(&kbd_port);
         const char* saved = kbd_port.keymap_saved(&kbd_port);
-        XQueryKeymap(d, keys);
+        kbd_port.poll(&kbd_port);
         keys_pressed = -1;
         for(int i=0; i<KEYBOARD_SIZE; i++) {
 
@@ -1562,7 +1539,7 @@ void app_run(int ac, char** av) {
         waitpid(-1, &status, WNOHANG);
 
         // сработают таймеры, чьё время пришло
-        timers_apply();
+        scheduler_tick();
 
         event_delay(USEC_TO_DBL(loop_delay));
 

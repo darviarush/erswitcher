@@ -149,8 +149,7 @@ static void er_reset_state() {
     er_kbd.maybe_group = -1;
 
     curcommand = NULL;
-    memset(timers, 0, sizeof timers);
-    timers_size = 0;
+    scheduler_system_reset(&er_scheduler);
 
     d = NULL;
     w = None;

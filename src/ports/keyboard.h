@@ -66,6 +66,9 @@ struct keyboard_port {
     void (*recover_active_mods)(keyboard_port_t* self);
 
     // Текущая и предыдущая карты нажатых клавиш (KEYBOARD_BUFFER_SIZE байт).
+    // poll() обновляет текущую карту, poll_saved() — предыдущую.
+    void (*poll)(keyboard_port_t* self);
+    void (*poll_saved)(keyboard_port_t* self);
     const char* (*keymap)(keyboard_port_t* self);
     const char* (*keymap_saved)(keyboard_port_t* self);
     void (*swap_keymap)(keyboard_port_t* self);

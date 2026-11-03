@@ -103,6 +103,19 @@ START_TEST(er_keyboard_port_clear_recover_is_repeatable) {
 }
 END_TEST
 
+START_TEST(er_keyboard_port_polls_keymaps) {
+    er_keyboard_layout();
+    keyboard_port_ensure();
+    mock_reset();
+
+    kbd_port.poll(&kbd_port);
+    kbd_port.poll_saved(&kbd_port);
+
+    // Опрос X11 остаётся внутри адаптера, приложение зовёт только порт.
+    ck_assert_int_eq(mock_count("XQueryKeymap("), 2);
+}
+END_TEST
+
 START_TEST(er_keyboard_port_presses_key) {
     er_keyboard_layout();
     keyboard_port_ensure();
@@ -126,6 +139,7 @@ Suite* suite_keyboard() {
     tcase_add_test(tc, er_keyboard_port_state_and_layout);
     tcase_add_test(tc, er_keyboard_port_swaps_keymaps);
     tcase_add_test(tc, er_keyboard_port_clear_recover_is_repeatable);
+    tcase_add_test(tc, er_keyboard_port_polls_keymaps);
     tcase_add_test(tc, er_keyboard_port_presses_key);
     suite_add_tcase(s, tc);
 

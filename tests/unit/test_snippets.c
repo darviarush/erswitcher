@@ -23,7 +23,7 @@ START_TEST(er_snippets_inserts_text_into_clipboard) {
 
     // Буфер принадлежит окну erswitcher-а, а вставка — по таймеру
     ck_assert(mock_find("XSetSelectionOwner(") >= 0);
-    ck_assert_int_gt(timers_size, 0);
+    ck_assert_int_gt(er_scheduler.size, 0);
 }
 END_TEST
 
