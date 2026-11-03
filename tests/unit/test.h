@@ -123,16 +123,10 @@ static void er_reset_state() {
     mock_keymap_clear();
     clipboard_x11_reset(&er_clipboard);
 
-    for(keyfn_t* k = keyfn, *n = keyfn + keyfn_size; k < n; k++) if(k->arg) free(k->arg);
-    free(keyfn);
-    keyfn = NULL;
-    keyfn_size = keyfn_max_size = 0;
+    config_free(&current_config);
+    config_init(&current_config);
     keyfn_active = -1;
-
-    for(int i = 0; i < compose_map_size; i++) free(compose_map[i].to);
-    free(compose_map);
-    compose_map = NULL;
-    compose_map_size = compose_map_max_size = 0;
+    load_config_requested = 0;
 
     input_buffer_init(&input);
     keys_pressed = 0;

@@ -53,8 +53,7 @@ START_TEST(er_snippets_from_config) {
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "Готово.");
-    // fn — общий приёмник вставки
-    ck_assert_ptr_eq((void*) keyfn[0].fn, (void*) insert_from_clipboard);
+    ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_SNIPPET);
 }
 END_TEST
 

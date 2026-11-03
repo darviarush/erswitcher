@@ -11,8 +11,8 @@
  * поэтому проверяем и то, что вызов X11 вообще был.
  */
 
-static int er_find_fn(void (*fn)(char*)) {
-    for(int i = 0; i < keyfn_size; i++) if(keyfn[i].fn == fn) return i;
+static int er_find_action(config_action_t action) {
+    for(int i = 0; i < keyfn_size; i++) if(keyfn[i].action == action) return i;
     return -1;
 }
 
@@ -44,14 +44,14 @@ START_TEST(er_functions_default_config) {
 
     int i = er_find_mods(STR_TO_KEY("Pause").code, ControlMask);
     ck_assert_msg(i >= 0, "Control+Pause не найден");
-    ck_assert_ptr_eq((void*) keyfn[i].fn, (void*) text_translate);
+    ck_assert_int_eq(keyfn[i].action, CONFIG_ACTION_TEXT_TRANSLATE);
     ck_assert_ptr_null((void*) keyfn[i].arg);
 
     i = er_find_mods(STR_TO_KEY("Break").code, AltMask | ShiftMask);
     ck_assert_msg(i >= 0, "Alt+Shift+Break не найден");
-    ck_assert_ptr_eq((void*) keyfn[i].fn, (void*) word_invertcase);
+    ck_assert_int_eq(keyfn[i].action, CONFIG_ACTION_WORD_INVERTCASE);
 
-    i = er_find_fn(compose);
+    i = er_find_action(CONFIG_ACTION_COMPOSE);
     ck_assert_msg(i >= 0, "compose не найден");
     ck_assert_int_eq(keyfn[i].key.code, STR_TO_KEY("KP_Begin").code);
 }
@@ -115,7 +115,7 @@ START_TEST(er_functions_unknown_function_is_skipped) {
     );
 
     ck_assert_int_eq(keyfn_size, 1);
-    ck_assert_ptr_eq((void*) keyfn[0].fn, (void*) word_translate);
+    ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
 END_TEST
 
@@ -128,7 +128,7 @@ START_TEST(er_functions_unknown_key_is_skipped) {
     );
 
     ck_assert_int_eq(keyfn_size, 1);
-    ck_assert_ptr_eq((void*) keyfn[0].fn, (void*) word_translate);
+    ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
 END_TEST
 
@@ -153,7 +153,7 @@ START_TEST(er_functions_two_keys_is_skipped) {
     );
 
     ck_assert_int_eq(keyfn_size, 1);
-    ck_assert_ptr_eq((void*) keyfn[0].fn, (void*) word_translate);
+    ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
 END_TEST
 
@@ -170,7 +170,7 @@ START_TEST(er_functions_old_combinations_are_dropped_on_reload) {
 
     er_load("[functions]\nControl+Pause=text translate\n");
     ck_assert_int_eq(keyfn_size, 1);
-    ck_assert_ptr_eq((void*) keyfn[0].fn, (void*) text_translate);
+    ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_TEXT_TRANSLATE);
 }
 END_TEST
 

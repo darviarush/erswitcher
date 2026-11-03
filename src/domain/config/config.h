@@ -59,6 +59,39 @@ typedef struct {
     char* arg;
 } config_binding_t;
 
+typedef struct {
+    config_options_t options;
+
+    config_binding_t* bindings;
+    int bindings_size;
+    int bindings_capacity;
+
+    compose_t* compose;
+    int compose_size;
+    int compose_capacity;
+} config_t;
+
+// Инициализирует пустой снимок конфига со значениями [options] по умолчанию.
+void config_init(config_t* config);
+
+// Освобождает привязки и compose, оставляя options как есть.
+void config_clear_entries(config_t* config);
+
+// Освобождает всё, включая options (сам struct остаётся валидным только
+// после повторного config_init()).
+void config_free(config_t* config);
+
+// Добавляет копию привязки. arg == NULL допустим для действий без аргумента.
+// Возвращает 1 при успехе.
+int config_add_binding(config_t* config, unikey_t key, config_action_t action, const char* arg);
+
+// Добавляет копию мнемоники (duplicate to, копия word/pos/cursor_back).
+// Возвращает 1 при успехе.
+int config_add_compose(config_t* config, const compose_t* item);
+
+// Сортирует [compose] по убыванию длины левой части — как старый qsort.
+void config_sort_compose(config_t* config);
+
 // Имя клавиши -> unikey_t без модификаторов.
 // Возвращает 1, если имя распознано.
 typedef int (*config_key_resolver_t)(const char* name, unikey_t* key, void* context);

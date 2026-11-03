@@ -26,7 +26,8 @@ DOMAIN_OBJECTS = $(DOMAIN_SOURCES:.c=.o)
 # Сценарии приложения: зависят от domain и ports, но не от X11.
 USE_CASE_SOURCES = \
 	src/use_cases/input/input.c \
-	src/use_cases/translate/translate.c
+	src/use_cases/translate/translate.c \
+	src/use_cases/config_reload/config_reload.c
 USE_CASE_OBJECTS = $(USE_CASE_SOURCES:.c=.o)
 
 # Инфраструктурные адаптеры. В доменных тестах не участвуют.
@@ -34,7 +35,8 @@ INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/keyboard.c \
 	src/infrastructure/x11/clipboard.c \
 	src/infrastructure/x11/events.c \
-	src/infrastructure/system/scheduler_time.c
+	src/infrastructure/system/scheduler_time.c \
+	src/infrastructure/system/config_store_fs.c
 INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
 
 APP_OBJECTS = erswitcher.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS)

@@ -108,8 +108,8 @@ START_TEST(er_commands_parse_into_keyfn) {
     // arg — сама команда, без подстановок (они делаются при запуске)
     int found = 0;
     for(int i = 0; i < keyfn_size; i++) {
-        if(keyfn[i].fn == run_command && keyfn[i].arg && strcmp(keyfn[i].arg, "date > %o") == 0) found++;
-        if(keyfn[i].fn == run_command && keyfn[i].arg && strcmp(keyfn[i].arg, "bash < %i") == 0) found++;
+        if(keyfn[i].action == CONFIG_ACTION_COMMAND && keyfn[i].arg && strcmp(keyfn[i].arg, "date > %o") == 0) found++;
+        if(keyfn[i].action == CONFIG_ACTION_COMMAND && keyfn[i].arg && strcmp(keyfn[i].arg, "bash < %i") == 0) found++;
     }
     ck_assert_int_eq(found, 2);
 }

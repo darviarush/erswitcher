@@ -58,10 +58,13 @@ extern char** environ;
 #include "src/ports/clipboard.h"
 #include "src/ports/scheduler.h"
 #include "src/ports/event_loop.h"
+#include "src/ports/config_store.h"
+#include "src/use_cases/config_reload/config_reload.h"
 #include "src/infrastructure/x11/keyboard.h"
 #include "src/infrastructure/x11/clipboard.h"
 #include "src/infrastructure/x11/events.h"
 #include "src/infrastructure/system/scheduler_time.h"
+#include "src/infrastructure/system/config_store_fs.h"
 
 #define KEY_TO_SYM(K)		unikey_to_keysym(K)
 #define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
@@ -140,21 +143,23 @@ Atom insert_from_clipboard_save_target;
 
 //@category Комбинации -> Функции
 
-typedef struct {
-    unikey_t key;
-    void (*fn)(char*);
-    char* arg;
-} keyfn_t;
-
-#define KEYFN_NEXT_ALLOC  256
-keyfn_t* keyfn = NULL;
-int keyfn_size = 0;
-int keyfn_max_size = 0;
+// Снимок конфигурации. Привязки хранят действие-enum, а не function
+// pointer; диспетчеризация — в execute_config_action().
+static config_t current_config;
 int keyfn_active = -1;
 
-int compose_map_size = 0;
-int compose_map_max_size = 0;
-compose_t* compose_map = NULL;
+#define keyfn       current_config.bindings
+#define keyfn_size  current_config.bindings_size
+#define compose_map      current_config.compose
+#define compose_map_size current_config.compose_size
+
+static config_store_port_t config_store_state;
+
+static void config_store_ensure(void) {
+    if(!config_store_state.read) config_store_fs_port(&config_store_state, &er_config_store);
+}
+
+static void execute_config_action(const config_binding_t* binding);
 
 
 //@category Раскладки
@@ -645,7 +650,6 @@ void change_key(int code) {
     // ищем соответствие среди функций
     for(int i=0; i<keyfn_size; i++) {
         if(keyfn[i].key.mods == mods && keyfn[i].key.code == code) {
-            //keyfn[i].fn(keyfn[i].arg);
             keyfn_active = i;
             return;
         }
@@ -986,461 +990,126 @@ void selection_invertcase(char*) {
     copy_selection(print_invertcase_buffer);
 }
 
-int need_load_config = 0;
-void signal_load_config(int) { need_load_config = 1; }
+volatile sig_atomic_t load_config_requested = 0;
+
+void signal_load_config(int) {
+    load_config_requested = 1;
+}
+
+static void config_log(void* context, const char* message) {
+    (void) context;
+    fprintf(stderr, "%s\n", message);
+}
+
+static int config_resolve_key(const char* name, unikey_t* key, void* context) {
+    (void) context;
+
+    KeySym ks = XStringToKeysym(name);
+    if(ks == NoSymbol) return 0;
+
+    unikey_t parsed = keysym_to_unikey(ks);
+    if(parsed.code == 0) return 0;
+
+    *key = parsed;
+    return 1;
+}
+
+static void apply_config_options(const config_options_t* options) {
+    keyboard_port_ensure();
+
+    int delay_us = (int) (options->delay * 1000000.0);
+    kbd_port.set_delay(&kbd_port, delay_us);
+    loop_delay = (int) (options->loop_delay * 1000000.0);
+    command_timeout = options->command_timeout;
+    command_interval = options->command_interval;
+
+    if(DEBUG) {
+        printf("delay = %i микросекунд\n", delay_us);
+        printf("loop_delay = %i микросекунд\n", loop_delay);
+        printf("command_timeout = %g секунд\n", command_timeout);
+        printf("command_interval = %g секунд\n", command_interval);
+    }
+}
+
+static void print_config_debug(void) {
+    if(!DEBUG) return;
+
+    for(int i = 0; i < keyfn_size; i++) {
+        const config_binding_t* binding = &keyfn[i];
+        KeySym ks = KEY_TO_SYM(binding->key);
+        printf("------------------------------\n");
+        print_sym(binding->key.mods, ks);
+        printf(" = %s\n", binding->arg ? binding->arg : "(null)");
+        fflush(stdout);
+    }
+
+    for(int i = 0; i < compose_map_size; i++) {
+        printf("compose[%i]: pos=%i cursor_back=%i -> %s\n",
+               i, compose_map[i].pos, compose_map[i].cursor_back,
+               compose_map[i].to ? compose_map[i].to : "");
+    }
+    fflush(stdout);
+}
 
 void load_config() {
     if(DEBUG) fprintf(stderr, "Конфигурация применяется ...\n");
 
-    // clipboard_s = NULL;
-    // clipboard_len = 0;
-    // clipboard_target = utf8_atom;
+    config_store_ensure();
 
-    for(keyfn_t *k = keyfn, *n = keyfn + keyfn_size; k<n; k++) if(k->arg) free(k->arg);
-    free(keyfn);
-    keyfn = NULL;
-    keyfn_max_size = keyfn_size = 0;
+    const char* path = config_store_state.path(&config_store_state);
 
-    for(int k = 0; k<compose_map_size; k++) free(compose_map[k].to);
-    free(compose_map);
-    compose_map = NULL;
-    compose_map_max_size = compose_map_size = 0;
+    config_reload_context_t reload = {
+        .store = &config_store_state,
+        .path = path,
+        .parse = {
+            .resolve_key = config_resolve_key,
+            .resolver_context = NULL,
+            .log = config_log,
+            .log_context = NULL,
+            .base_options = &current_config.options,
+        },
+    };
 
-    char* path = ".config/erswitcher.conf";
-
-    FILE* f = fopen(path, "rb");
-    if(!f) {
-        // каталог .config может отсутствовать — создаём
-        mkdir(".config", 0755);
-        f = fopen(path, "wb");
-        if(!f) {
-            fprintf(stderr, "WARN: не могу создать конфиг `%s`\n", path);
-            return;
-        }
-
-		const char* etc = "/usr/share/erswitcher.conf.simple";
-		FILE* c = fopen(etc, "rb");
-		if(c) {
-			#define BUF_SIZE_1M 	(1024*1024)
-			char buf[BUF_SIZE_1M];
-			int size;
-			while(0 != (size = fread(buf, BUF_SIZE_1M, 1, c))) fwrite(buf, size, 1, f);
-			fclose(c);
-		}
-		else
-			fprintf(f,
-			"#####################################################################\n"
-                "#              Конфигурацонный файл erswitcher-а                    #\n"
-                "#                                                                   #\n"
-                "# Автор: Ярослав О. Косьмина                                        #\n"
-                "# Сайт:  https://github.com/darviarush/erswitcher                   #\n"
-                "#                                                                   #\n"
-                "# Комбинации клавишь указываются в английской раскладке             #\n"
-                "#   и действуют во всех раскладках                                  #\n"
-                "# Названия символов взяты из Иксов. Посмотреть их можно запустив    #\n"
-                "#   ~/local/bin/erswitcher в консоли и введя комбинацию на          #\n"
-                "#   клавиатуре                                                      #\n"
-                "#####################################################################\n"
-                "\n"
-                "[functions]\n"
-                "# Транслитерация последнего введённого слова\n"
-                "Pause=word translate\n"
-                "# Транслитерация последнего ввода\n"
-                "Control+Pause=text translate\n"
-                "# Транслитерация выделенного участка или буфера обмена\n"
-                "Shift+Break=selected translate\n"
-                "# Изменение регистра последнего введённого слова\n"
-                "Alt+Shift+Break=word invertcase\n"
-                "# Изменение регистра последнего ввода\n"
-                "Alt+Control+Pause=text invertcase\n"
-                "# Изменение регистра последнего введённого слова\n"
-                "Alt+Pause=selected invertcase\n"
-                "# Транслитерация последнего введённого символа в дополнительные символы\n"
-                "KP_Begin=compose\n"
-                "Scroll_Lock=compose\n"
-                "\n"
-                "[options]\n"
-                "# Задержка между вызовами клавиатуры в секундах\n"
-                "loop_delay=0,01\n"
-                "# Задержка между нажатиями клавишь в секундах\n"
-                "delay=0,01\n"
-                "\n"
-                "[compose]\n"
-                "# Замены (мнемоники) - при нажатии на ScrollLock или меню (центральная клавиша на расширенной клавиатуре) заменяет последний введённый символ на соответствующий\n"
-                "\n"
-                "# Дополнительные символы кириллицы для украинского и белорусского алфавитов\n"
-                "ы=і\n"
-                "Ы=І\n"
-                "ъ=ї\n"
-                "Ъ=Ї\n"
-                "щ=ў\n"
-                "Щ=Ў\n"
-                "э=є\n"
-                "Э=Є\n"
-                "г=ґ\n"
-                "Г=Ґ\n"
-                "ё=’\n"
-                "Ё=₴\n"
-                "\n"
-                "# Кавычки\n"
-                "//=«\n"
-                "\\\\=»\n"
-                ",,=„\n"
-                "..=”\n"
-                "``=“\n"
-                ",=‘\n"
-                ".=’\n"
-                "# Тире - длинное, среднее и цифровое\n"
-                "-=—\n"
-                "-,=–\n"
-                "-.=‒\n"
-                "# Пунктуация\n"
-                "...=…\n"
-                "p=§\n"
-                "P=§§\n"
-                ":-=÷\n"
-                "-//-=―〃―\n"
-                "***=⁂\n"
-                "x=⌘\n"
-                "?\?=؟\n"
-                "?=¿\n"
-                "!=¡\n"
-                "n=¶\n"
-                "# Неразрывный пробел (\u00A0, &nbsp;)\n"
-                " = \n"
-                "# Утопающий и кричащий о помощи смайлик\n"
-                "хелп=‿︵‿ヽ(°□° )ノ︵‿︵\n"
-                "# Лежащий на боку и наблюдающий за чем-то смайлик\n"
-                "вау=∠( ᐛ 」∠)＿\n"
-                "# Ветер унёс зонтик бедняги во время дождя\n"
-                "нет=｀、ヽ(ノ＞＜)ノ ｀、ヽ｀☂ヽ\n"
-                "# Медвед\n"
-                "миш=ʕ ᵔᴥᵔ ʔ\n"
-                "# Пожималкин\n"
-                "хз=¯\\_(ツ)_/¯\n"
-                "# Смайлы\n"
-                ")=ヅ\n"
-                ";)=ゾ\n"
-                ":)=ジ\n"
-                "# Математические символы\n"
-                "+-=±\n"
-                "++=∑\n"
-                "**=∏\n"
-                "*=×\n"
-                "q=√\n"
-                "<\\==≤\n"
-                ">\\==≥\n"
-                "2=½\n"
-                "3=⅓\n"
-                "4=¼\n"
-                "5=⅕\n"
-                "6=⅙\n"
-                "7=⅐\n"
-                "# Cтрелочки\n"
-                "->=→\n"
-                "-->=⟶\n"
-                "<-=←\n"
-                "<--=⟵\n"
-                "t=// TODO: \n"
-                "T=# TODO: \n"
-                // ▄︻┻┳═ㅤㅤㅤ’’\̵͇ \з=(• - ̪●)=ε/̵͇ /’ ’ ㅤㅤㅤ═┳┻︻▄
-                // 0:47 ━━●━━━━━━━━━━━ 3:30
-                // ⇆ㅤㅤㅤㅤ◁ㅤㅤ❚❚ㅤㅤ▷ㅤㅤㅤㅤ↻
-                "## SQL\n"
-                "sele=SELECT *\\nFROM \\^ p\\nWHERE \\nORDER BY p.id DESC\\nLIMIT 100\\n\n"
-                "\n"
-                "[sendkeys]\n"
-                "# Шаблоны - вводятся с клавиатуры, их символы должны быть в одной из действующих раскладок\n"
-                "Super+Pause=Готово.\n"
-                "\n"
-                "[snippets]\n"
-                "# Сниппеты - вводятся через буфер обмена (clipboard), могут содержать любые символы\n"
-                "Super+Shift+Break=Готово.\n"
-                "\n"
-                "[commands]\n"
-                "# Команды операционной системы. Выполняются в оболочке шелла\n"
-                "Alt+Control+Shift+Break=kate ~/.config/erswitcher.conf && killall -HUP erswitcher\n"
-                "Alt+Control+d=date > %%o\n"
-                "Alt+Control+t=trans ru:en -b < %%i > %%o\n"
-                "Alt+Control+y=trans en:ru -b < %%i > %%o\n"
-               );
-
-        fclose(f);
-
-        f = fopen(path, "rb");
-        if(!f) {
-            fprintf(stderr, "WARN: не могу открыть только что созданный конфиг `%s`\n", path);
-            return;
-        }
+    config_t next;
+    if(!config_reload(&next, &reload)) {
+        // Как старый load_config(): неудачная загрузка оставляет пустые
+        // привязки/compose, но прежние [options].
+        config_free(&next);
+        config_clear_entries(&current_config);
+        keyfn_active = -1;
+        if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
+        return;
     }
 
-#define LINE_BUF_SIZE	(1024*1024)
+    config_free(&current_config);
+    current_config = next;
+    keyfn_active = -1;
 
-    char buf[LINE_BUF_SIZE];
-    int lineno = 0;
-
-#define SEC_FUNCTIONS 	((void (*)(char*)) -1)
-#define SEC_OPTIONS     ((void (*)(char*)) -2)
-    void (*fn)(char*) = NULL;
-
-NEXT_LINE:
-    while(fgets(buf, LINE_BUF_SIZE, f)) {
-        lineno++;
-
-        char* s = buf;
-        while(isspace(*s)) s++;
-
-        if(*s == '#' || *s == '\0') continue;
-		s = buf;	// возвращаемся
-
-        // удаляем пробелы в конце строки или только \n
-        char* z = s;
-        while(*z) z++;
-        if(*s!='[' && fn != SEC_FUNCTIONS) {
-            if(z[-1] == '\n') z--;
-        }
-        else {
-            while(isspace(z[-1])) z--;
-        }
-        *z = '\0';
-
-
-        if(*s == '[') { // это секция. Сверяемся со списком
-            if(EQ(s, "[functions]")) fn = SEC_FUNCTIONS;
-            else if(EQ(s, "[options]")) fn = SEC_OPTIONS;
-            else if(EQ(s, "[compose]")) fn = compose;
-            else if(EQ(s, "[sendkeys]")) fn = sendkeys;
-            else if(EQ(s, "[snippets]")) fn = insert_from_clipboard;
-            else if(EQ(s, "[commands]")) fn = run_command;
-            else {
-                fprintf(stderr, "WARN: %s:%i: не распознана секция %s. Пропущена\n", path, lineno, s);
-                fn = NULL;
-            }
-            continue;
-        }
-
-        if(fn == NULL) continue;
-
-        // TODO: \= и другие символы \n, \x{12}
-        // TODO: key=value на несколько строк
-        // TODO: возврат курсора на указанную позицию - необходимо для сниппетов
-        // TODO: выделение внутрь сниппетов
-
-        // разбираем ключ
-        char* v = s;
-        while(*v) {
-			if(*v == '\\') { v++; if(*v == '\0') break; v++; continue; }
-			if(*v == '=') break;
-			v++;
-		}
-        if(*v == '\0') {
-            fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет `=` в `%s`. Пропущено\n", path, lineno, s);
-            continue;
-        }
-        *v = '\0';
-        v++;
-
-        // меняем \char на символы
-        char* compose_position_cursor = NULL;
-        for(char* x = v; *x; x++) {
-            if(*x == '\\') {
-                if(x[1] == '^') {
-                    for(char* f=x; *f; f++) *f = f[2];
-                    compose_position_cursor = x;
-                    continue;
-                }
-
-                int to = 0;
-                switch(x[1]) {
-                    case '\\': to = '\\'; break;
-                    case 'n': to = '\n'; break;
-                    case 't': to = '\t'; break;
-                }
-
-                if(to) {
-                    *x=to;
-                    for(char* f=x+1; *f; f++) *f = f[1];
-                }
-            }
-        }
-
-        // после =
-        if(fn == SEC_OPTIONS) {
-            if(EQ(s, "delay")) {
-                int delay_us = atof(v) * 1000000;
-                if(delay_us <= 0 ) {
-                    fprintf(stderr, "WARN: %s:%i: ошибка: delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    delay_us = DELAY;
-                }
-                else printf("delay = %i микросекунд\n", delay_us);
-                keyboard_port_ensure();
-                kbd_port.set_delay(&kbd_port, delay_us);
-            }
-            else if(EQ(s, "loop_delay")) {
-                loop_delay = atof(v) * 1000000;
-                if(loop_delay <= 0 ) {
-                    fprintf(stderr, "WARN: %s:%i: ошибка: loop_delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    loop_delay = DELAY;
-                }
-                else printf("loop_delay = %i микросекунд\n", loop_delay);
-            }
-            else if(EQ(s, "command_timeout")) {
-                command_timeout = atof(v);
-                if(command_timeout <= 0 ) {
-                    fprintf(stderr, "WARN: %s:%i: ошибка: command_timeout в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    command_timeout = 13;
-                }
-                else printf("command_timeout = %g секунд\n", command_timeout);
-            }
-            else if(EQ(s, "command_interval")) {
-                command_interval = atof(v);
-                if(command_interval <= 0 ) {
-                    fprintf(stderr, "WARN: %s:%i: ошибка: command_interval в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    command_interval = 0.1;
-                }
-                else printf("command_interval = %g секунд\n", command_interval);
-            }
-            else {
-                fprintf(stderr, "WARN: %s:%i: ошибка: неизвестная опция `%s`. Пропущено\n", path, lineno, s);
-            }
-
-            continue;
-        }
-
-        // это мнемоника
-        if(fn == compose) {
-            // выделяем память под массив, если нужно
-            if(compose_map_size >= compose_map_max_size) {
-                compose_map_max_size += KEYFN_NEXT_ALLOC;
-                compose_map = realloc(compose_map, compose_map_max_size * sizeof(compose_t));
-            }
-
-            // разбираем ключ
-            wint_t* word = compose_map[compose_map_size].word;
-            int i = 0;
-            int m = 0;
-
-            FOR_UTF8(s) {
-                STEP_UTF8(s, ws);
-                if(ws == L'\\') {
-                    if(m==0) {
-                        m=1;
-                        continue;
-                    }
-                }
-                m = 0;
-
-                if(i >= COMPOSE_KEY_MAX) {
-                    fprintf(stderr, "WARN: %s:%i: строка слишком длинная \"%s\" > %i. Пропущенo\n", path, lineno, s, COMPOSE_KEY_MAX);
-                    goto NEXT_LINE;
-                }
-
-                word[i++] = ws;
-            }
-
-            if(compose_position_cursor) {
-                compose_map[compose_map_size].cursor_back = utf8_strlen(compose_position_cursor);
-                printf("cursor_back = %i\n", compose_map[compose_map_size].cursor_back);
-            }
-            else compose_map[compose_map_size].cursor_back = 0;
-
-            compose_map[compose_map_size].pos = i;
-            compose_map[compose_map_size++].to = strdup(v);
-
-			if(DEBUG) {printf("compose: %s ⟶ %s\n", s, v); fflush(stdout);}
-
-            continue;
-        }
-
-        // определяем комбинацию клавиш
-        unikey_t key = {0,0,0};
-        int mods = 0;
-        int key_set_flag = 0;
-
-        char* x = strtok(s, "+");
-        while (x != NULL) {
-            if(key_set_flag) {
-                fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: несколько клавишь-немодификаторов подряд (как %s в %s). Пропущено\n", path, lineno, x, s);
-                goto NEXT_LINE;
-            }
-
-            if(EQ(x, "Shift")) mods |= ShiftMask;
-            else if(EQ(x, "Control") || EQ(x, "Ctrl")) mods |= ControlMask;
-            else if(EQ(x, "Alt") || EQ(x, "Option")) mods |= AltMask;
-            else if(EQ(x, "Meta")) mods |= MetaMask;
-            else if(EQ(x, "Super") || EQ(x, "Win") || EQ(x, "Command")) mods |= SuperMask;
-            else if(EQ(x, "Hyper")) mods |= HyperMask;
-            else {
-                key = STR_TO_KEY(x);
-                if(key.code == 0) {
-                    fprintf(stderr, "WARN: %s:%i: не распознан символ %s. Пропущено\n", path, lineno, x);
-                    goto NEXT_LINE;
-                }
-
-                key.mods = mods;
-                key_set_flag = 1;
-            }
-
-            x = strtok(NULL, "+");
-        };
-
-        if(!key_set_flag) {
-            fprintf(stderr, "WARN: %s:%i: ошибка синтаксиса: нет клавиши-немодификатора (в выражении %s). Пропущено\n", path, lineno, s);
-            continue;
-        }
-
-        // определяем функцию
-        char* arg = NULL;
-        void (*fn1)(char*);
-
-        if(fn != SEC_FUNCTIONS) {
-            arg = strdup(v);
-            fn1 = fn;
-        }
-
-        else if(EQ(v, "word translate")) fn1 = word_translate;
-        else if(EQ(v, "text translate")) fn1 = text_translate;
-        else if(EQ(v, "selected translate")) fn1 = selection_translate;
-
-        else if(EQ(v, "word invertcase")) fn1 = word_invertcase;
-        else if(EQ(v, "text invertcase")) fn1 = text_invertcase;
-        else if(EQ(v, "selected invertcase")) fn1 = selection_invertcase;
-
-        else if(EQ(v, "compose")) fn1 = compose;
-
-        else {
-            fprintf(stderr, "WARN: %s:%i: нет функции %s. Пропущено\n", path, lineno, v);
-            continue;
-        }
-
-        // выделяем память под массив, если нужно
-        if(keyfn_size == keyfn_max_size) {
-            keyfn_max_size += KEYFN_NEXT_ALLOC;
-            keyfn = realloc(keyfn, keyfn_max_size * sizeof(keyfn_t));
-        }
-
-        keyfn[keyfn_size++] = (keyfn_t) {key: key, fn: fn1, arg: arg};
-        if(DEBUG) {
-            keyfn_t *k = keyfn+keyfn_size-1;
-            printf("------------------------------\n");
-            KeySym ks = KEY_TO_SYM(k->key);
-            print_sym(k->key.mods, ks);
-            printf(" = %s\n", k->arg);
-            fflush(stdout);
-        }
-    }
-
-    fclose(f);
-
-    // сортируем мнемоники по убыванию их длины
-    int compose_map_cmp(const void* a, const void *b) {
-        return ((compose_t*) b)->pos - ((compose_t*) a)->pos;
-    }
-    // Пустой массив: compose_map == NULL, но qsort с пустым массивом
-    // всё равно может вызвать сравнение и разыменовать NULL
-    if(compose_map_size > 1) qsort(compose_map, compose_map_size, sizeof(compose_t), compose_map_cmp);
+    apply_config_options(&current_config.options);
+    print_config_debug();
 
     if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
+}
+
+static void execute_config_action(const config_binding_t* binding) {
+    if(!binding) return;
+
+    switch(binding->action) {
+        case CONFIG_ACTION_WORD_TRANSLATE: word_translate(binding->arg); break;
+        case CONFIG_ACTION_TEXT_TRANSLATE: text_translate(binding->arg); break;
+        case CONFIG_ACTION_SELECTED_TRANSLATE: selection_translate(binding->arg); break;
+
+        case CONFIG_ACTION_WORD_INVERTCASE: word_invertcase(binding->arg); break;
+        case CONFIG_ACTION_TEXT_INVERTCASE: text_invertcase(binding->arg); break;
+        case CONFIG_ACTION_SELECTED_INVERTCASE: selection_invertcase(binding->arg); break;
+
+        case CONFIG_ACTION_COMPOSE: compose(binding->arg); break;
+        case CONFIG_ACTION_SENDKEYS: sendkeys(binding->arg); break;
+        case CONFIG_ACTION_SNIPPET: insert_from_clipboard(binding->arg); break;
+        case CONFIG_ACTION_COMMAND: run_command(binding->arg); break;
+
+        case CONFIG_ACTION_NONE: break;
+    }
 }
 
 void app_run(int ac, char** av);
@@ -1483,6 +1152,7 @@ void app_run(int ac, char** av) {
     init_keyboard();
 
     // конфигурация должна загружаться после инициализации клавиатуры
+    config_init(&current_config);
     load_config();
 
     signal(SIGHUP, signal_load_config);
@@ -1524,7 +1194,7 @@ void app_run(int ac, char** av) {
                     change_key(i);
                 } else {	// клавиша отжата
                     if(keys_pressed == 0 && keyfn_active != -1) {
-                        keyfn[keyfn_active].fn(keyfn[keyfn_active].arg);
+                        execute_config_action(&keyfn[keyfn_active]);
                         keyfn_active = -1;
                     }
                 }
@@ -1544,8 +1214,8 @@ void app_run(int ac, char** av) {
         event_delay(USEC_TO_DBL(loop_delay));
 
 		// обработка сигналов
-		if(need_load_config) {
-			need_load_config = 0;
+		if(load_config_requested) {
+			load_config_requested = 0;
 			load_config();
 		}
     }

@@ -1,9 +1,90 @@
 #include <ctype.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
 #include "../text/text.h"
+
+#define CONFIG_GROW 256
+
+void config_init(config_t* config) {
+    if(!config) return;
+    memset(config, 0, sizeof(*config));
+    config->options = config_options_default();
+}
+
+void config_clear_entries(config_t* config) {
+    if(!config) return;
+
+    for(int i = 0; i < config->bindings_size; i++) free(config->bindings[i].arg);
+    free(config->bindings);
+    config->bindings = NULL;
+    config->bindings_size = 0;
+    config->bindings_capacity = 0;
+
+    for(int i = 0; i < config->compose_size; i++) free(config->compose[i].to);
+    free(config->compose);
+    config->compose = NULL;
+    config->compose_size = 0;
+    config->compose_capacity = 0;
+}
+
+void config_free(config_t* config) {
+    if(!config) return;
+    config_clear_entries(config);
+    memset(&config->options, 0, sizeof(config->options));
+}
+
+int config_add_binding(config_t* config, unikey_t key, config_action_t action, const char* arg) {
+    if(!config) return 0;
+
+    if(config->bindings_size >= config->bindings_capacity) {
+        int capacity = config->bindings_capacity + CONFIG_GROW;
+        config_binding_t* bindings = realloc(config->bindings, capacity * sizeof(*bindings));
+        if(!bindings) return 0;
+        config->bindings = bindings;
+        config->bindings_capacity = capacity;
+    }
+
+    char* copy = arg ? strdup(arg) : NULL;
+    if(arg && !copy) return 0;
+
+    config->bindings[config->bindings_size++] = (config_binding_t) {
+        .key = key,
+        .action = action,
+        .arg = copy,
+    };
+    return 1;
+}
+
+int config_add_compose(config_t* config, const compose_t* item) {
+    if(!config || !item) return 0;
+
+    if(config->compose_size >= config->compose_capacity) {
+        int capacity = config->compose_capacity + CONFIG_GROW;
+        compose_t* compose = realloc(config->compose, capacity * sizeof(*compose));
+        if(!compose) return 0;
+        config->compose = compose;
+        config->compose_capacity = capacity;
+    }
+
+    compose_t copy = *item;
+    copy.to = item->to ? strdup(item->to) : NULL;
+    if(item->to && !copy.to) return 0;
+
+    config->compose[config->compose_size++] = copy;
+    return 1;
+}
+
+static int compose_cmp(const void* a, const void* b) {
+    return ((const compose_t*) b)->pos - ((const compose_t*) a)->pos;
+}
+
+void config_sort_compose(config_t* config) {
+    if(!config || config->compose_size <= 1) return;
+    qsort(config->compose, config->compose_size, sizeof(*config->compose), compose_cmp);
+}
 
 config_section_t config_section_from_string(const char* s) {
     if(!s) return CONFIG_SECTION_UNKNOWN;

@@ -10,8 +10,9 @@
   через `#include`, поэтому тесты видят и `static`-функции, и глобальное
   состояние. К нему линкуются `src/use_cases/**/*.o` и
   `src/infrastructure/x11/keyboard.o`, `src/infrastructure/x11/clipboard.o`,
-  `src/infrastructure/x11/events.o` и
-  `src/infrastructure/system/scheduler_time.o`; X11-вызовы подменены
+  `src/infrastructure/x11/events.o`,
+  `src/infrastructure/system/scheduler_time.o` и
+  `src/infrastructure/system/config_store_fs.o`; X11-вызовы подменены
   `tests/unit/mock.c`;
 * `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
@@ -32,7 +33,10 @@ make test-unit
 
 Системный scheduler проверяется набором `scheduler port`: просроченный
 таймер срабатывает один раз, будущий остаётся в очереди, контекст
-передаётся каждому callback'у.
+передаётся каждому callback'у. Загрузка конфига проверяется набором
+`config reload`: модель `[functions]`/`[options]`/`[compose]`/
+`[sendkeys]`/`[snippets]`/`[commands]`, сохранение base-опций,
+escape-последовательности и предупреждения о битых строках.
 
 Буфер обмена проверяется набором `clipboard`: `set`/`clear`, отдача
 собственного буфера, вызов callback при отсутствии владельца,

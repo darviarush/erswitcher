@@ -196,8 +196,9 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 - `send_key(key, event)` / `press_key(key)` / `press_key_multi(key, n)`;
 - `clear_active_mods()` / `recover_active_mods()` — сохранение и
   восстановление зажатых модификаторов;
-- `keymap()` / `keymap_saved()` / `swap_keymap()` — текущая и предыдущая
-  карты нажатых клавиш для опроса.
+- `keymap()` / `keymap_saved()` / `poll()` / `poll_saved()` /
+  `swap_keymap()` — текущая и предыдущая карты нажатых клавиш для
+  опроса.
 
 Доменные модификаторы (`ERS_MOD_SHIFT`, `ERS_MOD_LOCK`, …) не должны
 называться `ShiftMask`/`LockMask`. На первом этапе их числовые значения
@@ -268,7 +269,7 @@ typedef struct {
     InputBuffer input;             // word[], symbol[], pos
     int keys_pressed;              // опрос клавиатуры, не содержимое буфера
     int current_win;
-    int need_load_config;
+    volatile sig_atomic_t load_config_requested;
 
     keyboard_port_t  keyboard;
     clipboard_port_t clipboard;
@@ -369,7 +370,8 @@ typedef struct {
 - добавлен набор `use cases` с фейковым портом клавиатуры;
 - `delay` из `[options]` устанавливается через `keyboard->set_delay()`,
   опрос клавиатуры в `app_run` использует `keymap()/keymap_saved()/
-  swap_keymap()`; макросы совместимости над `er_kbd` удалены.
+  poll()/poll_saved()/swap_keymap()`; макросы совместимости над
+  `er_kbd` удалены.
 
 Осталось в этом шаге:
 
@@ -422,11 +424,29 @@ typedef struct {
 
 ### Шаг 5. Конфиг
 
-- `ports/config_store`;
-- `use_cases/config_reload`;
-- привязки, compose, snippets, commands — из модели, без function pointer
-  и sentinel-значений;
-- SIGHUP через флаг.
+Сделано:
+
+- введён `ports/config_store` (`path`/`read`/`ensure_default`) и файловая
+  реализация `infrastructure/system/config_store_fs`; текст конфига по
+  умолчанию перенесён туда без изменений;
+- введён `use_cases/config_reload`: текст разбирается в `config_t` с
+  `options`, привязками и `[compose]`; файловый ввод-вывод остаётся за
+  портом, X11 — за резолвером клавиш;
+- `keyfn_t` с `void (*fn)(char*)` и sentinel-значениями удалён: привязки
+  хранят `config_action_t` и аргумент, диспетчеризация — в
+  `execute_config_action()`;
+- `[options]` сохраняют прежнее поведение накопления: при перезагрузке
+  новый снимок стартует от текущих значений, а отсутствующая секция их
+  не сбрасывает;
+- `SIGHUP` теперь только выставляет `volatile sig_atomic_t`, разбор идёт
+  в главном цикле;
+- добавлен набор `config reload` с фейковым резолвером клавиш;
+- ручной smoke: команда и snippet из модели, повторная загрузка по
+  `SIGHUP` заменяет привязки.
+
+Осталось:
+
+- команды, snippets и sendkeys пока остаются в монолите (шаг 6).
 
 ### Шаг 6. Команды, snippets, sendkeys
 

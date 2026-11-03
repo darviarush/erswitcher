@@ -41,6 +41,7 @@
 #include "test_clipboard.c"
 #include "test_use_cases.c"
 #include "test_scheduler.c"
+#include "test_config_reload.c"
 
 int main(void) {
     int failed = 0;
@@ -57,6 +58,7 @@ int main(void) {
         suite_clipboard(),
         suite_use_cases(),
         suite_scheduler(),
+        suite_config_reload(),
         NULL
     };
 
