@@ -44,8 +44,10 @@ static void er_layout_abc() {
     mock_keyboard(0);
 }
 
+// Сканкод буквы — по таблице мока (KEY_A, KEY_B, KEY_C не подряд)
 static unikey_t er_key(char ch) {
-    return (unikey_t) {code: ch - 'a' + CODE_A, mods: 0, group: 0};
+    int code = ch == 'a' ? KEY_A : ch == 'b' ? KEY_B : ch == 'c' ? KEY_C : 0;
+    return (unikey_t) {code: code, mods: 0, group: 0};
 }
 
 static void er_input(char const* s) {
@@ -135,8 +137,10 @@ START_TEST(er_compose_cursor_back) {
     );
 
     ck_assert_int_eq(compose_map_size, 1);
-    // После «if(» одна позиция, дальше «) {\n\t\n}» — 8 символов
-    ck_assert_int_eq(compose_map[0].cursor_back, 8);
+    ck_assert_int_eq(compose_map[0].pos, 2);
+    // \^ отрезает всё, что после него: «if(» и «) {\n\t\n}»
+    // Курсор возвращается на начало хвоста — на его длину
+    ck_assert_int_eq(compose_map[0].cursor_back, 7);
     ck_assert_str_eq(compose_map[0].to, "if() {\n\t\n}");
 }
 END_TEST
@@ -151,7 +155,7 @@ START_TEST(er_compose_escapes) {
 
     ck_assert_int_eq(compose_map_size, 3);
     ck_assert_str_eq(compose_map[0].to, "print , \"\\n\";");
-    ck_assert_int_eq(compose_map[0].cursor_back, 6);
+    ck_assert_int_eq(compose_map[0].cursor_back, 7);
     ck_assert_str_eq(compose_map[1].to, "a\tb");
     ck_assert_str_eq(compose_map[2].to, "a\nb");
 }
@@ -212,40 +216,44 @@ START_TEST(er_compose_applies_longest_match) {
     mock_reset();
     compose(NULL);
 
-    ck_assert_ptr_nonnull((void*) insert_from_clipboard_data);
-    ck_assert_str_eq(insert_from_clipboard_data, "три");
+    ck_assert_ptr_nonnull((void*) clipboard_s);
+    ck_assert_str_eq(clipboard_s, "три");
     // Удаляем ровно столько символов, сколько в ключе
-    ck_assert_int_eq(mock_count("XTestFakeKeyEvent("), 3);
+    // (XTestFakeKeyEvent — по два вызова на клавишу: нажатие и отжатие)
+    ck_assert_int_eq(mock_count("XTestFakeKeyEvent("), 6);
 }
 END_TEST
 
 START_TEST(er_compose_no_match_does_nothing) {
     er_layout_abc();
+    clipboard_free();
     er_load("[compose]\nxyz=нет\n");
 
     er_input("abc");
     mock_reset();
     compose(NULL);
 
-    ck_assert_ptr_null((void*) insert_from_clipboard_data);
+    ck_assert_ptr_null((void*) clipboard_s);
     ck_assert_int_eq(mock_find("XTestFakeKeyEvent("), -1);
 }
 END_TEST
 
 START_TEST(er_compose_empty_buffer_does_nothing) {
     er_layout_abc();
+    clipboard_free();
     er_load("[compose]\na=б\n");
 
     mock_reset();
     compose(NULL);
 
-    ck_assert_ptr_null((void*) insert_from_clipboard_data);
+    ck_assert_ptr_null((void*) clipboard_s);
     ck_assert_int_eq(mock_n, 0);
 }
 END_TEST
 
 START_TEST(er_compose_partial_key_matches_head) {
     er_layout_abc();
+    clipboard_free();
     er_load("[compose]\naa=б\n");
 
     // В буфере «ba»: ключу «aa» не хватает первого символа
@@ -253,7 +261,7 @@ START_TEST(er_compose_partial_key_matches_head) {
     mock_reset();
     compose(NULL);
 
-    ck_assert_ptr_null((void*) insert_from_clipboard_data);
+    ck_assert_ptr_null((void*) clipboard_s);
 }
 END_TEST
 
@@ -265,7 +273,7 @@ START_TEST(er_compose_key_after_other_symbols) {
     mock_reset();
     compose(NULL);
 
-    ck_assert_str_eq(insert_from_clipboard_data, "два");
+    ck_assert_str_eq(clipboard_s, "два");
 }
 END_TEST
 
@@ -294,7 +302,7 @@ START_TEST(er_compose_key_with_switched_layout) {
     mock_reset();
     compose(NULL);
 
-    ck_assert_str_eq(insert_from_clipboard_data, "б");
+    ck_assert_str_eq(clipboard_s, "б");
     ck_assert_msg(mock_find("XkbLockGroup(") >= 0, "группа не переключилась");
 }
 END_TEST

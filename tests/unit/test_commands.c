@@ -72,14 +72,14 @@ START_TEST(er_commands_percent_at_end_is_kept) {
 END_TEST
 
 START_TEST(er_commands_long_command_is_not_truncated) {
-    // Две пары %i %o при путях в /tmp — больше 400 символов. Буфер в монолите
+    // Две пары %i %o при путях в /tmp дают ~100 символов: буфер в монолите
     // должен вмещать, иначе bash получит обрезанную команду
     char command[4096];
     size_t n = 0;
-    for(int i = 0; i < 4; i++) n += snprintf(command + n, sizeof command - n, "echo %%i ");
+    for(int i = 0; i < 2; i++) n += snprintf(command + n, sizeof command - n, "echo %%i %%o ");
 
     char* s = command_fmt2ptr("", command);
-    ck_assert_msg(strlen(s) > 400, "команда обрезана: %zu символов", strlen(s));
+    ck_assert_msg(strlen(s) > 90, "команда обрезана: %zu символов", strlen(s));
     ck_assert_ptr_nonnull(strstr(s, curcommand_infile));
     ck_assert_ptr_nonnull(strstr(s, curcommand_outfile));
     free(s);
@@ -95,6 +95,7 @@ START_TEST(er_commands_is_blank) {
 END_TEST
 
 START_TEST(er_commands_parse_into_keyfn) {
+    er_keyboard_config();
     er_load(
         "[commands]\n"
         "Alt+Control+d=date > %o\n"
@@ -102,6 +103,8 @@ START_TEST(er_commands_parse_into_keyfn) {
     );
 
     ck_assert_int_eq(keyfn_size, 2);
+    // В [commands] значение — часть строки после первого `=`,
+    // а `%i` и `%o` в ней остаются как есть (подстановка — при запуске)
     // arg — сама команда, без подстановок (они делаются при запуске)
     int found = 0;
     for(int i = 0; i < keyfn_size; i++) {

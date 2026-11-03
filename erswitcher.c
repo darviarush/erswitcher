@@ -284,11 +284,15 @@ unikey_t keysym_to_unikey(KeySym ks) {
     //unikey_t key = keyboard_state(XKeysymToKeycode(d, ks));
     //if(key.code) return key;
 
-    for(int code = 0; code < KEYBOARD_SIZE; ++code)
-        for(int shift = 0; shift < 2; ++shift) {
-            KeySym search_ks = XkbKeycodeToKeysym(d, code, maybe_group, shift);
-            if(ks == search_ks)	return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: maybe_group};
-        }
+    // maybe_group == -1 — ещё не смотрели ни одной раскладки; с -1
+    // XkbKeycodeToKeysym() ничего не найдёт, поэтому пропускаем текущую
+    if(maybe_group >= 0) {
+        for(int code = 0; code < KEYBOARD_SIZE; ++code)
+            for(int shift = 0; shift < 2; ++shift) {
+                KeySym search_ks = XkbKeycodeToKeysym(d, code, maybe_group, shift);
+                if(ks == search_ks)	return (unikey_t) {code: code, mods: shift? ShiftMask: 0, group: maybe_group};
+            }
+    }
 
     // чтобы не переключать клавиатуру и shift пойдём от обратного:
     for(int group = 0; group < groups; ++group)
@@ -862,12 +866,13 @@ void add_to_buffer(unikey_t key) {
     //printf("add_to_buffer: %S\n", word);
 }
 
+// Начало последнего слова в буфере: после последнего пробела,
+// а если пробелов нет — с нуля
 int from_space() {
-    if(pos == 0) return 0;
-    int from=pos-1;
-    for(; from>0 && iswspace(KEY_TO_INT(word[from])); from--);
-    for(; from>0; from--) if(iswspace(KEY_TO_INT(word[from]))) break;
-    return from;
+    for(int from = pos - 1; from >= 0; from--) {
+        if(iswspace(KEY_TO_INT(word[from]))) return from + 1;
+    }
+    return 0;
 }
 
 void press_key_multi(unikey_t key, int n) {
@@ -1779,7 +1784,9 @@ void compose(char*) {
     }
 
     // удаляем мнемонику введённую ранее
-    unikey_t key = keyboard_state(0);
+    // Модификаторов тут не нужно: раскладку берём из последнего введённого символа,
+    // как при печати — так работает и под тестами, где XkbGetState не настоящий
+    unikey_t key = pos? word[pos-1]: keyboard_state(0);
     press_key_multi(SYM_TO_KEY(XK_BackSpace), remove_sym);
     set_group(key.group);
     // подменяем буфер собой и вставляем из него композэ
@@ -1832,6 +1839,8 @@ void load_config() {
 
     FILE* f = fopen(path, "rb");
     if(!f) {
+        // каталог .config может отсутствовать — создаём
+        mkdir(".config", 0755);
         f = fopen(path, "wb");
         if(!f) {
             fprintf(stderr, "WARN: не могу создать конфиг `%s`\n", path);
@@ -2098,7 +2107,7 @@ NEXT_LINE:
                 loop_delay = atof(v) * 1000000;
                 if(loop_delay <= 0 ) {
                     fprintf(stderr, "WARN: %s:%i: ошибка: loop_delay в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    delay = DELAY;
+                    loop_delay = DELAY;
                 }
                 else printf("loop_delay = %i микросекунд\n", loop_delay);
             }
@@ -2106,7 +2115,7 @@ NEXT_LINE:
                 command_timeout = atof(v);
                 if(command_timeout <= 0 ) {
                     fprintf(stderr, "WARN: %s:%i: ошибка: command_timeout в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    delay = DELAY;
+                    command_timeout = 13;
                 }
                 else printf("command_timeout = %g секунд\n", command_timeout);
             }
@@ -2114,7 +2123,7 @@ NEXT_LINE:
                 command_interval = atof(v);
                 if(command_interval <= 0 ) {
                     fprintf(stderr, "WARN: %s:%i: ошибка: command_interval в секундах, а не `%s`. Пропущено\n", path, lineno, v);
-                    delay = DELAY;
+                    command_interval = 0.1;
                 }
                 else printf("command_interval = %g секунд\n", command_interval);
             }

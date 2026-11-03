@@ -38,6 +38,10 @@ typedef struct {
     char str[256];
 } mock_call_t;
 
+// Подключается тестом: перехват эмуляции нажатий (см. test_sendkeys.c).
+// Отдельная переменная, потому что XTestFakeKeyEvent — функция из XTest.h
+static int (*mock_fake_key_hook)(Display*, unsigned int, Bool, unsigned long) = NULL;
+
 static mock_call_t mock_calls[MOCK_CALLS_MAX];
 static int mock_n = 0;
 
@@ -189,6 +193,17 @@ KeySym XStringToKeysym(const char* name) {
     if(strcmp(name, "underscore") == 0) return XK_underscore;
     if(strcmp(name, "BackSpace") == 0) return XK_BackSpace;
     if(strcmp(name, "Pause") == 0) return XK_Pause;
+    if(strcmp(name, "Break") == 0) return XK_Break;
+    if(strcmp(name, "Home") == 0) return XK_Home;
+    if(strcmp(name, "End") == 0) return XK_End;
+    if(strcmp(name, "Up") == 0) return XK_Up;
+    if(strcmp(name, "Down") == 0) return XK_Down;
+    if(strcmp(name, "Prior") == 0) return XK_Prior;
+    if(strcmp(name, "Next") == 0) return XK_Next;
+    if(strcmp(name, "KP_Enter") == 0) return XK_KP_Enter;
+    if(strcmp(name, "Menu") == 0) return XK_Menu;
+    if(strcmp(name, "Escape") == 0) return XK_Escape;
+    if(strcmp(name, "Delete") == 0) return XK_Delete;
     if(strcmp(name, "Scroll_Lock") == 0) return XK_Scroll_Lock;
     if(strcmp(name, "KP_Begin") == 0) return XK_KP_Begin;
     if(strcmp(name, "Left") == 0) return XK_Left;
@@ -202,9 +217,24 @@ KeySym XStringToKeysym(const char* name) {
     if(strcmp(name, "F3") == 0) return XK_F3;
     if(strcmp(name, "F5") == 0) return XK_F5;
 
+    // Клавиши-модификаторы как отдельные имена (нужны для раскладки и нажатий)
+    if(strcmp(name, "Super_L") == 0) return XK_Super_L;
+    if(strcmp(name, "Super_R") == 0) return XK_Super_R;
+    if(strcmp(name, "Meta_L") == 0) return XK_Meta_L;
+    if(strcmp(name, "Alt_L") == 0) return XK_Alt_L;
+    if(strcmp(name, "Caps_Lock") == 0) return XK_Caps_Lock;
+    if(strcmp(name, "Num_Lock") == 0) return XK_Num_Lock;
+    if(strcmp(name, "Hyper_L") == 0) return XK_Hyper_L;
+
     // Остальные односимвольные имена — как в X11: `a` → 0x61.
     // Кириллические имена X11 (Cyrillic_a и т.п.) здесь не поддержаны намеренно, см. doc/test-unit.md
     if(strlen(name) == 1) return (unsigned char) name[0];
+
+    // F1..F12: у X11 это один диапазон 0xFFBE + номер
+    if(name[0] == 'F' && name[1] >= '1' && name[1] <= '9' && name[2] == '\0') {
+        return XK_F1 + (name[1] - '1');
+    }
+
     return NoSymbol;
 }
 
@@ -270,6 +300,7 @@ void XConvertCase(KeySym sym, KeySym* lower, KeySym* upper) {
 
 int XTestFakeKeyEvent(Display* dpy, unsigned int keycode, Bool is_press, unsigned long fake_delay) {
     mock_push_int("XTestFakeKeyEvent(", keycode, is_press, (int) fake_delay, 0);
+    if(mock_fake_key_hook) return mock_fake_key_hook(dpy, keycode, is_press, fake_delay);
     (void) dpy;
     return 1;
 }

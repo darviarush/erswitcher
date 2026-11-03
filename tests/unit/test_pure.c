@@ -6,8 +6,23 @@
  * Когда они начнут переезжать в src/, здесь поменяются только #include.
  */
 
+// Символ кладётся в word[] как клавиша по таблице мока: KEY_TO_INT()
+// достаёт из неё utf32-символ, по которому и работают iswspace/печать
 static unikey_t pure_key(int ch) {
-    return (unikey_t) {code: ch, mods: 0, group: 0};
+    int code = ch == ' ' ? KEY_SPACE : KEY_A + (ch - 'a');
+    return (unikey_t) {code: code, mods: 0, group: 0};
+}
+
+// Раскладка для буфера ввода: буквы и пробел
+static void pure_layout() {
+    mock_keymap_clear();
+    mock_keymap_set(KEY_A, 0, 0, XK_a);
+    mock_keymap_set(KEY_B, 0, 0, XK_b);
+    mock_keymap_set(KEY_C, 0, 0, XK_c);
+    mock_keymap_set_all_groups(KEY_SPACE, XK_space);
+    mock_modifiers_fill();
+    groups = 1;
+    maybe_group = 0;
 }
 
 // @category utf8
@@ -34,6 +49,7 @@ END_TEST
 // @category буфер ввода
 
 START_TEST(er_from_space_tail_word) {
+    pure_layout();
     // «abc xyz»: последнее слово начинается после пробела
     char const* s = "abc xyz";
     for(int i = 0; s[i]; i++) word[i] = pure_key(s[i]);
@@ -43,6 +59,7 @@ START_TEST(er_from_space_tail_word) {
 END_TEST
 
 START_TEST(er_from_space_single_word) {
+    pure_layout();
     for(int i = 0; i < 3; i++) word[i] = pure_key('a' + i);
     pos = 3;
     ck_assert_int_eq(from_space(), 0);

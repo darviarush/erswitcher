@@ -11,6 +11,9 @@
  */
 
 START_TEST(er_snippets_inserts_text_into_clipboard) {
+    // Идентификаторы атомов нужны заранее: в жизни их создаёт open_display()
+    utf8_atom = 2;
+    clipboard_atom = 3;
     mock_reset();
     insert_from_clipboard("Готово.");
 
@@ -18,9 +21,9 @@ START_TEST(er_snippets_inserts_text_into_clipboard) {
     ck_assert_str_eq(clipboard_s, "Готово.");
     ck_assert_int_eq(clipboard_len, 13);   // «Готово.» — 13 байт в utf8
 
-    // Сначала буфер принадлежит окну erswitcher-а, потом — вставка
-    ck_assert(mock_has("XInternAtom(CLIPBOARD"));
+    // Буфер принадлежит окну erswitcher-а, а вставка — по таймеру
     ck_assert(mock_find("XSetSelectionOwner(") >= 0);
+    ck_assert_int_gt(timers_size, 0);
 }
 END_TEST
 

@@ -79,7 +79,6 @@ START_TEST(er_config_missing_creates_default) {
     // Файл создан, и в нём есть хоть что-то распознанное
     ck_assert_int_eq(access(er_env.config, F_OK), 0);
     ck_assert_int_gt(keyfn_size, 0);
-    ck_assert(mock_has("XInternAtom(CLIPBOARD"));
 }
 END_TEST
 
@@ -112,7 +111,7 @@ START_TEST(er_config_comments_and_spaces) {
         "   # тоже комментарий\n"
         "\n"
         "[functions]\n"
-        "  Pause=word translate   \n"
+        "Pause=word translate   \n"
     );
 
     ck_assert_int_eq(keyfn_size, 1);

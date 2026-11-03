@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,6 +85,10 @@ static char* er_read(char const* path, char* buf, size_t size) {
 
 // Делает копию строки, чтобы тест мог мокать её, не задевая настоящую
 static void er_fixture_setup() {
+    // Монолит стартует с setlocale(LC_ALL, "ru_RU.UTF-8") — без него
+    // atof() не понимает запятую в `delay=0,01` (см. app_run)
+    setlocale(LC_ALL, "ru_RU.UTF-8");
+
     char tmpl[] = "/tmp/erswitcher-unit-XXXXXX";
     if(!mkdtemp(tmpl)) {
         fprintf(stderr, "mkdtemp: %s\n", strerror(errno));
@@ -164,6 +169,29 @@ static void er_reset_state() {
 
     active_use = 0;
     active_len = 0;
+}
+
+/*
+ * «Физическая» клавиатура для разбора конфига.
+ *
+ * Комбинацию из конфига надо превратить в сканкод, а keysym_to_unikey()
+ * ищет только среди клавиш настоящей раскладки. В тестах её нет, поэтому
+ * кладём в мок те клавиши, что встречаются в конфиге по умолчанию.
+ * После загрузки конфига раскладку для конкретного теста можно переопределить:
+ * er_load() её не трогает, дальше только поиск по таблице мока.
+ */
+static void er_keyboard_config() {
+    mock_keymap_clear();
+    mock_keymap_set(70, 0, 0, XK_Pause);
+    mock_keymap_set(71, 0, 0, XK_Break);
+    mock_keymap_set(72, 0, 0, XK_KP_Begin);
+    mock_keymap_set(73, 0, 0, XK_Scroll_Lock);
+    mock_keymap_set(74, 0, 0, XK_F1);
+    mock_keymap_set_all_groups(KEY_D, XK_d);
+    mock_modifiers_fill();
+    groups = 1;
+    group_en = 0;
+    maybe_group = 0;
 }
 
 // Начальное состояние перед каждым тестом: песочница и чистые глобалы монолита

@@ -54,6 +54,7 @@ int main(void) {
 
     for(int i = 0; suites[i]; i++) {
         SRunner* runner = srunner_create(suites[i]);
+        srunner_set_fork_status(runner, CK_NOFORK);
         srunner_run_all(runner, CK_NORMAL);
         int run = srunner_ntests_run(runner);
         int bad = srunner_ntests_failed(runner);

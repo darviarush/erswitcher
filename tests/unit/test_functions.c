@@ -26,6 +26,7 @@ static int er_find_mods(unsigned code, int mods) {
 // @category конфиг по умолчанию
 
 START_TEST(er_functions_default_config) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Pause=word translate\n"
@@ -57,6 +58,7 @@ START_TEST(er_functions_default_config) {
 END_TEST
 
 START_TEST(er_functions_modifier_aliases) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Ctrl+Pause=word translate\n"
@@ -81,12 +83,15 @@ START_TEST(er_functions_modifier_aliases) {
     for(size_t a = 0; a < sizeof aliases / sizeof aliases[0]; a++) {
         char line[64];
         snprintf(line, sizeof line, "%s+Pause", aliases[a].name);
-        ck_assert_msg(er_find_mods(STR_TO_KEY(line).code, aliases[a].mods) >= 0, "не найден %s", line);
+        // В строке с плюсом STR_TO_KEY() не годится: XStringToKeysym("Ctrl+Pause")
+        // не существует. Нужна сама клавиша, модификаторы уже проверены выше
+        ck_assert_msg(er_find_mods(STR_TO_KEY("Pause").code, aliases[a].mods) >= 0, "не найден %s", line);
     }
 }
 END_TEST
 
 START_TEST(er_functions_multiple_modifiers_order_is_free) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Alt+Control+Shift+Break=text translate\n"
@@ -102,6 +107,7 @@ END_TEST
 // @category ошибки в конфиге
 
 START_TEST(er_functions_unknown_function_is_skipped) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Pause=word translate\n"
@@ -114,6 +120,7 @@ START_TEST(er_functions_unknown_function_is_skipped) {
 END_TEST
 
 START_TEST(er_functions_unknown_key_is_skipped) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "NoSuchKey=word translate\n"
@@ -126,6 +133,7 @@ START_TEST(er_functions_unknown_key_is_skipped) {
 END_TEST
 
 START_TEST(er_functions_only_modifiers_is_skipped) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Control+Alt=word translate\n"
@@ -137,6 +145,7 @@ START_TEST(er_functions_only_modifiers_is_skipped) {
 END_TEST
 
 START_TEST(er_functions_two_keys_is_skipped) {
+    er_keyboard_config();
     er_load(
         "[functions]\n"
         "Break+Pause=word translate\n"
@@ -155,6 +164,7 @@ START_TEST(er_functions_empty_section) {
 END_TEST
 
 START_TEST(er_functions_old_combinations_are_dropped_on_reload) {
+    er_keyboard_config();
     er_load("[functions]\nPause=word translate\n");
     ck_assert_int_eq(keyfn_size, 1);
 

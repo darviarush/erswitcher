@@ -10,7 +10,7 @@
 
 ## Задачи
 
-* [ ] Юнит-тесты на фреймворке Check для Pure functions с libbacktrace
+* [ ] Юнит-тесты на фреймворке Criterion для Pure functions с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address`
 * [ ] Функциональные тесты для окна конфига на tcl+tk. С tcltest и `event generate .top.entry_field <Motion> -x 10 -y 10`
 * [ ] Разбить монолит в src/ по doc/arch.md
 * [ ] Добавить юнит-тесты в github CI. Отладить `.github/workflows/test.yml`. Запуск локально `act -j test-linux`
