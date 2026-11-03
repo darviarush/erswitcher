@@ -131,8 +131,8 @@ src/
 │   └── tray_indicator.h/.c         # отрисовка/состояние иконки, поверх tray-порта
 │
 └── app/
-    ├── context.h/.c                # AppContext: состояние + порты
-    └── app_run.h/.c                # главный цикл, composition root
+    ├── app.h                       # состояние, обёртки, API для main/тестов
+    └── app.c                       # главный цикл и composition root
 
 main.c                              # только вызов app_run()
 ```
@@ -408,8 +408,8 @@ typedef struct {
   X11-реализация `infrastructure/x11/events` делает `select` по
   `ConnectionNumber`, затем `XPending`/`XNextEvent`;
 - обработка конкретных X11-событий (трей, clipboard, configure/expose)
-  пока осталась в `erswitcher.c` отдельным callback'ом; сам цикл
-  `app_run` по-прежнему в монолите;
+  осталась в слое приложения отдельным callback'ом; сам цикл `app_run`
+  позже перенесён в `src/app/app.c`;
 - опрос `XQueryKeymap` перенесён в `keyboard->poll()`/`poll_saved()`;
   `app_run` больше не вызывает X11 напрямую для клавиатуры;
 - добавлен набор `scheduler port` и проверка опроса карт клавиатуры в
@@ -501,9 +501,23 @@ typedef struct {
 
 ### Шаг 8. Удаление монолита
 
-- Удалить `erswitcher.c` и include-трюк `main.c`.
-- Переписать `tests/unit` на линковку модулей и фейковые порты.
-- Обновить Makefile, `doc/arch.md` и `doc/tests.md`.
+Сделано:
+
+- `erswitcher.c` удалён; его оставшийся код перенесён в
+  `src/app/app.c`, объявления — в `src/app/app.h`;
+- `main.c` больше не подключается через `#include`: это отдельный
+  объект, который вызывает `app_run`;
+- `tests/unit` линкуются с `src/app/app.o` и модулями; X11-заглушки
+  подключаются из `test.h`, а не из монолита;
+- Makefile собирает приложение из объектных файлов, без
+  `erswitcher.o`;
+- обновлены `doc/arch.md` и `doc/tests.md`;
+- `make test` зелёный, ручной smoke: команда, `%i`/`%o`, таймаут,
+  snippet, sendkeys, compose, `word translate`, SIGHUP.
+
+Критерии готовности из раздела 11 выполнены: в `domain/` и
+`use_cases/` нет X11/файлов/процессов/часов; `main.c` только запускает
+`app_run`; сборка идёт из объектных файлов.
 
 После каждого шага обязательны:
 
@@ -523,9 +537,8 @@ make test
   проверка — существующие функциональные тесты и ручной smoke.
 - `tests/functional` (Tcl/Tk) не зависят от внутренней структуры C-кода
   и должны оставаться зелёными на всех шагах.
-- После шага 8 в тестах не должно быть
-  `#include "../../erswitcher.c"`; текущий `tests/unit/mock.c`
-  распадается на наборы фейковых портов.
+- После шага 8 в тестах нет `#include "../../erswitcher.c"`;
+  `tests/unit/mock.c` подключается из `test.h` и содержит заглушки X11.
 
 ## 11. Критерии готовности
 

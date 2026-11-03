@@ -7,102 +7,13 @@
 
 #define _GNU_SOURCE
 
-#include <X11/X.h>
-#include <X11/XKBlib.h>
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/extensions/XKB.h>
-#include <X11/extensions/XTest.h>
-#include <X11/keysym.h>
-#include <ctype.h>
-#include <errno.h>
-#include <locale.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <time.h>
-#include <unistd.h>
-#include <wchar.h>
-#include <wctype.h>
-#include <xkbcommon/xkbcommon.h>
+#include "app.h"
 
-extern char** environ;
-
-
-//@category Отладка
-
-#define DEBUG	1
-
-
-//@category Клавиши
-
-#include "src/domain/unikey/unikey.h"
-#include "src/domain/input_buffer/input_buffer.h"
-#include "src/domain/text/text.h"
-#include "src/domain/case_invert/case_invert.h"
-#include "src/domain/compose/compose.h"
-#include "src/domain/command_template/command_template.h"
-#include "src/use_cases/input/input.h"
-#include "src/use_cases/translate/translate.h"
-#include "src/ports/keyboard.h"
-#include "src/ports/clipboard.h"
-#include "src/ports/scheduler.h"
-#include "src/ports/event_loop.h"
-#include "src/ports/config_store.h"
-#include "src/ports/command_runner.h"
-#include "src/ports/tray.h"
-#include "src/use_cases/config_reload/config_reload.h"
-#include "src/use_cases/sendkeys/sendkeys.h"
-#include "src/use_cases/snippets/snippets.h"
-#include "src/use_cases/commands/commands.h"
-#include "src/infrastructure/x11/keyboard.h"
-#include "src/infrastructure/x11/clipboard.h"
-#include "src/infrastructure/x11/events.h"
-#include "src/infrastructure/x11/tray.h"
-#include "src/presentation/tray_indicator.h"
-#include "src/infrastructure/system/scheduler_time.h"
-#include "src/infrastructure/system/config_store_fs.h"
-#include "src/infrastructure/system/command_runner_fork.h"
-#include "src/infrastructure/system/desktop.h"
-
-#define KEY_TO_SYM(K)		unikey_to_keysym(K)
-#define KEY_TO_INT(K)		xkb_keysym_to_utf32(unikey_to_keysym(K))
-#define SYM_TO_KEY(K)		keysym_to_unikey(K)
-#define SYM_TO_INT(S)		xkb_keysym_to_utf32(S)
-#define INT_TO_SYM(S)		xkb_utf32_to_keysym(S)
-#define INT_TO_KEY(K)		keysym_to_unikey(xkb_utf32_to_keysym(K))
-
-#define SYM_TO_STR(K)		XKeysymToString(K)
-#define KEY_TO_STR(K)		XKeysymToString(KEY_TO_SYM(K))
-#define INT_TO_STR(K)		XKeysymToString(INT_TO_SYM(K))
-
-#define STR_TO_SYM(K)		XStringToKeysym(K)
-#define STR_TO_INT(K)		SYM_TO_INT(XStringToKeysym(K))
-#define STR_TO_KEY(K)		SYM_TO_KEY(XStringToKeysym(K))
-
-#define EQ(S1, S2)			(strcmp(S1, S2) == 0)
-
-// Установлен ли бит
-#define BIT(VECTOR, BIT_IDX)   ( ((char*)VECTOR)[BIT_IDX/8]&(1<<(BIT_IDX%8)) )
-// размер буфера word (совпадает с доменным InputBuffer)
-#define BUF_SIZE	INPUT_BUFFER_CAPACITY
+#define DEBUG 1
 
 input_buffer_t input;		// буфер ввода: word[], symbol[], pos
 int keys_pressed;			// нажато клавишь
 
-
-//@category Задержки
-
-// TODO: задержку указывать в конфиге
-// дефолтная задержка
-#define DELAY 		    10000
-// .0 - обязателен, иначе деление будет целочисленным
-#define USEC_TO_DBL(U)	(U / 1000000.0)
 
 int loop_delay = DELAY;			// задержка между опросами клавиатуры
 pid_t config_window_pid = 0;	// pid конфигуратора
@@ -112,26 +23,6 @@ pid_t config_window_pid = 0;	// pid конфигуратора
 Display *d;					// текущий дисплей
 Window w;					// окно этого приложения
 Window current_win;			// окно устанавливается при вводе с клавиатуры
-
-// Временные макросы совместимости: состояние буфера обмена уже принадлежит
-// X11-адаптеру. Они исчезнут вместе с монолитом после переноса app_run.
-#define selection_chunk_size er_clipboard.selection_chunk_size
-#define clipboard_s          er_clipboard.send_data
-#define clipboard_pos        er_clipboard.send_pos
-#define clipboard_len        er_clipboard.send_len
-#define clipboard_target     er_clipboard.send_target
-#define selection_retrive    er_clipboard.receive_data
-#define selection_retrive_length er_clipboard.receive_len
-#define selection_retrive_type   er_clipboard.receive_type
-#define on_get_selection     er_clipboard.pending_callback
-#define incr_is              er_clipboard.incr_is
-#define incr_propid          er_clipboard.incr_property
-#define incr_window          er_clipboard.incr_window
-#define sel_data_atom        er_clipboard.sel_data_atom
-#define utf8_atom            er_clipboard.utf8_atom
-#define clipboard_atom       er_clipboard.clipboard_atom
-#define targets_atom         er_clipboard.targets_atom
-#define incr_atom            er_clipboard.incr_atom
 
 void (*on_copy_selection)(int,int) = NULL;			// обработчик завершения копирования буфера обмена в буфер ввода
 
@@ -146,13 +37,8 @@ Atom insert_from_clipboard_save_target;
 
 // Снимок конфигурации. Привязки хранят действие-enum, а не function
 // pointer; диспетчеризация — в execute_config_action().
-static config_t current_config;
+config_t current_config;
 int keyfn_active = -1;
-
-#define keyfn       current_config.bindings
-#define keyfn_size  current_config.bindings_size
-#define compose_map      current_config.compose
-#define compose_map_size current_config.compose_size
 
 static config_store_port_t config_store_state;
 
@@ -167,9 +53,9 @@ static void execute_config_action(const config_binding_t* binding);
 
 // Обёртки над портом клавиатуры: старые имена остаются для монолита и
 // тестов, реализация Xkb/XTest живёт в infrastructure/x11/keyboard.c.
-static keyboard_port_t kbd_port;
+keyboard_port_t kbd_port;
 
-static void keyboard_port_ensure(void) {
+void keyboard_port_ensure(void) {
     if(!kbd_port.init) keyboard_x11_port(&kbd_port, &er_kbd);
     er_kbd.display = d;
 }
@@ -238,11 +124,6 @@ void set_group(int group) {
 // int meta_mask = 1 << 5;
 // int meta_mask = 1 << 5;
 
-#define AltMask			Mod1Mask
-#define NumMask			Mod2Mask
-#define MetaMask		Mod3Mask
-#define SuperMask		Mod4Mask
-#define HyperMask		Mod5Mask
 void print_sym(int mods, KeySym ks) {
     keyboard_x11_print_sym(mods, (uint32_t) ks);
 }
@@ -972,11 +853,8 @@ void app_run(int ac, char** av) {
     }
 }
 
-//@category Заглушки для юнит-тестов
-
-// Мок подключается последним: ему нужны уже описанные выше set_group(),
-// keyboard_state() и прочие функции монолита. Иксы заменяются целиком,
-// поэтому тестам не нужен живой X-сервер
-#ifdef ERSWITCHER_UNIT
-#include "tests/unit/mock.c"
-#endif
+void app_reset_runtime(void) {
+    commands_use_case_reset(&commands_uc);
+    command_runner_fork_reset(&command_runner_state);
+    commands_use_case_set_options(&commands_uc, command_timeout, command_interval);
+}

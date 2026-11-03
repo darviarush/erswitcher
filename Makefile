@@ -6,11 +6,11 @@ CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
 # Тесты собираются без -Werror и без -O4: предупреждения компилятора не должны
 # валить прогон, а libbacktrace нужны символы (-g)
 CC = cc
-TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -DERSWITCHER_UNIT
+TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra
 TEST_LIBS = check libbacktrace
 TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
 
-# Приложение — erswitcher.c + main.c плюс чистые модули,
+# Приложение — src/app/app.c + main.c плюс чистые модули,
 # X11-адаптеры инфраструктуры и presentation.
 
 # Чистые доменные модули: без X11, файлов и процессов.
@@ -50,14 +50,14 @@ PRESENTATION_SOURCES = \
 	src/presentation/tray_indicator.c
 PRESENTATION_OBJECTS = $(PRESENTATION_SOURCES:.c=.o)
 
-APP_OBJECTS = erswitcher.o main.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
+APP_OBJECTS = src/app/app.o main.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
 TEST_DOMAIN = tests/unit/test_domain
 
 erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
 		gcc $(CFLAGS) $(CLIBS) -o $@ $^
 
-erswitcher.o: erswitcher.c $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h) $(wildcard src/presentation/*.h)
-		gcc $(CFLAGS) -c -o $@ erswitcher.c
+src/app/app.o: src/app/app.c $(wildcard src/app/*.h) $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h) $(wildcard src/presentation/*.h)
+		gcc $(CFLAGS) -c -o $@ src/app/app.c
 
 main.o: main.c
 		gcc $(CFLAGS) -c -o $@ main.c
@@ -115,11 +115,11 @@ dist:	## Собирает дистрибутив (экспериментальн
 
 test: test-unit test-functional	## Все тесты
 
-# Один бинарник на все наборы: монолит подключается #include-ом из test.h
-# (-DERSWITCHER_UNIT), поэтому main() только один
-test-unit: $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)	## Юнит-тесты на Check
+# Один бинарник на все наборы: test.c содержит общий main(), а app.c
+# линкуется как обычный объектный файл.
+test-unit: src/app/app.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)	## Юнит-тесты на Check
 		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
-			$(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
+			../../src/app/app.o $(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
 		cd tests/unit && ./test
 		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test_domain.c \

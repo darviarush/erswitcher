@@ -2,11 +2,8 @@
 #define __ERSWITCHER_TESTS_UNIT_MOCK__H__
 
 /*
- * Заглушка X11 для юнит-тестов. Подключается в конце erswitcher.c:
- *
- *     #ifdef ERSWITCHER_UNIT
- *     #include "tests/unit/mock.c"
- *     #endif
+ * Заглушка X11 для юнит-тестов. Подключается из test.h в каждый
+ * тестовый бинарник; app.c и адаптеры линкуются как обычные объекты.
  *
  * Нужна потому, что разбор конфига неразрывно связан с иксами:
  * `Pause` превращается в KeySym через XStringToKeysym, а мнемоники [compose]
@@ -340,6 +337,24 @@ int XSync(Display* dpy, Bool discard) {
 
 
 // @category Слой 2: только то, что нужно тестам
+
+Display* XOpenDisplay(char const* name) {
+    mock_push_str("XOpenDisplay(", name);
+    return (Display*) 0x1;
+}
+
+int XGetErrorText(Display* dpy, int code, char* buffer, int length) {
+    mock_push_int("XGetErrorText(", code, 0, 0, 0);
+    (void) dpy;
+    if(buffer && length > 0) snprintf(buffer, (size_t) length, "mock X error %i", code);
+    return 0;
+}
+
+int (*XSynchronize(Display* dpy, Bool onoff))(Display*) {
+    mock_push_int("XSynchronize(", onoff, 0, 0, 0);
+    (void) dpy;
+    return NULL;
+}
 
 XErrorHandler XSetErrorHandler(XErrorHandler handler) {
     mock_push_int("XSetErrorHandler(", 0, 0, 0, 0);

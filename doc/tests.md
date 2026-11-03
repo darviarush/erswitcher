@@ -6,15 +6,11 @@
 
 `make test-unit` собирает и запускает два бинарника:
 
-* `tests/unit/test` — старые тесты монолита. `erswitcher.c` подключается
-  через `#include`, поэтому тесты видят и `static`-функции, и глобальное
-  состояние. К нему линкуются `src/use_cases/**/*.o` и
-  `src/infrastructure/x11/keyboard.o`, `src/infrastructure/x11/clipboard.o`,
-  `src/infrastructure/x11/events.o`,
-  `src/infrastructure/system/scheduler_time.o`,
-  `src/infrastructure/system/config_store_fs.o` и
-  `src/infrastructure/system/command_runner_fork.o`; X11-вызовы подменены
-  `tests/unit/mock.c`;
+* `tests/unit/test` — тесты приложения и портов. К нему линкуются
+  `src/app/app.o`, `src/use_cases/**/*.o`, адаптеры
+  `src/infrastructure/**/*.o` и `src/presentation/tray_indicator.o`.
+  `test.h` подключает `tests/unit/mock.c` с заглушками X11; монолит
+  `erswitcher.c` больше не используется;
 * `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
   `config`). Они линкуются как обычные объектные файлы и не требуют X11.
@@ -30,7 +26,7 @@ make test-unit
 сканкодов и символов, переключение раскладки, инъекция клавиш и опрос
 `keymap`/`keymap_saved`, `poll`/`poll_saved`. Сценарии `input`/`translate`
 проверяются набором `use cases` с фейковым портом — без X11 и без
-`erswitcher.c`.
+слоя приложения.
 
 Системный scheduler проверяется набором `scheduler port`: просроченный
 таймер срабатывает один раз, будущий остаётся в очереди, контекст

@@ -4,18 +4,14 @@
 /*
  * Общий заголовок юнит-тестов.
  *
- * Монолит подключается целиком, чтобы тесты видели и static-функции,
- * и глобалы (input, keyfn[], compose_map[], er_kbd...). Побочный
- * эффект: сброс состояния между тестами — наша забота, для этого есть
- * er_reset_state().
+ * Тесты линкуются с модулями приложения (src/app/app.o и адаптерами),
+ * а не подключают монолит через #include. Заголовок app.h даёт общие
+ * глобалы и обёртки, mock.c — заглушки X11. Сброс состояния между
+ * тестами — наша забота, для этого есть er_reset_state().
  *
  * Всё здесь static, а файл подключается из каждого test_*.c, поэтому
  * предупреждения «объявлено, но не используется» ожидаемы и заглушены.
  */
-
-#ifndef ERSWITCHER_UNIT
-#define ERSWITCHER_UNIT
-#endif
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -36,7 +32,28 @@
 // <linux/input-event-codes.h>, но общие заголовки X11 — тащат
 #include <linux/input-event-codes.h>
 
-#include "../../erswitcher.c"
+#include "../../src/app/app.h"
+#include "mock.c"
+
+// Тестовые имена полей clipboard-адаптера: в приложении они не нужны,
+// но тесты проверяют Selection/INCR напрямую.
+#define selection_chunk_size er_clipboard.selection_chunk_size
+#define clipboard_s          er_clipboard.send_data
+#define clipboard_pos        er_clipboard.send_pos
+#define clipboard_len        er_clipboard.send_len
+#define clipboard_target     er_clipboard.send_target
+#define selection_retrive    er_clipboard.receive_data
+#define selection_retrive_length er_clipboard.receive_len
+#define selection_retrive_type   er_clipboard.receive_type
+#define on_get_selection     er_clipboard.pending_callback
+#define incr_is              er_clipboard.incr_is
+#define incr_propid          er_clipboard.incr_property
+#define incr_window          er_clipboard.incr_window
+#define sel_data_atom        er_clipboard.sel_data_atom
+#define utf8_atom            er_clipboard.utf8_atom
+#define clipboard_atom       er_clipboard.clipboard_atom
+#define targets_atom         er_clipboard.targets_atom
+#define incr_atom            er_clipboard.incr_atom
 
 // Тестовое окружение: подменённый HOME, из которого load_config() читает
 // .config/erswitcher.conf
@@ -137,8 +154,7 @@ static void er_reset_state() {
     command_timeout = 13;
     command_interval = 0.1;
 
-    commands_use_case_reset(&commands_uc);
-    command_runner_fork_reset(&command_runner_state);
+    app_reset_runtime();
 
     er_kbd.groups = 0;
     er_kbd.group_ru = -1;
