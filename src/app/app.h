@@ -174,7 +174,7 @@ void signal_load_config(int);
 void load_config(void);
 void app_run(int ac, char** av);
 
-/* Сброс состояния сценариев команд между тестами. */
+/* Сброс состояния сценариев команд между тестами */
 void app_reset_runtime(void);
 
 #endif /* __ERSWITCHER_APP__H__ */

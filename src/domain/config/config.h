@@ -71,29 +71,29 @@ typedef struct {
     int compose_capacity;
 } config_t;
 
-// Инициализирует пустой снимок конфига со значениями [options] по умолчанию.
+// Инициализирует пустой снимок конфига со значениями [options] по умолчанию
 void config_init(config_t* config);
 
-// Освобождает привязки и compose, оставляя options как есть.
+// Освобождает привязки и compose, оставляя options как есть
 void config_clear_entries(config_t* config);
 
 // Освобождает всё, включая options (сам struct остаётся валидным только
-// после повторного config_init()).
+// после повторного config_init())
 void config_free(config_t* config);
 
-// Добавляет копию привязки. arg == NULL допустим для действий без аргумента.
-// Возвращает 1 при успехе.
+// Добавляет копию привязки. arg == NULL допустим для действий без аргумента
+// Возвращает 1 при успехе
 int config_add_binding(config_t* config, unikey_t key, config_action_t action, const char* arg);
 
-// Добавляет копию мнемоники (duplicate to, копия word/pos/cursor_back).
-// Возвращает 1 при успехе.
+// Добавляет копию мнемоники (duplicate to, копия word/pos/cursor_back)
+// Возвращает 1 при успехе
 int config_add_compose(config_t* config, const compose_t* item);
 
-// Сортирует [compose] по убыванию длины левой части — как старый qsort.
+// Сортирует [compose] по убыванию длины левой части — как старый qsort
 void config_sort_compose(config_t* config);
 
-// Имя клавиши -> unikey_t без модификаторов.
-// Возвращает 1, если имя распознано.
+// Имя клавиши -> unikey_t без модификаторов
+// Возвращает 1, если имя распознано
 typedef int (*config_key_resolver_t)(const char* name, unikey_t* key, void* context);
 
 typedef enum {
@@ -115,30 +115,30 @@ config_action_t config_action_for_section(config_section_t section);
 
 config_options_t config_options_default(void);
 
-// Разбирает число с десятичной точкой или запятой независимо от locale.
-// Возвращает 1 при успехе.
+// Разбирает число с десятичной точкой или запятой независимо от locale
+// Возвращает 1 при успехе
 int config_parse_seconds(const char* value, double* out);
 
 // Устанавливает опцию. При некорректном значении возвращает INVALID
-// и восстанавливает значение по умолчанию — как старый load_config().
+// и восстанавливает значение по умолчанию — как старый load_config()
 config_option_result_t config_set_option(config_options_t* options, const char* name, const char* value);
 
-// Разбирает выражение вида "Shift+Control+Pause".
-// Резолвер получает только имя клавиши, без модификаторов.
+// Разбирает выражение вида "Shift+Control+Pause"
+// Резолвер получает только имя клавиши, без модификаторов
 config_key_result_t config_parse_key_expression(
     const char* expression,
     config_key_resolver_t resolver,
     void* context,
     unikey_t* out);
 
-// Раскрывает \n, \t, \\ и маркер курсора \^ прямо в value.
-// cursor (может быть NULL) указывает на символ сразу после маркера.
-// Возвращает value.
+// Раскрывает \n, \t, \\ и маркер курсора \^ прямо в value
+// cursor (может быть NULL) указывает на символ сразу после маркера
+// Возвращает value
 char* config_unescape_value(char* value, char** cursor);
 
-// Разбирает левую часть [compose] в Unicode-символы.
-// Обратная косая черта экранирует следующий символ.
-// Возвращает количество символов или -1, если их больше max.
+// Разбирает левую часть [compose] в Unicode-символы
+// Обратная косая черта экранирует следующий символ
+// Возвращает количество символов или -1, если их больше max
 int config_parse_compose_key(const char* key, wint_t* out, int max);
 
 #endif /* __ERSWITCHER_DOMAIN_CONFIG__H__ */

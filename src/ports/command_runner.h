@@ -29,23 +29,23 @@ typedef enum {
 struct command_runner_port {
     void* context;
 
-    /* Возвращает malloc-строку или NULL. input == NULL считается пустым. */
+    /* Возвращает malloc-строку или NULL. input == NULL считается пустым */
     char* (*prepare)(command_runner_port_t* self, const char* command,
                      const char* input, int input_len);
 
     /* Забирает command (malloc) в собственность в любом случае.
      * capture_output — читать ли временный outfile после завершения.
-     * 1 — запущено, 0 — уже выполняется, -1 — ошибка. */
+     * 1 — запущено, 0 — уже выполняется, -1 — ошибка */
     int (*start)(command_runner_port_t* self, char* command, int capture_output);
 
-    /* Неблокирующий опрос. На DONE/ERROR временные файлы уже убраны. */
+    /* Неблокирующий опрос. На DONE/ERROR временные файлы уже убраны */
     command_runner_status_t (*poll)(command_runner_port_t* self);
 
-    /* Убивает процесс (если он есть) и освобождает временное состояние. */
+    /* Убивает процесс (если он есть) и освобождает временное состояние */
     void (*cancel)(command_runner_port_t* self);
 
     /* Вывод последней завершённой команды; пустая строка, если вывода нет.
-     * Указатель живёт до следующего start()/cancel(). */
+     * Указатель живёт до следующего start()/cancel() */
     const char* (*output)(command_runner_port_t* self, int* len);
 };
 

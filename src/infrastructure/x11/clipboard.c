@@ -52,7 +52,7 @@ static void clear_receive_data(clipboard_x11_t* state) {
     state->receive_type = None;
 }
 
-// Данные принадлежат callback только на время вызова; затем освобождаются.
+// Данные принадлежат callback только на время вызова; затем освобождаются
 static void deliver(clipboard_x11_t* state, char* data, int len, Atom type) {
     clipboard_get_callback_t callback = state->pending_callback;
     void* context = state->pending_context;
@@ -94,7 +94,7 @@ static void get_impl(clipboard_x11_t* state, clipboard_selection_t selection,
         fflush(stdout);
     }
 
-    // Если владелец буфера мы же, отдаём копию своих данных сразу.
+    // Если владелец буфера мы же, отдаём копию своих данных сразу
     if(state->window == owner) {
         if(CLIPBOARD_DEBUG) {
             printf("get_selection: буфер - мы же\n");

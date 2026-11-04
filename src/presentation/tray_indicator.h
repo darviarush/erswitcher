@@ -24,7 +24,7 @@ void tray_indicator_init(tray_indicator_t* self, tray_port_t* tray,
 int tray_indicator_attach(tray_indicator_t* self, void* display,
                           unsigned long window);
 
-/* Возвращает 1, если событие относилось к лотку. */
+/* Возвращает 1, если событие относилось к лотку */
 int tray_indicator_handle_event(tray_indicator_t* self,
                                 const void* native_event);
 

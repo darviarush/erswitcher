@@ -56,7 +56,7 @@ static void tick_impl(scheduler_port_t* port) {
             fn(context);
 
             // Слот освобождаем после callback: новый таймер, поставленный
-            // из callback, не должен занять его раньше времени.
+            // из callback, не должен занять его раньше времени
             state->timers[i].fn = NULL;
             state->timers[i].context = NULL;
         } else

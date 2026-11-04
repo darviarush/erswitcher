@@ -136,7 +136,7 @@ config_options_t config_options_default(void) {
 }
 
 // Свой разбор числа: atof() зависит от locale, а запятая в конфиге
-// должна работать независимо от setlocale().
+// должна работать независимо от setlocale()
 static int parse_double(const char* s, double* out) {
     const char* p = s;
     while(isspace((unsigned char) *p))
@@ -218,7 +218,7 @@ static config_option_result_t set_seconds(double* field, const char* value, doub
 }
 
 // delay/loop_delay в монолите хранятся как целые микросекунды:
-// значение, которое после умножения на 1e6 даёт 0, считается ошибкой.
+// значение, которое после умножения на 1e6 даёт 0, считается ошибкой
 static config_option_result_t set_microseconds(double* field, const char* value, double fallback) {
     double parsed;
     if(!config_parse_seconds(value, &parsed) || parsed <= 0 || parsed * 1000000.0 < 1.0) {

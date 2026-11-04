@@ -36,7 +36,7 @@ Atom insert_from_clipboard_save_target;
 //@category Комбинации -> Функции
 
 // Снимок конфигурации. Привязки хранят действие-enum, а не function
-// pointer; диспетчеризация — в execute_config_action().
+// pointer; диспетчеризация — в execute_config_action()
 config_t current_config;
 int keyfn_active = -1;
 
@@ -52,7 +52,7 @@ static void execute_config_action(const config_binding_t* binding);
 //@category Раскладки
 
 // Обёртки над портом клавиатуры: старые имена остаются для монолита и
-// тестов, реализация Xkb/XTest живёт в infrastructure/x11/keyboard.c.
+// тестов, реализация Xkb/XTest живёт в infrastructure/x11/keyboard.c
 keyboard_port_t kbd_port;
 
 void keyboard_port_ensure(void) {
@@ -144,7 +144,7 @@ static void scheduler_port_ensure(void) {
     er_scheduler.debug = DEBUG;
 }
 
-// Единая точка постановки таймера: лениво инициализирует порт.
+// Единая точка постановки таймера: лениво инициализирует порт
 static int after(double interval, scheduler_callback_t fn, void* context) {
     scheduler_port_ensure();
     return scheduler_state.after(&scheduler_state, interval, fn, context);
@@ -196,9 +196,9 @@ void open_display() {
     XSetErrorHandler(null_X_error);
 
     // Не включаем отладочный синхронный режим Xlib: он делает каждый
-    // XQueryKeymap/XGetInputFocus/XQueryPointer полноценным round-trip'ом.
+    // XQueryKeymap/XGetInputFocus/XQueryPointer полноценным round-trip'ом
     // При опросе клавиатуры каждые loop_delay это заметно увеличивает
-    // задержку ввода, особенно под композитором/на медленном X-сервере.
+    // задержку ввода, особенно под композитором/на медленном X-сервере
     XSynchronize(d, False);
 
     // Создаём окно
@@ -718,7 +718,7 @@ void load_config() {
     config_t next;
     if(!config_reload(&next, &reload)) {
         // Как старый load_config(): неудачная загрузка оставляет пустые
-        // привязки/compose, но прежние [options].
+        // привязки/compose, но прежние [options]
         config_free(&next);
         config_clear_entries(&current_config);
         keyfn_active = -1;

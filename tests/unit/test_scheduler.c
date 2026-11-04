@@ -22,7 +22,7 @@ START_TEST(er_scheduler_runs_due_timer_once) {
     port.tick(&port);
     ck_assert_int_eq(calls, 1);
 
-    // Таймер одноразовый: повторный tick его уже не выполняет.
+    // Таймер одноразовый: повторный tick его уже не выполняет
     port.tick(&port);
     ck_assert_int_eq(calls, 1);
 }

@@ -210,7 +210,7 @@ static int ensure_default_impl(config_store_port_t* port) {
 
     if(access(state->path, F_OK) == 0) return 1;
 
-    // Каталог .config может отсутствовать — создаём, как старый load_config().
+    // Каталог .config может отсутствовать — создаём, как старый load_config()
     mkdir(".config", 0755);
 
     FILE* f = fopen(state->path, "wb");

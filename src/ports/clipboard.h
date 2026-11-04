@@ -23,7 +23,7 @@ typedef enum {
 
 typedef struct clipboard_port clipboard_port_t;
 
-/* data всегда не NULL; пустой буфер приходит как "". */
+/* data всегда не NULL; пустой буфер приходит как "" */
 typedef void (*clipboard_get_callback_t)(void* context, const char* data, int len,
                                          clipboard_format_t format);
 
@@ -34,7 +34,7 @@ struct clipboard_port {
                 clipboard_format_t format, clipboard_get_callback_t callback,
                 void* callback_context);
 
-    /* s должна быть выделена malloc(): порт освободит её при замене/clear. */
+    /* s должна быть выделена malloc(): порт освободит её при замене/clear */
     void (*set)(clipboard_port_t* self, char* data, int len,
                 clipboard_format_t format);
 

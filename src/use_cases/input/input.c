@@ -20,7 +20,7 @@ void input_use_case_backspace(input_use_case_t* self) {
 }
 
 void input_use_case_handle_key(input_use_case_t* self, unikey_t key) {
-    // Управляющие модификаторы не участвуют во вводе обычного текста.
+    // Управляющие модификаторы не участвуют во вводе обычного текста
     if(key.mods & ~(ERS_MOD_SHIFT | ERS_MOD_LOCK | ERS_MOD_NUM)) return;
 
     keyboard_key_kind_t kind = self->keyboard->kind(self->keyboard, key);

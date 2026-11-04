@@ -27,17 +27,17 @@ struct tray_port {
     void* context;
 
     /* Пристыковать native-окно к лотку. display/window — непрозрачные
-     * для сценариев; X11-адаптер приводит их к своим типам. */
+     * для сценариев; X11-адаптер приводит их к своим типам */
     int (*dock)(tray_port_t* self, void* display, unsigned long window);
 
-    /* Отправить systray-сообщение (dock/message). */
+    /* Отправить systray-сообщение (dock/message) */
     int (*send)(tray_port_t* self, long message,
                 long data1, long data2, long data3);
 
-    /* Разобрать native event. Возвращает NONE, если событие не про лоток. */
+    /* Разобрать native event. Возвращает NONE, если событие не про лоток */
     tray_event_t (*event)(tray_port_t* self, const void* native_event);
 
-    /* Размер пристыкованного окна; -1, пока размер неизвестен. */
+    /* Размер пристыкованного окна; -1, пока размер неизвестен */
     void (*size)(tray_port_t* self, int* width, int* height);
 };
 

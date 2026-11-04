@@ -26,8 +26,8 @@ void input_buffer_reset(input_buffer_t* buffer);
 void input_buffer_push(input_buffer_t* buffer, unikey_t key, wint_t symbol);
 void input_buffer_backspace(input_buffer_t* buffer);
 
-// Начало последнего слова: после последнего пробельного символа.
-// Если пробелов нет — 0. Пустой буфер — тоже 0.
+// Начало последнего слова: после последнего пробельного символа
+// Если пробелов нет — 0. Пустой буфер — тоже 0
 int input_buffer_from_space(const input_buffer_t* buffer);
 
 #endif /* __ERSWITCHER_DOMAIN_INPUT_BUFFER__H__ */

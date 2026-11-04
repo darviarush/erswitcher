@@ -17,8 +17,8 @@ typedef struct {
     char* to; // правая часть (что вставить)
 } compose_t;
 
-// Индекс первого совпадения в map[0..size) или -1.
-// symbols — Unicode-символы буфера, symbols_pos — длина ввода.
+// Индекс первого совпадения в map[0..size) или -1
+// symbols — Unicode-символы буфера, symbols_pos — длина ввода
 int compose_find(const compose_t* map, int size, const wint_t* symbols, int symbols_pos);
 
 #endif /* __ERSWITCHER_DOMAIN_COMPOSE__H__ */

@@ -75,7 +75,7 @@ START_TEST(er_config_reload_builds_model) {
                          "test.conf", &context, &config),
                      1);
 
-    // Секция [options] не задаёт delay — значение из base сохраняется.
+    // Секция [options] не задаёт delay — значение из base сохраняется
     ck_assert_double_eq_tol(config.options.delay, 0.25, 1e-9);
     ck_assert_double_eq_tol(config.options.loop_delay, 0.02, 1e-9);
 

@@ -146,7 +146,7 @@ START_TEST(input_buffer_from_space_trailing_space) {
     input_buffer_t buffer;
     input_buffer_init(&buffer);
 
-    // Хвостовой пробел — часть последнего слова.
+    // Хвостовой пробел — часть последнего слова
     push_str(&buffer, L"abc ");
     ck_assert_int_eq(input_buffer_from_space(&buffer), 0);
 

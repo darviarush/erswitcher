@@ -36,14 +36,14 @@ typedef struct {
     char str[256];
 } mock_call_t;
 
-// Подключается тестом: перехват эмуляции нажатий (см. test_sendkeys.c).
+// Подключается тестом: перехват эмуляции нажатий (см. test_sendkeys.c)
 // Отдельная переменная, потому что XTestFakeKeyEvent — функция из XTest.h
 static int (*mock_fake_key_hook)(Display*, unsigned int, Bool, unsigned long) = NULL;
 
 static mock_call_t mock_calls[MOCK_CALLS_MAX];
 static int mock_n = 0;
 
-// Настройки ответов X11 для тестов буфера обмена.
+// Настройки ответов X11 для тестов буфера обмена
 static Window mock_selection_owner = None;
 static Atom mock_property_type = None;
 static const char* mock_property_data = NULL;
@@ -136,8 +136,8 @@ static int mock_keymap_n = 0;
 static int mock_keyboard_group = 0; // активная группа, как раскладка в X11
 static unsigned int mock_keyboard_mods = 0;
 
-// Выставляется тестом: если не NULL, XStringToKeysym идёт сюда первым.
-// Так можно смоделировать символ, которого нет в текущей раскладке, но он есть по клавише.
+// Выставляется тестом: если не NULL, XStringToKeysym идёт сюда первым
+// Так можно смоделировать символ, которого нет в текущей раскладке, но он есть по клавише
 static KeySym (*mock_string_to_keysym)(char const* name) = NULL;
 
 static void mock_keymap_clear() {
@@ -247,7 +247,7 @@ KeySym XStringToKeysym(const char* name) {
     if(strcmp(name, "Num_Lock") == 0) return XK_Num_Lock;
     if(strcmp(name, "Hyper_L") == 0) return XK_Hyper_L;
 
-    // Остальные односимвольные имена — как в X11: `a` → 0x61.
+    // Остальные односимвольные имена — как в X11: `a` → 0x61
     // Кириллические имена X11 (Cyrillic_a и т.п.) здесь не поддержаны намеренно, см. doc/test-unit.md
     if(strlen(name) == 1) return (unsigned char) name[0];
 
@@ -402,7 +402,7 @@ int XSetSelectionOwner(Display* dpy, Atom selection, Window owner, Time time) {
     return 1;
 }
 
-// Тест может сделать вид, что владелец буфера — наше окно или чужой клиент.
+// Тест может сделать вид, что владелец буфера — наше окно или чужой клиент
 Window XGetSelectionOwner(Display* dpy, Atom selection) {
     mock_push_int("XGetSelectionOwner(", (int) selection, 0, 0, 0);
     (void) dpy;
@@ -427,7 +427,7 @@ int XChangeProperty(Display* dpy, Window win, Atom property, Atom type, int form
     return 1;
 }
 
-// Тест может подсунуть ответ на SelectionNotify. По умолчанию — пусто.
+// Тест может подсунуть ответ на SelectionNotify. По умолчанию — пусто
 int XGetWindowProperty(Display* dpy, Window win, Atom property, long long_offset,
                        long long_length, Bool del, Atom req_type, Atom* actual_type,
                        int* actual_format, unsigned long* nitems,

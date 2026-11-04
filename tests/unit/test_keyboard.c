@@ -90,7 +90,7 @@ START_TEST(er_keyboard_port_clear_recover_is_repeatable) {
 
     // clear_active_mods() и recover_active_mods() должны быть парными:
     // после recover счётчик вложенности обязан вернуться в 0, иначе второй
-    // перевод/инверсия регистра в процессе упадёт с ABORT.
+    // перевод/инверсия регистра в процессе упадёт с ABORT
     kbd_port.clear_active_mods(&kbd_port);
     ck_assert_int_eq(er_kbd.active_use, 1);
     kbd_port.recover_active_mods(&kbd_port);
@@ -111,7 +111,7 @@ START_TEST(er_keyboard_port_polls_keymaps) {
     kbd_port.poll(&kbd_port);
     kbd_port.poll_saved(&kbd_port);
 
-    // Опрос X11 остаётся внутри адаптера, приложение зовёт только порт.
+    // Опрос X11 остаётся внутри адаптера, приложение зовёт только порт
     ck_assert_int_eq(mock_count("XQueryKeymap("), 2);
 }
 END_TEST
@@ -124,7 +124,7 @@ START_TEST(er_keyboard_port_presses_key) {
     unikey_t key = {code : KEY_A, mods : 0, group : 0};
     kbd_port.press_key(&kbd_port, key);
 
-    // Одно нажатие и одно отжатие.
+    // Одно нажатие и одно отжатие
     ck_assert_int_eq(mock_count("XTestFakeKeyEvent("), 2);
 }
 END_TEST

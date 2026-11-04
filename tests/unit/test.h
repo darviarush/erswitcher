@@ -36,7 +36,7 @@
 #include "mock.c"
 
 // Тестовые имена полей clipboard-адаптера: в приложении они не нужны,
-// но тесты проверяют Selection/INCR напрямую.
+// но тесты проверяют Selection/INCR напрямую
 #define selection_chunk_size er_clipboard.selection_chunk_size
 #define clipboard_s er_clipboard.send_data
 #define clipboard_pos er_clipboard.send_pos

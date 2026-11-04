@@ -43,17 +43,17 @@ typedef struct {
 
 extern clipboard_x11_t er_clipboard;
 
-// Запоминает display/окно и создаёт атомы. Вызывается из open_display().
+// Запоминает display/окно и создаёт атомы. Вызывается из open_display()
 void clipboard_x11_init(clipboard_x11_t* state, Display* display, Window window);
 
-// Заполняет порт колбэками, работающими с state.
+// Заполняет порт колбэками, работающими с state
 void clipboard_x11_port(clipboard_port_t* port, clipboard_x11_t* state);
 
-// Обрабатывает SelectionNotify/SelectionClear/SelectionRequest/PropertyNotify.
-// Возвращает 1, если событие относилось к буферу обмена.
+// Обрабатывает SelectionNotify/SelectionClear/SelectionRequest/PropertyNotify
+// Возвращает 1, если событие относилось к буферу обмена
 int clipboard_x11_handle_event(clipboard_x11_t* state, XEvent* event);
 
-// Сбрасывает данные и ожидающий callback (для тестов и завершения).
+// Сбрасывает данные и ожидающий callback (для тестов и завершения)
 void clipboard_x11_reset(clipboard_x11_t* state);
 
 #endif /* __ERSWITCHER_INFRASTRUCTURE_X11_CLIPBOARD__H__ */

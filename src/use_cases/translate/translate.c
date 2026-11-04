@@ -7,7 +7,7 @@ void translate_use_case_buffer(keyboard_port_t* keyboard, unikey_t* word, int po
     keyboard->clear_active_mods(keyboard);
 
     // clear_active_mods() запомнил группу для восстановления. Для перевода
-    // подменяем её на противоположную.
+    // подменяем её на противоположную
     unikey_t state = keyboard->state(keyboard, 0);
     int en = keyboard->layout_en(keyboard);
     int ru = keyboard->layout_ru(keyboard);

@@ -119,7 +119,7 @@ START_TEST(er_input_use_case_backspace_and_control) {
     input_use_case_handle_key(&input, (unikey_t){code : 14, mods : 0, group : 0});
     ck_assert_int_eq(buffer.pos, 1);
 
-    // Shift+Backspace не удаляет: старое поведение change_key/add_to_buffer.
+    // Shift+Backspace не удаляет: старое поведение change_key/add_to_buffer
     input_use_case_handle_key(&input, (unikey_t){code : 14, mods : ERS_MOD_SHIFT, group : 0});
     ck_assert_int_eq(buffer.pos, 1);
 
@@ -163,7 +163,7 @@ START_TEST(er_input_use_case_from_space_trailing_space) {
     input_use_case_t input;
     input_use_case_init(&input, &buffer, &port);
 
-    // Хвостовой пробел не должен обнулять последнее слово.
+    // Хвостовой пробел не должен обнулять последнее слово
     ck_assert_int_eq(input_use_case_from_space(&input), 2);
 }
 END_TEST

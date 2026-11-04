@@ -19,8 +19,8 @@
 #define KEYBOARD_SIZE (32 * 8)
 #define KEYBOARD_BUFFER_SIZE (KEYBOARD_SIZE / 8)
 
-// Значения совпадают с X11 KeySym: на первом этапе это снижает риск.
-// Сценарии используют их через порт и не включают X11-заголовки.
+// Значения совпадают с X11 KeySym: на первом этапе это снижает риск
+// Сценарии используют их через порт и не включают X11-заголовки
 #define KEYBOARD_SYMBOL_BACKSPACE 0xff08u
 #define KEYBOARD_SYMBOL_SHIFT_L 0xffe1u
 #define KEYBOARD_SYMBOL_INSERT 0xff63u
@@ -57,7 +57,7 @@ struct keyboard_port {
     int (*layout_hint)(keyboard_port_t* self);
     void (*set_layout_hint)(keyboard_port_t* self, int group);
     void (*set_layout)(keyboard_port_t* self, int group);
-    // Группа, которая будет восстановлена после recover_active_mods().
+    // Группа, которая будет восстановлена после recover_active_mods()
     void (*set_active_group)(keyboard_port_t* self, int group);
 
     void (*set_delay)(keyboard_port_t* self, int microseconds);
@@ -67,8 +67,8 @@ struct keyboard_port {
     void (*clear_active_mods)(keyboard_port_t* self);
     void (*recover_active_mods)(keyboard_port_t* self);
 
-    // Текущая и предыдущая карты нажатых клавиш (KEYBOARD_BUFFER_SIZE байт).
-    // poll() обновляет текущую карту, poll_saved() — предыдущую.
+    // Текущая и предыдущая карты нажатых клавиш (KEYBOARD_BUFFER_SIZE байт)
+    // poll() обновляет текущую карту, poll_saved() — предыдущую
     void (*poll)(keyboard_port_t* self);
     void (*poll_saved)(keyboard_port_t* self);
     const char* (*keymap)(keyboard_port_t* self);

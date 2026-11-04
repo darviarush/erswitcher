@@ -24,7 +24,7 @@ typedef struct {
 void command_runner_fork_port(command_runner_port_t* port,
                               command_runner_fork_t* state);
 
-/* Сбрасывает состояние, не меняя пути infile/outfile. */
+/* Сбрасывает состояние, не меняя пути infile/outfile */
 void command_runner_fork_reset(command_runner_fork_t* state);
 
 #endif /* __ERSWITCHER_INFRASTRUCTURE_SYSTEM_COMMAND_RUNNER_FORK__H__ */

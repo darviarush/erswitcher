@@ -13,7 +13,7 @@
 
 #define BIT(VECTOR, BIT_IDX) (((char*) (VECTOR))[BIT_IDX / 8] & (1 << (BIT_IDX % 8)))
 
-// delay_us по умолчанию совпадает с DELAY монолита (0,01 с).
+// delay_us по умолчанию совпадает с DELAY монолита (0,01 с)
 keyboard_x11_t er_kbd = {.delay_us = 10000};
 
 static keyboard_x11_t* state_of(keyboard_port_t* port) {
@@ -131,7 +131,7 @@ static keyboard_key_kind_t kind_impl(keyboard_x11_t* s, unikey_t key) {
     KeySym ks = to_keysym_impl(s, key);
     if(ks == XK_BackSpace) return KEYBOARD_KEY_BACKSPACE;
 
-    // Клавиши, которые сбрасывают начало ввода, как в старом add_to_buffer().
+    // Клавиши, которые сбрасывают начало ввода, как в старом add_to_buffer()
     const KeySym is_control[] = {
         XK_Home, XK_Left, XK_Up, XK_Right, XK_Down,
         XK_Prior, XK_Page_Up, XK_Next, XK_Page_Down,
@@ -182,7 +182,7 @@ static void send_mods(keyboard_x11_t* s, int mods, int is_press) {
 
     // Для обычных букв модификаторов нет. Не делаем лишний X-запрос
     // XGetModifierMapping на каждое нажатие: при переводе длинного текста
-    // это заметно замедляет ввод в графических приложениях.
+    // это заметно замедляет ввод в графических приложениях
     if(!mods) return;
 
     XModifierKeymap* modifiers = XGetModifierMapping(s->display);
@@ -324,7 +324,7 @@ static void recover_active_mods_impl(keyboard_x11_t* s) {
     printf("===== recover_active_mods END =====\n");
 
     // Парный к active_use++ в clear_active_mods_impl(). Без этого второй
-    // вызов clear_active_mods() в том же процессе считает, что вложенный.
+    // вызов clear_active_mods() в том же процессе считает, что вложенный
     s->active_use--;
 }
 

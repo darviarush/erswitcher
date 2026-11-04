@@ -24,8 +24,8 @@ static int er_record_key(Display* dpy, unsigned int code, Bool is_press, unsigne
     return 1;
 }
 
-// Раскладка: группа 0 — латиница a, b, c; группа 1 — кириллица а, б, в.
-// Одна и та же буква есть только в одной группе.
+// Раскладка: группа 0 — латиница a, b, c; группа 1 — кириллица а, б, в
+// Одна и та же буква есть только в одной группе
 static void er_layout() {
     mock_keymap_clear();
     mock_keymap_set(KEY_A, 0, 0, XK_a);
