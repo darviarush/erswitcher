@@ -31,7 +31,7 @@ static void format_sym_impl(char* out, size_t size, int mods, KeySym ks) {
     out[0] = '\0';
 
     for(int i = 0; i < 32; i++) {
-        int mask = mods & (1 << i);
+        unsigned int mask = (unsigned int) mods & (1u << i);
         if(!mask) continue;
         if(begin)
             append_sym(out, size, "+");

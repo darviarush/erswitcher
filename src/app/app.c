@@ -310,10 +310,8 @@ void print_invertcase_buffer(int from, int backspace) {
     translate_use_case_invertcase(&kbd_port, input.word, input.pos, from, backspace);
 }
 
-char* get_event_type(int n) {
-    if(n < 2 || n > LASTEvent) return NULL;
-
-    char* names[] = {
+const char* get_event_type(int n) {
+    static const char* const names[] = {
         NULL,
         NULL,
         "KeyPress",
@@ -353,6 +351,7 @@ char* get_event_type(int n) {
         "LASTEvent",
     };
 
+    if(n < 2 || n >= (int) (sizeof names / sizeof names[0])) return NULL;
     return names[n];
 }
 
@@ -455,7 +454,7 @@ void change_key(int code) {
         char state_buf[128];
         size_t pos = 0;
         for(int i = 0; i < 32; i++) {
-            if(state & (1 << i))
+            if(state & (1u << i))
                 pos += (size_t) snprintf(state_buf + pos, sizeof state_buf - pos, "%i", i);
             else if(pos + 1 < sizeof state_buf)
                 state_buf[pos++] = ' ';
@@ -468,7 +467,7 @@ void change_key(int code) {
         else if(key.group == kbd_port.layout_ru(&kbd_port))
             snprintf(layout, sizeof layout, "ru");
         else
-            snprintf(layout, sizeof layout, "%i", key.group);
+            snprintf(layout, sizeof layout, "%u", (unsigned) key.group);
 
         char sym[256];
         keyboard_x11_format_sym(sym, sizeof sym, key.mods, (uint32_t) ks);
@@ -589,7 +588,7 @@ void cursor_back__fn(void* context) {
 void compose(char*) {
     if(input.pos == 0) return;
 
-    wint_t symbols[BUF_SIZE];
+    wint_t symbols[BUF_SIZE] = {0};
     for(int i = 0; i < input.pos; i++)
         symbols[i] = KEY_TO_INT(input.word[i]);
 

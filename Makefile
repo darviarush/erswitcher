@@ -1,7 +1,7 @@
-.PHONY: clean install launch s kill format format-check check-deps appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps cppcheck appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
-CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
+CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
 
 # Отладочный вывод включается во время запуска: ERSWITCHER_DEBUG=1 make s
 # или ERSWITCHER_DEBUG=1 ./erswitcher. На сборку это не влияет
@@ -134,6 +134,16 @@ format-check:	## Проверяет форматирование C/H без из
 
 check-deps:	## Проверяет зависимости; C=Сборка/Тесты/Разработка/Упаковка
 		@CATEGORY="$(C)" ./tools/check-deps.sh
+
+CPPCHECK ?= cppcheck
+CPPCHECK_FLAGS ?= --enable=warning,performance,portability --std=c17 --language=c \
+	--inline-suppr --suppress=missingIncludeSystem --error-exitcode=1
+CPPCHECK_SOURCES = main.c $(shell find src -name '*.c' -print | sort) \
+	tests/unit/test.c tests/unit/test-domain.c
+
+cppcheck:	## Статический анализ cppcheck
+		@command -v $(CPPCHECK) >/dev/null 2>&1 || { echo "FAIL: не найден $(CPPCHECK)" >&2; exit 1; }
+		$(CPPCHECK) $(CPPCHECK_FLAGS) -I src -I tests/unit $(CPPCHECK_SOURCES)
 
 appimage: erswitcher	## Собирает AppImage в dist/
 		@test -n "$(VERSION)" || { echo "FAIL: VERSION пуст; задайте make appimage VERSION=..." >&2; exit 1; }

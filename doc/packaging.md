@@ -60,6 +60,7 @@
 - `check` — юнит-тесты;
 - `libbacktrace` — стектрейсы в тестах;
 - `clang`/`clang-format` — форматирование;
+- `cppcheck` — статический анализ;
 - `xorg-server-xvfb` — `xvfb-run` для функциональных тестов;
 - `xdotool` — ручной smoke-тест;
 - `desktop-file-utils` — проверка `.desktop`.

@@ -15,10 +15,11 @@
 * [x] Функциональные тесты для окна конфига на tcl+tk. С tcltest и `event generate .top.entry_field <Motion> -x 10 -y 10`
 * [x] Разбить монолит в src/ по doc/arch.md
 * [x] Добавить команду check-deps в make
-* [ ] Юнит-тесты перенести на фреймворк Criterion (колоризация) с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address` (для стектрейса вместо libbacktrace, проверить, что поддерживается gcc и clang). Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
+* [ ] Юнит-тесты перенести на фреймворк Criterion (колоризация) с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address` (для стектрейса вместо libbacktrace, проверить, что поддерживается gcc и clang)
+* [ ] Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
 * [ ] Динамический анализ (санитайзеры) и фаззинг-тесты / doc/test-metodology.md
 * [x] Добавить Clang-Format для форматирования кода, отформатировать код. Убрать astyle
-* [ ] Добавить чекер Clang-Tidy и CFLAGS += -fanalyzer, чекнуть код
+* [x] Добавить чекер cppcheck и CFLAGS += -fanalyzer, чекнуть код
 * [ ] Добавить юнит-тесты, покрытие, линтер и форматтер в github CI. Отладить `.github/workflows/test.yml`. Запуск локально `act -j test-linux`. См. https://github.com/actions/runner-images, https://github.com/cross-platform-actions/action
 * [x] ERSWITCHER_DEBUG=1 – включает вывод отладки и нажатых комбинаций клавишь на консоль. Сейчас выдаётся постоянно. Добавить временные метки, чтобы можно было посчитать время между событиями
 * [ ] Переключение языков по комбинации клавишь (функция в конфиге разделе [functions] – "switch language"). Сейчас – переключение через X11 (для неё оставить эту функцию как виртуальную клавишу "SwitchLang", если в [functions]: " SwitchLang = switch language"). Это для wayland – он не даёт переключать языки дяже в расширенном режиме. А так же для окон виртуальных машин – эмуляция комбинаций клавиш сможет переключить язык ОС

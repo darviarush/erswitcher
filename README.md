@@ -103,6 +103,7 @@ make check-deps C=Упаковка
 * check — юнит-тесты;
 * libbacktrace — стектрейсы в тестах;
 * clang/clang-format — форматирование;
+* cppcheck — статический анализ;
 * xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
 * xdotool — ручной smoke-тест клавиатуры и окна;
 * desktop-file-utils — проверка `.desktop`-файлов.
@@ -119,7 +120,7 @@ make check-deps C=Упаковка
 
 ```sh
 sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
-  libxtst-dev tcl tk check libbacktrace-dev clang-format clang \
+  libxtst-dev tcl tk check libbacktrace-dev clang-format clang cppcheck \
   xvfb xdotool gh librsvg2-bin desktop-file-utils curl
 ```
 
@@ -131,7 +132,7 @@ sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
 
 ```sh
 sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
-  tcl tk check libbacktrace clang xorg-server-xvfb xdotool github-cli \
+  tcl tk check libbacktrace clang cppcheck xorg-server-xvfb xdotool github-cli \
   librsvg desktop-file-utils curl
 yay -S --needed appimagetool-bin
 ```
@@ -149,6 +150,16 @@ ERSWITCHER_DEBUG=1 make test
 Каждая строка отладочного вывода имеет временную метку в секундах от
 запуска приложения, например `[         0.123456]`. По разнице меток
 можно измерять интервалы между событиями. Вывод идёт в stderr.
+
+# STATIC ANALYSIS
+
+```sh
+make cppcheck
+```
+
+Сборка приложения выполняется с `-fanalyzer` (GCC static analyzer);
+предупреждения анализатора считаются ошибками сборки. Для `cppcheck`
+используется набор проверок `warning,performance,portability`.
 
 # AUTOLOAD
 

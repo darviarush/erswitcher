@@ -50,6 +50,9 @@ static void free_output(command_runner_fork_t* state) {
     state->output_len = 0;
 }
 
+// state->output освобождается в free_output(); анализатор не видит это владение
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
 static void read_output(command_runner_fork_t* state) {
     free_output(state);
 
@@ -68,21 +71,21 @@ static void read_output(command_runner_fork_t* state) {
     if(size < 0) size = 0;
     rewind(f);
 
-    char* data = malloc((size_t) size + 1);
-    if(!data) {
+    state->output = malloc((size_t) size + 1);
+    if(!state->output) {
         fclose(f);
         return;
     }
 
-    size_t n = fread(data, 1, (size_t) size, f);
+    size_t n = fread(state->output, 1, (size_t) size, f);
     fclose(f);
 
-    data[n] = '\0';
-    if(n && data[n - 1] == '\n') data[--n] = '\0';
+    state->output[n] = '\0';
+    if(n && state->output[n - 1] == '\n') state->output[--n] = '\0';
 
-    state->output = data;
     state->output_len = (int) n;
 }
+#pragma GCC diagnostic pop
 
 static int start_impl(command_runner_port_t* port, char* command,
                       int capture_output) {

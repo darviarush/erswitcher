@@ -171,7 +171,6 @@ static int parse_double(const char* s, double* out) {
     if(!digits) return 0;
 
     if(*p == 'e' || *p == 'E') {
-        const char* exponent_start = p;
         p++;
 
         int exponent_sign = 1;
@@ -188,9 +187,7 @@ static int parse_double(const char* s, double* out) {
             p++;
         }
 
-        if(!exponent_digits) {
-            p = exponent_start;
-        } else {
+        if(exponent_digits) {
             if(exponent > 308) return 0;
             while(exponent-- > 0)
                 value *= exponent_sign > 0 ? 10 : 0.1;

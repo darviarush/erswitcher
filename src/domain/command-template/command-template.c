@@ -24,7 +24,10 @@ static int append(string_buf_t* buf, const char* s, size_t n) {
         buf->cap = cap;
     }
 
-    if(n) memcpy(buf->data + buf->len, s, n);
+    if(n) {
+        if(!buf->data) return 0;
+        memcpy(buf->data + buf->len, s, n);
+    }
     buf->len += n;
     buf->data[buf->len] = '\0';
     return 1;

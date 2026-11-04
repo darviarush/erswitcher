@@ -149,7 +149,7 @@ void press_key_multi(unikey_t key, int n);
 void sendkeys(char* s);
 void print_translate_buffer(int from, int backspace);
 void print_invertcase_buffer(int from, int backspace);
-char* get_event_type(int n);
+const char* get_event_type(int n);
 void to_buffer(const char* s);
 void shift_leftArrow(void);
 void control_insert(void);
