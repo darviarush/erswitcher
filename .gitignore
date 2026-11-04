@@ -8,3 +8,10 @@ build/
 dist/
 *.AppImage
 monet.md
+coverage.html
+*.gcda
+*.gcno
+coverage/
+coverage.*.html
+coverage.css
+coverage.js

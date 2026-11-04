@@ -19,6 +19,7 @@
 ```sh
 make test-unit
 make memcheck
+make coverage
 ```
 
 Доменные модули используются приложением (`unikey`, `input_buffer`,
@@ -51,6 +52,15 @@ escape-последовательности и предупреждения о �
 собственного буфера, вызов callback при отсутствии владельца,
 асинхронный `SelectionNotify` и сборка ответа INCR. Мок X11 умеет
 возвращать заданного владельца Selection и заданные данные свойства.
+
+Покрытие собирается отдельными объектами с `--coverage`:
+
+```sh
+make coverage        # текст по ветвям + coverage.html
+make coverage-text   # только текст
+make coverage-html   # только HTML
+make coverage-clean  # удалить артефакты
+```
 
 ## Функциональные тесты
 

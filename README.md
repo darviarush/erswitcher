@@ -101,8 +101,10 @@ make check-deps C=Упаковка
 
 * git;
 * criterion — юнит-тесты и стектрейсы;
+* gcov/gcovr — покрытие тестами;
 * clang/clang-format — форматирование;
 * cppcheck — статический анализ;
+* gcovr — отчёт о покрытии;
 * xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
 * xdotool — ручной smoke-тест клавиатуры и окна;
 * desktop-file-utils — проверка `.desktop`-файлов.
@@ -119,7 +121,7 @@ make check-deps C=Упаковка
 
 ```sh
 sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
-  libxtst-dev tcl tk criterion-dev clang-format clang cppcheck \
+  libxtst-dev tcl tk criterion-dev clang-format clang cppcheck gcovr \
   xvfb xdotool gh librsvg2-bin desktop-file-utils curl
 ```
 
@@ -131,7 +133,7 @@ sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
 
 ```sh
 sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
-  tcl tk criterion clang cppcheck xorg-server-xvfb xdotool github-cli \
+  tcl tk criterion clang cppcheck gcovr xorg-server-xvfb xdotool github-cli \
   librsvg desktop-file-utils curl
 yay -S --needed appimagetool-bin
 ```
@@ -156,6 +158,7 @@ ERSWITCHER_DEBUG=1 make test
 make cppcheck
 make memcheck
 make valgrind VALGRIND_FILTER='commands/*'
+make coverage
 ```
 
 Сборка приложения выполняется с `-fanalyzer` (GCC static analyzer);
@@ -165,6 +168,8 @@ make valgrind VALGRIND_FILTER='commands/*'
 проверкой утечек. `make valgrind` запускает выбранные тесты под Valgrind;
 Criterion изолирует каждый тест в отдельном процессе, поэтому полный
 прогон под Valgrind занимает минуты, и фильтр обязателен.
+`make coverage` собирает тесты с `--coverage`, печатает покрытие ветвей
+в консоль и создаёт `coverage.html`.
 
 # AUTOLOAD
 

@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck valgrind test-build appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck valgrind coverage coverage-build coverage-run coverage-text coverage-html coverage-clean test-build appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
@@ -217,6 +217,53 @@ valgrind:	## Valgrind для выбранных тестов: VALGRIND_FILTER=..
 		cd tests/unit && CRITERION_JOBS=1 $(VALGRIND) $(VALGRIND_FLAGS) \
 			--trace-children=yes --trace-children-skip=/bin/sh,/usr/bin/rm,/bin/rm \
 			./test --filter '$(VALGRIND_FILTER)' --color=never
+
+# Покрытие: отдельные объекты с --coverage, чтобы не смешивать с ASan-сборкой
+COVERAGE_DIR ?= build/coverage
+COVERAGE_CFLAGS = -std=gnu17 -g -O0 -Wall -Wextra -Werror --coverage
+COVERAGE_LDFLAGS = --coverage
+COVERAGE_APP_OBJECTS = $(patsubst %.c,$(COVERAGE_DIR)/%.o,$(TEST_APP_SOURCES))
+COVERAGE_TEST_OBJECT = $(COVERAGE_DIR)/tests/unit/test.o
+COVERAGE_DOMAIN_TEST_OBJECT = $(COVERAGE_DIR)/tests/unit/test-domain.o
+COVERAGE_DOMAIN_OBJECTS = $(patsubst %.c,$(COVERAGE_DIR)/%.o,$(DOMAIN_SOURCES))
+COVERAGE_OBJECTS = $(COVERAGE_APP_OBJECTS) $(COVERAGE_DOMAIN_OBJECTS) \
+	$(COVERAGE_TEST_OBJECT) $(COVERAGE_DOMAIN_TEST_OBJECT)
+GCOVR ?= gcovr
+
+$(COVERAGE_DIR)/%.o: %.c $(wildcard tests/unit/*.h) $(wildcard src/*/*.h) $(wildcard src/*/*/*.h)
+		@mkdir -p $(dir $@)
+		$(CC) $(COVERAGE_CFLAGS) -c -o $@ $<
+
+$(COVERAGE_DIR)/test: $(COVERAGE_TEST_OBJECT) $(COVERAGE_APP_OBJECTS)
+		$(CC) $(COVERAGE_LDFLAGS) -rdynamic -o $@ $^ \
+			$$(pkg-config --cflags --libs criterion) $(TEST_LIBS_LOCAL)
+
+$(COVERAGE_DIR)/test-domain: $(COVERAGE_DOMAIN_TEST_OBJECT) $(COVERAGE_DOMAIN_OBJECTS)
+		$(CC) $(COVERAGE_LDFLAGS) -o $@ $^ \
+			$$(pkg-config --cflags --libs criterion)
+
+coverage-build: $(COVERAGE_DIR)/test $(COVERAGE_DIR)/test-domain	## Собирает тесты с покрытием
+
+coverage-run: coverage-build	## Запускает тесты для покрытия
+		find $(COVERAGE_DIR) -name '*.gcda' -delete
+		$(COVERAGE_DIR)/test --color=never
+		$(COVERAGE_DIR)/test-domain --color=never
+
+coverage-text: coverage-run	## Покрытие в консоль: ветви
+		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
+		$(GCOVR) -r . --txt-metric branch
+
+coverage-html: coverage-run	## Покрытие в coverage.html
+		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
+		$(GCOVR) -r . --html --html-details -o coverage.html
+
+coverage: coverage-run	## Полный отчёт: консоль и coverage.html
+		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
+		$(GCOVR) -r . --txt-metric branch
+		$(GCOVR) -r . --html --html-details -o coverage.html
+
+coverage-clean:	## Удаляет артефакты покрытия
+		rm -rf $(COVERAGE_DIR) coverage.html coverage.*.html coverage.css coverage.js
 
 # Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
 # виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate

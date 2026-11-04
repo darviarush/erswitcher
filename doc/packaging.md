@@ -60,6 +60,7 @@
 - `criterion` — юнит-тесты и стектрейсы;
 - `clang`/`clang-format` — форматирование;
 - `cppcheck` — статический анализ;
+- `gcovr` — покрытие тестами;
 - `xorg-server-xvfb` — `xvfb-run` для функциональных тестов;
 - `xdotool` — ручной smoke-тест;
 - `desktop-file-utils` — проверка `.desktop`.

@@ -16,7 +16,7 @@
 * [x] Разбить монолит в src/ по doc/arch.md
 * [x] Добавить команду check-deps в make
 * [x] Юнит-тесты перенести на фреймворк Criterion (колоризация) с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address` (для стектрейса вместо libbacktrace, проверить, что поддерживается gcc и clang)
-* [ ] Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
+* [x] Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
 * [ ] Динамический анализ (санитайзеры) и фаззинг-тесты / doc/test-metodology.md
 * [x] Добавить Clang-Format для форматирования кода, отформатировать код. Убрать astyle
 * [x] Добавить чекер cppcheck и CFLAGS += -fanalyzer, чекнуть код

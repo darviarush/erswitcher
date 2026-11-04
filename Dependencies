@@ -37,6 +37,7 @@ test|cmd|xvfb-run|conditional|xvfb-run без DISPLAY
 # --- Разработка ---
 dev|cmd|clang-format|optional|форматирование
 dev|cmd|cppcheck|optional|статический анализ
+dev|cmd|gcovr|optional|покрытие тестами
 dev|cmd|git|optional|работа с репозиторием
 dev|cmd|xdotool|optional|ручной smoke
 dev|cmd|valgrind|optional|поиск утечек памяти
