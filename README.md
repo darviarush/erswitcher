@@ -74,6 +74,7 @@ chmod +x erswitcher-*-x86_64.AppImage
 # DEPENDENCIES
 
 Полный список программ и пакетов: [`Dependencies`](Dependencies).
+Проверить окружение: `make check-deps`.
 
 Для сборки и запуска нужны:
 

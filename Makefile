@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
@@ -125,6 +125,9 @@ format:	## Форматирует C/H через clang-format
 format-check:	## Проверяет форматирование C/H без изменений
 		@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || { echo "FAIL: не найден $(CLANG_FORMAT); см. doc/formatting.md" >&2; exit 1; }
 		find main.c src tests -type f \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 -r $(CLANG_FORMAT) --dry-run --Werror
+
+check-deps:	## Проверяет зависимости сборки, тестов и упаковки
+		./tools/check-deps.sh
 
 appimage: erswitcher	## Собирает AppImage в dist/
 		@test -n "$(VERSION)" || { echo "FAIL: VERSION пуст; задайте make appimage VERSION=..." >&2; exit 1; }

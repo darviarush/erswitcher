@@ -1,5 +1,7 @@
 Зависимости (Dependencies)
 
+Проверить окружение: make check-deps
+
 * Для работы (Runtime)
 
 	- X11: libX11, libXtst, libxkbcommon
