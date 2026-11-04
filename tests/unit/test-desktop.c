@@ -49,9 +49,9 @@ START_TEST(er_desktop_does_not_overwrite_existing) {
 END_TEST
 
 START_TEST(er_desktop_launches_configurator_from_appdir) {
-    char appdir[PATH_MAX];
-    char bindir[PATH_MAX];
-    char script[PATH_MAX];
+    char appdir[PATH_MAX + 64];
+    char bindir[PATH_MAX + 128];
+    char script[PATH_MAX + 256];
     char marker[PATH_MAX];
 
     snprintf(appdir, sizeof appdir, "%s/appdir", er_env.home);

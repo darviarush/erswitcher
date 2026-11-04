@@ -8,10 +8,10 @@ CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
 ERSWITCHER_DEBUG ?= 0
 export ERSWITCHER_DEBUG
 
-# Тесты собираются без -Werror и без -O4: предупреждения компилятора не должны
-# валить прогон, а libbacktrace нужны символы (-g)
+# Тесты собираются с -Werror: предупреждения не должны оставаться незамеченными.
+# libbacktrace нужны символы (-g)
 CC = cc
-TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra
+TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -Werror
 TEST_LIBS = check libbacktrace
 TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
 

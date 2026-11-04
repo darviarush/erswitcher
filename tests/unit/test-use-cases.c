@@ -30,8 +30,7 @@ static keyboard_key_kind_t er_fake_kind(keyboard_port_t* port, unikey_t key) {
 
 static uint32_t er_fake_symbol(keyboard_port_t* port, unikey_t key) {
     er_fake_keyboard_t* fake = port->context;
-    if(key.code < sizeof(fake->symbols) / sizeof(fake->symbols[0])) return fake->symbols[key.code];
-    return 0;
+    return fake->symbols[key.code];
 }
 
 static unikey_t er_fake_state(keyboard_port_t* port, int code) {
