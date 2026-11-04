@@ -1,60 +1,52 @@
-Зависимости (Dependencies)
+# Зависимости En-Ru Switcher
+#
+# Это машиночитаемый манифест для `make check-deps`.
+# Формат: категория|тип|имя|обязательность|описание
+#
+# категория:      build, test, dev, packaging
+# тип:            cmd  — проверяется через command -v
+#                 pkg  — проверяется через pkg-config --exists
+# обязательность: required | optional | conditional
+#                 conditional сейчас означает «нужен, если не задан DISPLAY»
+#
+# Проверяются возможности, а не имена пакетов: для библиотек используется
+# pkg-config, для программ — command -v. Имена пакетов по дистрибутивам
+# указаны в README.md.
+#
+# Примеры:
+#   make check-deps
+#   make check-deps C=Сборка
+#   make check-deps C=Тесты
+#   make check-deps C=Разработка
+#   make check-deps C=Упаковка
 
-Проверить окружение: make check-deps
+# --- Сборка ---
+build|cmd|gcc|required|C-компилятор
+build|cmd|make|required|GNU Make
+build|cmd|pkg-config|required|pkg-config/pkgconf
+build|pkg|x11|required|X11
+build|pkg|xkbcommon|required|Xkbcommon
+build|pkg|xtst|required|XTest
 
-* Для работы (Runtime)
+# --- Тесты ---
+test|pkg|check|required|Check
+test|pkg|libbacktrace|required|libbacktrace
+test|cmd|tclsh|required|Tcl
+test|cmd|wish|required|Tk/wish
+test|cmd|xvfb-run|conditional|xvfb-run без DISPLAY
 
-	- X11: libX11, libXtst, libxkbcommon
-	- Tcl/Tk 8.6+ — конфигуратор
-	- Системный трей с поддержкой _NET_SYSTEM_TRAY_S0
-	- Linux/Unix-подобная система с X11
+# --- Разработка ---
+dev|cmd|clang-format|optional|форматирование
+dev|cmd|git|optional|работа с репозиторием
+dev|cmd|xdotool|optional|ручной smoke
+dev|cmd|valgrind|optional|поиск утечек памяти
+dev|cmd|gdb|optional|отладка
+dev|cmd|meld|optional|make diff
 
-* Для сборки (Build)
-
-	- GCC или другой C-компилятор
-	- GNU Make
-	- pkg-config (pkgconf)
-	- Заголовки и библиотеки X11: libX11, libXtst, libxkbcommon
-	- Git — если сборка из репозитория
-
-* Для разработки и тестирования (Development & Testing)
-
-	- check — фреймворк юнит-тестов
-	- libbacktrace — стектрейсы в тестах
-	- clang/clang-format — форматирование и проверка стиля
-	- xorg-server-xvfb — xvfb-run для функциональных тестов без дисплея
-	- xdotool — ручной smoke-тест клавиатуры и окон
-	- valgrind — поиск утечек памяти
-	- desktop-file-utils — проверка .desktop-файлов
-	- gdb — отладка (опционально)
-	- meld — просмотр различий конфигов для make diff (опционально)
-
-* Для упаковки и релизов (Packaging & Release)
-
-	- appimagetool (AUR: appimagetool-bin) — сборка AppImage
-	- gh (GitHub CLI) — создание GitHub Releases
-	- curl — загрузка appimagetool/runtime при необходимости
-	- yay или другой AUR-helper — установка appimagetool-bin
-	- librsvg (rsvg-convert) — пересборка иконки (опционально)
-	- desktop-file-utils — проверка desktop-файла
-	- autoconf, m4, mcedit — экспериментальная цель make dist (опционально)
-
-* Arch Linux / Manjaro
-
-```sh
-sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
-	tcl tk check libbacktrace clang xorg-server-xvfb xdotool valgrind \
-	github-cli librsvg desktop-file-utils curl gdb meld
-yay -S --needed appimagetool-bin
-```
-
-* Ubuntu / Debian
-
-```sh
-sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
-	libxtst-dev tcl tk check libbacktrace-dev clang-format clang \
-	xvfb xdotool valgrind gh librsvg2-bin desktop-file-utils curl gdb meld
-```
-
-appimagetool в Ubuntu/Debian обычно не входит в репозитории: используйте
-официальный AppImage, см. doc/packaging/appimage.md.
+# --- Упаковка и релизы ---
+packaging|cmd|appimagetool|optional|AppImage
+packaging|cmd|gh|optional|GitHub Releases
+packaging|cmd|curl|optional|загрузка appimagetool
+packaging|cmd|rsvg-convert|optional|пересборка иконки
+packaging|cmd|desktop-file-validate|optional|проверка desktop-файла
+packaging|cmd|yay|optional|AUR helper

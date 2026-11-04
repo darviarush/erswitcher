@@ -126,8 +126,8 @@ format-check:	## Проверяет форматирование C/H без из
 		@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || { echo "FAIL: не найден $(CLANG_FORMAT); см. doc/formatting.md" >&2; exit 1; }
 		find main.c src tests -type f \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 -r $(CLANG_FORMAT) --dry-run --Werror
 
-check-deps:	## Проверяет зависимости сборки, тестов и упаковки
-		./tools/check-deps.sh
+check-deps:	## Проверяет зависимости; C=Сборка/Тесты/Разработка/Упаковка
+		@CATEGORY="$(C)" ./tools/check-deps.sh
 
 appimage: erswitcher	## Собирает AppImage в dist/
 		@test -n "$(VERSION)" || { echo "FAIL: VERSION пуст; задайте make appimage VERSION=..." >&2; exit 1; }
