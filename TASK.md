@@ -14,7 +14,7 @@
 * [x] Юнит-тесты на фреймворке Check для Pure functions с libbacktrace
 * [x] Функциональные тесты для окна конфига на tcl+tk. С tcltest и `event generate .top.entry_field <Motion> -x 10 -y 10`
 * [x] Разбить монолит в src/ по doc/arch.md
-* [ ] Добавить команду check-deps в make
+* [x] Добавить команду check-deps в make
 * [ ] Юнит-тесты перенести на фреймворк Criterion (колоризация) с `CFLAGS += -fsanitize=address -g` и `LDFLAGS += -fsanitize=address` (для стектрейса вместо libbacktrace, проверить, что поддерживается gcc и clang). Добавить покрытие утилитами gcov, lcov или gcovr. Предусмотреть отчёт: `gcovr -r . --html --html-details -o coverage.html` и вывод на консоль `gcovr -r . --txt-metric branch` в виде команд make
 * [ ] Динамический анализ (санитайзеры) и фаззинг-тесты / doc/test-metodology.md
 * [x] Добавить Clang-Format для форматирования кода, отформатировать код. Убрать astyle
