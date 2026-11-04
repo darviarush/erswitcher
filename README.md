@@ -168,8 +168,10 @@ make coverage
 проверкой утечек. `make valgrind` запускает выбранные тесты под Valgrind;
 Criterion изолирует каждый тест в отдельном процессе, поэтому полный
 прогон под Valgrind занимает минуты, и фильтр обязателен.
-`make coverage` собирает тесты с `--coverage`, печатает покрытие ветвей
-в консоль и создаёт `coverage.html`.
+`make coverage` собирает тесты с `--coverage`, печатает цветную сводку
+покрытия только по `src/` (ветви и строки) и создаёт `coverage.html`.
+Полный отчёт вместе с тестами: `make coverage COVERAGE_FILTER='.*'`.
+Цветом можно управлять через `COVERAGE_COLOR=always|never`.
 
 # AUTOLOAD
 

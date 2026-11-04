@@ -229,6 +229,7 @@ COVERAGE_DOMAIN_OBJECTS = $(patsubst %.c,$(COVERAGE_DIR)/%.o,$(DOMAIN_SOURCES))
 COVERAGE_OBJECTS = $(COVERAGE_APP_OBJECTS) $(COVERAGE_DOMAIN_OBJECTS) \
 	$(COVERAGE_TEST_OBJECT) $(COVERAGE_DOMAIN_TEST_OBJECT)
 GCOVR ?= gcovr
+COVERAGE_FILTER ?= src/.*
 
 $(COVERAGE_DIR)/%.o: %.c $(wildcard tests/unit/*.h) $(wildcard src/*/*.h) $(wildcard src/*/*/*.h)
 		@mkdir -p $(dir $@)
@@ -249,18 +250,18 @@ coverage-run: coverage-build	## Запускает тесты для покры�
 		$(COVERAGE_DIR)/test --color=never
 		$(COVERAGE_DIR)/test-domain --color=never
 
-coverage-text: coverage-run	## Покрытие в консоль: ветви
+coverage-text: coverage-run	## Цветная сводка покрытия исходников
 		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
-		$(GCOVR) -r . --txt-metric branch
+		GCOVR="$(GCOVR)" tools/coverage-summary.sh '$(COVERAGE_FILTER)'
 
-coverage-html: coverage-run	## Покрытие в coverage.html
+coverage-html: coverage-run	## Покрытие исходников в coverage.html
 		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
-		$(GCOVR) -r . --html --html-details -o coverage.html
+		$(GCOVR) -r . --filter '$(COVERAGE_FILTER)' --html --html-details -o coverage.html
 
-coverage: coverage-run	## Полный отчёт: консоль и coverage.html
+coverage: coverage-run	## Сводка исходников и coverage.html
 		@command -v $(GCOVR) >/dev/null 2>&1 || { echo "FAIL: не найден $(GCOVR); установите gcovr" >&2; exit 1; }
-		$(GCOVR) -r . --txt-metric branch
-		$(GCOVR) -r . --html --html-details -o coverage.html
+		GCOVR="$(GCOVR)" tools/coverage-summary.sh '$(COVERAGE_FILTER)'
+		$(GCOVR) -r . --filter '$(COVERAGE_FILTER)' --html --html-details -o coverage.html
 
 coverage-clean:	## Удаляет артефакты покрытия
 		rm -rf $(COVERAGE_DIR) coverage.html coverage.*.html coverage.css coverage.js

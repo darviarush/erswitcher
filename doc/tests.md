@@ -56,11 +56,16 @@ escape-последовательности и предупреждения о �
 Покрытие собирается отдельными объектами с `--coverage`:
 
 ```sh
-make coverage        # текст по ветвям + coverage.html
-make coverage-text   # только текст
-make coverage-html   # только HTML
+make coverage        # сводка исходников + coverage.html
+make coverage-text   # только цветная сводка исходников
+make coverage-html   # только HTML по исходникам
 make coverage-clean  # удалить артефакты
 ```
+
+`coverage-text` показывает только `TOTAL` по `src/`: ветви и строки,
+с цветовой шкалой и полосой. Тесты и моки в этот отчёт не входят.
+Полный отчёт: `make coverage COVERAGE_FILTER='.*'`. Управление цветом:
+`COVERAGE_COLOR=always` или `COVERAGE_COLOR=never`.
 
 ## Функциональные тесты
 
