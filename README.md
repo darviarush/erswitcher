@@ -155,11 +155,14 @@ ERSWITCHER_DEBUG=1 make test
 
 ```sh
 make cppcheck
+make memcheck
 ```
 
 Сборка приложения выполняется с `-fanalyzer` (GCC static analyzer);
 предупреждения анализатора считаются ошибками сборки. Для `cppcheck`
 используется набор проверок `warning,performance,portability`.
+`make memcheck` запускает юнит-тесты под `valgrind` с проверкой
+определённых и косвенных утечек.
 
 # AUTOLOAD
 

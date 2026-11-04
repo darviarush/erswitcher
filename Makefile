@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check check-deps cppcheck appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck test-build appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
@@ -184,14 +184,25 @@ test: test-unit test-functional	## Все тесты
 
 # Один бинарник на все наборы: test.c содержит общий main(), а app.c
 # линкуется как обычный объектный файл.
-test-unit: src/app/app.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)	## Юнит-тесты на Check
+test-build: src/app/app.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
 		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
 			../../src/app/app.o $(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
-		cd tests/unit && ./test
 		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test-domain.c \
 			$(DOMAIN_OBJECTS) $$(pkg-config --cflags --libs check)
+
+test-unit: test-build	## Юнит-тесты на Check
+		cd tests/unit && ./test
 		./$(TEST_DOMAIN)
+
+VALGRIND ?= valgrind
+VALGRIND_FLAGS ?= --leak-check=full --show-leak-kinds=definite,indirect \
+	--errors-for-leak-kinds=definite,indirect --track-origins=yes --error-exitcode=1
+
+memcheck: test-build	## Юнит-тесты под valgrind
+		@command -v $(VALGRIND) >/dev/null 2>&1 || { echo "FAIL: не найден $(VALGRIND)" >&2; exit 1; }
+		cd tests/unit && $(VALGRIND) $(VALGRIND_FLAGS) ./test
+		$(VALGRIND) $(VALGRIND_FLAGS) ./$(TEST_DOMAIN)
 
 # Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
 # виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate
