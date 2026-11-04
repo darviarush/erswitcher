@@ -170,13 +170,6 @@ release: appimage	## Собирает AppImage и публикует его в G
 			$(GH) release create "$(RELEASE_TAG)" "$(APPIMAGE_OUTDIR)/$(APPIMAGE_NAME)" --title "$(RELEASE_TITLE)" --generate-notes; \
 		fi
 
-dist:	## Собирает дистрибутив (экспериментально)
-		autoscan
-		mcedit configure.scan
-		mv configure.scan configure.in
-		autoconf
-		./configure
-
 test: test-unit test-functional	## Все тесты
 
 # Один бинарник на все наборы: test.c содержит общий main(), а app.c
