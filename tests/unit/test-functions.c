@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(functions, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * [functions] — из одной части конфига в вызовы функций
  *
@@ -26,7 +28,7 @@ static int er_find_mods(unsigned code, int mods) {
 
 // @category конфиг по умолчанию
 
-START_TEST(er_functions_default_config) {
+Test(functions, er_functions_default_config) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -55,9 +57,7 @@ START_TEST(er_functions_default_config) {
     ck_assert_msg(i >= 0, "compose не найден");
     ck_assert_int_eq(keyfn[i].key.code, STR_TO_KEY("KP_Begin").code);
 }
-END_TEST
-
-START_TEST(er_functions_modifier_aliases) {
+Test(functions, er_functions_modifier_aliases) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -90,9 +90,7 @@ START_TEST(er_functions_modifier_aliases) {
         ck_assert_msg(er_find_mods(STR_TO_KEY("Pause").code, aliases[a].mods) >= 0, "не найден %s", line);
     }
 }
-END_TEST
-
-START_TEST(er_functions_multiple_modifiers_order_is_free) {
+Test(functions, er_functions_multiple_modifiers_order_is_free) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -103,11 +101,9 @@ START_TEST(er_functions_multiple_modifiers_order_is_free) {
     ck_assert(er_find_mods(STR_TO_KEY("Break").code, AltMask | ControlMask | ShiftMask) >= 0);
     ck_assert(er_find_mods(STR_TO_KEY("Pause").code, ShiftMask | SuperMask) >= 0);
 }
-END_TEST
-
 // @category ошибки в конфиге
 
-START_TEST(er_functions_unknown_function_is_skipped) {
+Test(functions, er_functions_unknown_function_is_skipped) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -117,9 +113,7 @@ START_TEST(er_functions_unknown_function_is_skipped) {
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
-END_TEST
-
-START_TEST(er_functions_unknown_key_is_skipped) {
+Test(functions, er_functions_unknown_key_is_skipped) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -129,9 +123,7 @@ START_TEST(er_functions_unknown_key_is_skipped) {
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
-END_TEST
-
-START_TEST(er_functions_only_modifiers_is_skipped) {
+Test(functions, er_functions_only_modifiers_is_skipped) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -140,9 +132,7 @@ START_TEST(er_functions_only_modifiers_is_skipped) {
 
     ck_assert_int_eq(keyfn_size, 1);
 }
-END_TEST
-
-START_TEST(er_functions_two_keys_is_skipped) {
+Test(functions, er_functions_two_keys_is_skipped) {
     er_keyboard_config();
     er_load(
         "[functions]\n"
@@ -152,15 +142,11 @@ START_TEST(er_functions_two_keys_is_skipped) {
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_WORD_TRANSLATE);
 }
-END_TEST
-
-START_TEST(er_functions_empty_section) {
+Test(functions, er_functions_empty_section) {
     er_load("[functions]\n");
     ck_assert_int_eq(keyfn_size, 0);
 }
-END_TEST
-
-START_TEST(er_functions_old_combinations_are_dropped_on_reload) {
+Test(functions, er_functions_old_combinations_are_dropped_on_reload) {
     er_keyboard_config();
     er_load("[functions]\nPause=word translate\n");
     ck_assert_int_eq(keyfn_size, 1);
@@ -168,26 +154,4 @@ START_TEST(er_functions_old_combinations_are_dropped_on_reload) {
     er_load("[functions]\nControl+Pause=text translate\n");
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_TEXT_TRANSLATE);
-}
-END_TEST
-
-static TCase* tcase_functions() {
-    TCase* tc = tcase_create("functions");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_functions_default_config);
-    tcase_add_test(tc, er_functions_modifier_aliases);
-    tcase_add_test(tc, er_functions_multiple_modifiers_order_is_free);
-    tcase_add_test(tc, er_functions_unknown_function_is_skipped);
-    tcase_add_test(tc, er_functions_unknown_key_is_skipped);
-    tcase_add_test(tc, er_functions_only_modifiers_is_skipped);
-    tcase_add_test(tc, er_functions_two_keys_is_skipped);
-    tcase_add_test(tc, er_functions_empty_section);
-    tcase_add_test(tc, er_functions_old_combinations_are_dropped_on_reload);
-    return tc;
-}
-
-Suite* suite_functions() {
-    Suite* s = suite_create("[functions]");
-    suite_add_tcase(s, tcase_functions());
-    return s;
 }

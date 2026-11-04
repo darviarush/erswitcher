@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(tray, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * Трей: X11-адаптер раскладывает native events в tray_event_t, а
  * presentation/tray-indicator реагирует на клик и размер, не зная X11
@@ -67,7 +69,7 @@ static void tray_click(void* context) {
     ((tray_click_context_t*) context)->clicks++;
 }
 
-START_TEST(er_tray_indicator_attaches_and_clicks) {
+Test(tray, er_tray_indicator_attaches_and_clicks) {
     fake_tray_t state;
     tray_port_t port;
     tray_indicator_t indicator;
@@ -97,9 +99,7 @@ START_TEST(er_tray_indicator_attaches_and_clicks) {
     ck_assert_int_eq(tray_indicator_handle_event(&indicator, NULL), 0);
     ck_assert_int_eq(context.clicks, 1);
 }
-END_TEST
-
-START_TEST(er_tray_x11_maps_events) {
+Test(tray, er_tray_x11_maps_events) {
     tray_x11_t state;
     tray_port_t port;
     XEvent event;
@@ -135,18 +135,4 @@ START_TEST(er_tray_x11_maps_events) {
 
     event.type = SelectionNotify;
     ck_assert_int_eq(port.event(&port, &event), TRAY_EVENT_NONE);
-}
-END_TEST
-
-static TCase* tcase_tray() {
-    TCase* tc = tcase_create("tray");
-    tcase_add_test(tc, er_tray_indicator_attaches_and_clicks);
-    tcase_add_test(tc, er_tray_x11_maps_events);
-    return tc;
-}
-
-Suite* suite_tray() {
-    Suite* s = suite_create("tray");
-    suite_add_tcase(s, tcase_tray());
-    return s;
 }

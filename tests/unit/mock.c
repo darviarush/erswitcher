@@ -157,10 +157,10 @@ static int mock_keymap_count() {
 static void mock_keymap_set(int code, int group, int shift, KeySym ks) {
     if(mock_keymap_n >= MOCK_KEYMAP_MAX) return;
     mock_keymap[mock_keymap_n++] = (mock_keymap_entry_t){
-        code : code,
-        group : group,
-        shift : shift,
-        ks : ks
+        .code = code,
+        .group = group,
+        .shift = shift,
+        .ks = ks,
     };
 }
 

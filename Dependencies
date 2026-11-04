@@ -29,8 +29,7 @@ build|pkg|xkbcommon|required|Xkbcommon
 build|pkg|xtst|required|XTest
 
 # --- Тесты ---
-test|pkg|check|required|Check
-test|pkg|libbacktrace|required|libbacktrace
+test|pkg|criterion|required|Criterion
 test|cmd|tclsh|required|Tcl
 test|cmd|wish|required|Tk/wish
 test|cmd|xvfb-run|conditional|xvfb-run без DISPLAY

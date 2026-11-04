@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(clipboard, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * Буфер обмена: порт и X11 Selection/INCR-адаптер
  *
@@ -36,7 +38,7 @@ static void er_clipboard_setup(clipboard_port_t* port) {
     clipboard_x11_port(port, &er_clipboard);
 }
 
-START_TEST(er_clipboard_set_and_clear) {
+Test(clipboard, er_clipboard_set_and_clear) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
 
@@ -52,9 +54,7 @@ START_TEST(er_clipboard_set_and_clear) {
     ck_assert_ptr_null(clipboard_s);
     ck_assert_int_eq(clipboard_len, 0);
 }
-END_TEST
-
-START_TEST(er_clipboard_get_own_selection) {
+Test(clipboard, er_clipboard_get_own_selection) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
     port.set(&port, strdup("тест"), 8, CLIPBOARD_FORMAT_UTF8);
@@ -68,9 +68,7 @@ START_TEST(er_clipboard_get_own_selection) {
     ck_assert_int_eq(capture.len, 8);
     ck_assert_str_eq(capture.data, "тест");
 }
-END_TEST
-
-START_TEST(er_clipboard_get_no_owner) {
+Test(clipboard, er_clipboard_get_no_owner) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
 
@@ -83,9 +81,7 @@ START_TEST(er_clipboard_get_no_owner) {
     ck_assert_int_eq(capture.len, 0);
     ck_assert_str_eq(capture.data, "");
 }
-END_TEST
-
-START_TEST(er_clipboard_get_foreign_is_async) {
+Test(clipboard, er_clipboard_get_foreign_is_async) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
 
@@ -114,9 +110,7 @@ START_TEST(er_clipboard_get_foreign_is_async) {
     ck_assert_int_eq(capture.calls, 1);
     ck_assert_str_eq(capture.data, "выделено");
 }
-END_TEST
-
-START_TEST(er_clipboard_get_incr) {
+Test(clipboard, er_clipboard_get_incr) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
 
@@ -149,8 +143,6 @@ START_TEST(er_clipboard_get_incr) {
     ck_assert_int_eq(capture.calls, 1);
     ck_assert_str_eq(capture.data, "часть");
 }
-END_TEST
-
 static mock_call_t* er_clipboard_find_call(const char* prefix) {
     for(int i = 0; i < mock_n; i++) {
         if(strncmp(mock_calls[i].str, prefix, strlen(prefix)) == 0) return &mock_calls[i];
@@ -158,7 +150,7 @@ static mock_call_t* er_clipboard_find_call(const char* prefix) {
     return NULL;
 }
 
-START_TEST(er_clipboard_selection_request_sends_data) {
+Test(clipboard, er_clipboard_selection_request_sends_data) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
     port.set(&port, strdup("abc"), 3, CLIPBOARD_FORMAT_UTF8);
@@ -182,9 +174,7 @@ START_TEST(er_clipboard_selection_request_sends_data) {
     ck_assert_int_eq(change->ints[3], 3); // nelements
     ck_assert(mock_find("XSendEvent(") >= 0);
 }
-END_TEST
-
-START_TEST(er_clipboard_selection_request_incr) {
+Test(clipboard, er_clipboard_selection_request_incr) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
     selection_chunk_size = 2;
@@ -221,9 +211,7 @@ START_TEST(er_clipboard_selection_request_incr) {
     ck_assert_ptr_nonnull(change);
     ck_assert_int_eq(change->ints[3], 2);
 }
-END_TEST
-
-START_TEST(er_clipboard_selection_clear) {
+Test(clipboard, er_clipboard_selection_clear) {
     clipboard_port_t port;
     er_clipboard_setup(&port);
     port.set(&port, strdup("abc"), 3, CLIPBOARD_FORMAT_UTF8);
@@ -234,23 +222,4 @@ START_TEST(er_clipboard_selection_clear) {
 
     ck_assert_int_eq(clipboard_x11_handle_event(&er_clipboard, &event), 1);
     ck_assert_ptr_null(clipboard_s);
-}
-END_TEST
-
-Suite* suite_clipboard() {
-    Suite* s = suite_create("clipboard");
-
-    TCase* tc = tcase_create("Selection/INCR");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_clipboard_set_and_clear);
-    tcase_add_test(tc, er_clipboard_get_own_selection);
-    tcase_add_test(tc, er_clipboard_get_no_owner);
-    tcase_add_test(tc, er_clipboard_get_foreign_is_async);
-    tcase_add_test(tc, er_clipboard_get_incr);
-    tcase_add_test(tc, er_clipboard_selection_request_sends_data);
-    tcase_add_test(tc, er_clipboard_selection_request_incr);
-    tcase_add_test(tc, er_clipboard_selection_clear);
-    suite_add_tcase(s, tc);
-
-    return s;
 }

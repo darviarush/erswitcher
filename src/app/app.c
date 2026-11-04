@@ -585,7 +585,8 @@ void cursor_back__fn(void* context) {
     cursor_back = 0;
 }
 
-void compose(char*) {
+void compose(char* arg) {
+    (void) arg;
     if(input.pos == 0) return;
 
     wint_t symbols[BUF_SIZE] = {0};
@@ -618,29 +619,36 @@ void compose(char*) {
     if(cursor_back) after(0.30, cursor_back__fn, NULL);
 }
 
-void word_translate(char*) {
+void word_translate(char* arg) {
+    (void) arg;
     print_translate_buffer(from_space(), 1);
 }
-void text_translate(char*) {
+void text_translate(char* arg) {
+    (void) arg;
     print_translate_buffer(0, 1);
 }
-void selection_translate(char*) {
+void selection_translate(char* arg) {
+    (void) arg;
     copy_selection(print_translate_buffer);
 }
 
-void word_invertcase(char*) {
+void word_invertcase(char* arg) {
+    (void) arg;
     print_invertcase_buffer(from_space(), 1);
 }
-void text_invertcase(char*) {
+void text_invertcase(char* arg) {
+    (void) arg;
     print_invertcase_buffer(0, 1);
 }
-void selection_invertcase(char*) {
+void selection_invertcase(char* arg) {
+    (void) arg;
     copy_selection(print_invertcase_buffer);
 }
 
 volatile sig_atomic_t load_config_requested = 0;
 
-void signal_load_config(int) {
+void signal_load_config(int signum) {
+    (void) signum;
     load_config_requested = 1;
 }
 

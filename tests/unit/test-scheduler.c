@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(scheduler, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * Системный scheduler: проверяем контракт порта без X11
  * Время здесь настоящее, поэтому просроченные таймеры ставим с
@@ -10,7 +12,7 @@ static void er_scheduler_callback(void* context) {
     (*(int*) context)++;
 }
 
-START_TEST(er_scheduler_runs_due_timer_once) {
+Test(scheduler, er_scheduler_runs_due_timer_once) {
     scheduler_system_reset(&er_scheduler);
     scheduler_port_t port;
     scheduler_system_port(&port, &er_scheduler);
@@ -26,9 +28,7 @@ START_TEST(er_scheduler_runs_due_timer_once) {
     port.tick(&port);
     ck_assert_int_eq(calls, 1);
 }
-END_TEST
-
-START_TEST(er_scheduler_keeps_future_timer) {
+Test(scheduler, er_scheduler_keeps_future_timer) {
     scheduler_system_reset(&er_scheduler);
     scheduler_port_t port;
     scheduler_system_port(&port, &er_scheduler);
@@ -40,9 +40,7 @@ START_TEST(er_scheduler_keeps_future_timer) {
     ck_assert_int_eq(calls, 0);
     ck_assert_int_gt(er_scheduler.size, 0);
 }
-END_TEST
-
-START_TEST(er_scheduler_passes_context_to_each_timer) {
+Test(scheduler, er_scheduler_passes_context_to_each_timer) {
     scheduler_system_reset(&er_scheduler);
     scheduler_port_t port;
     scheduler_system_port(&port, &er_scheduler);
@@ -55,18 +53,4 @@ START_TEST(er_scheduler_passes_context_to_each_timer) {
     port.tick(&port);
     ck_assert_int_eq(first, 1);
     ck_assert_int_eq(second, 1);
-}
-END_TEST
-
-Suite* suite_scheduler() {
-    Suite* s = suite_create("scheduler port");
-
-    TCase* tc = tcase_create("system clock");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_scheduler_runs_due_timer_once);
-    tcase_add_test(tc, er_scheduler_keeps_future_timer);
-    tcase_add_test(tc, er_scheduler_passes_context_to_each_timer);
-    suite_add_tcase(s, tc);
-
-    return s;
 }

@@ -3,13 +3,15 @@
 
 #include "test.h"
 
+TestSuite(desktop, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * Системная интеграция: desktop/autostart-файлы и переход в $HOME
  * Запуск конфигуратора здесь не проверяем: это fork/exec, его покрывает
  * ручной smoke с реальным треем
  */
 
-START_TEST(er_desktop_creates_files) {
+Test(desktop, er_desktop_creates_files) {
     desktop_init("/opt/erswitcher");
 
     char path[PATH_MAX];
@@ -24,9 +26,7 @@ START_TEST(er_desktop_creates_files) {
     ck_assert_ptr_nonnull(strstr(er_read(path, buf, sizeof buf), "Exec=/opt/erswitcher"));
     ck_assert_ptr_nonnull(strstr(buf, "X-GNOME-UsesNotifications=t"));
 }
-END_TEST
-
-START_TEST(er_desktop_does_not_overwrite_existing) {
+Test(desktop, er_desktop_does_not_overwrite_existing) {
     char path[PATH_MAX];
 
     desktop_init("/opt/erswitcher");
@@ -46,9 +46,7 @@ START_TEST(er_desktop_does_not_overwrite_existing) {
     er_path(path, sizeof path, ".config/autostart/erswitcher.desktop");
     ck_assert_str_eq(er_read(path, buf, sizeof buf), "keep-autostart");
 }
-END_TEST
-
-START_TEST(er_desktop_launches_configurator_from_appdir) {
+Test(desktop, er_desktop_launches_configurator_from_appdir) {
     char appdir[PATH_MAX + 64];
     char bindir[PATH_MAX + 128];
     char script[PATH_MAX + 256];
@@ -79,9 +77,7 @@ START_TEST(er_desktop_launches_configurator_from_appdir) {
     er_path(marker, sizeof marker, "launched-appdir");
     ck_assert_int_eq(access(marker, F_OK), 0);
 }
-END_TEST
-
-START_TEST(er_desktop_goto_home) {
+Test(desktop, er_desktop_goto_home) {
     char sub[PATH_MAX];
     char cwd[PATH_MAX];
 
@@ -95,9 +91,7 @@ START_TEST(er_desktop_goto_home) {
     ck_assert_str_eq(cwd, er_env.home);
     ck_assert_str_eq(getenv("PWD"), er_env.home);
 }
-END_TEST
-
-START_TEST(er_desktop_launches_configurator) {
+Test(desktop, er_desktop_launches_configurator) {
     char path[PATH_MAX];
     char marker[PATH_MAX];
 
@@ -118,22 +112,4 @@ START_TEST(er_desktop_launches_configurator) {
 
     er_path(marker, sizeof marker, "launched");
     ck_assert_int_eq(access(marker, F_OK), 0);
-}
-END_TEST
-
-static TCase* tcase_desktop() {
-    TCase* tc = tcase_create("desktop");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_desktop_creates_files);
-    tcase_add_test(tc, er_desktop_does_not_overwrite_existing);
-    tcase_add_test(tc, er_desktop_goto_home);
-    tcase_add_test(tc, er_desktop_launches_configurator);
-    tcase_add_test(tc, er_desktop_launches_configurator_from_appdir);
-    return tc;
-}
-
-Suite* suite_desktop() {
-    Suite* s = suite_create("desktop");
-    suite_add_tcase(s, tcase_desktop());
-    return s;
 }

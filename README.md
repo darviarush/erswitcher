@@ -100,8 +100,7 @@ make check-deps C=Упаковка
 Для разработки и тестов дополнительно:
 
 * git;
-* check — юнит-тесты;
-* libbacktrace — стектрейсы в тестах;
+* criterion — юнит-тесты и стектрейсы;
 * clang/clang-format — форматирование;
 * cppcheck — статический анализ;
 * xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
@@ -120,7 +119,7 @@ make check-deps C=Упаковка
 
 ```sh
 sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
-  libxtst-dev tcl tk check libbacktrace-dev clang-format clang cppcheck \
+  libxtst-dev tcl tk criterion-dev clang-format clang cppcheck \
   xvfb xdotool gh librsvg2-bin desktop-file-utils curl
 ```
 
@@ -132,7 +131,7 @@ sudo apt install build-essential git pkg-config libx11-dev libxkbcommon-dev \
 
 ```sh
 sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
-  tcl tk check libbacktrace clang cppcheck xorg-server-xvfb xdotool github-cli \
+  tcl tk criterion clang cppcheck xorg-server-xvfb xdotool github-cli \
   librsvg desktop-file-utils curl
 yay -S --needed appimagetool-bin
 ```
@@ -156,13 +155,16 @@ ERSWITCHER_DEBUG=1 make test
 ```sh
 make cppcheck
 make memcheck
+make valgrind VALGRIND_FILTER='commands/*'
 ```
 
 Сборка приложения выполняется с `-fanalyzer` (GCC static analyzer);
 предупреждения анализатора считаются ошибками сборки. Для `cppcheck`
 используется набор проверок `warning,performance,portability`.
-`make memcheck` запускает юнит-тесты под `valgrind` с проверкой
-определённых и косвенных утечек.
+`make memcheck` запускает полный набор тестов с AddressSanitizer и
+проверкой утечек. `make valgrind` запускает выбранные тесты под Valgrind;
+Criterion изолирует каждый тест в отдельном процессе, поэтому полный
+прогон под Valgrind занимает минуты, и фильтр обязателен.
 
 # AUTOLOAD
 

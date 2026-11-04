@@ -17,7 +17,7 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 
-#include <check.h>
+#include "assert-compat.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -102,6 +102,8 @@ static char* er_read(char const* path, char* buf, size_t size) {
 
 // Делает копию строки, чтобы тест мог мокать её, не задевая настоящую
 static void er_fixture_setup() {
+    logger_init();
+
     // Монолит стартует с setlocale(LC_ALL, "ru_RU.UTF-8") — без него
     // atof() не понимает запятую в `delay=0,01` (см. app_run)
     setlocale(LC_ALL, "ru_RU.UTF-8");

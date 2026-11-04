@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(use_cases, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * Сценарии input/translate с фейковым портом клавиатуры
  *
@@ -58,7 +60,7 @@ static void er_fake_recover(keyboard_port_t* port) {
 static unikey_t er_fake_from_keysym(keyboard_port_t* port, uint32_t keysym) {
     (void) port;
     ck_assert_int_eq(keysym, KEYBOARD_SYMBOL_BACKSPACE);
-    return (unikey_t){code : 14, mods : 0, group : 0};
+    return (unikey_t){.code = 14, .mods = 0, .group = 0};
 }
 
 static void er_fake_press_multi(keyboard_port_t* port, unikey_t key, int n) {
@@ -90,7 +92,7 @@ static keyboard_port_t er_fake_port(er_fake_keyboard_t* fake) {
     return port;
 }
 
-START_TEST(er_input_use_case_prints) {
+Test(use_cases, er_input_use_case_prints) {
     er_fake_keyboard_t fake = {.kind = KEYBOARD_KEY_PRINTABLE};
     fake.symbols[30] = L'a';
     keyboard_port_t port = er_fake_port(&fake);
@@ -99,14 +101,12 @@ START_TEST(er_input_use_case_prints) {
     input_use_case_t input;
     input_use_case_init(&input, &buffer, &port);
 
-    input_use_case_handle_key(&input, (unikey_t){code : 30, mods : 0, group : 0});
+    input_use_case_handle_key(&input, (unikey_t){.code = 30, .mods = 0, .group = 0});
     ck_assert_int_eq(buffer.pos, 1);
     ck_assert_int_eq(buffer.word[0].code, 30);
     ck_assert_int_eq(buffer.symbol[0], L'a');
 }
-END_TEST
-
-START_TEST(er_input_use_case_backspace_and_control) {
+Test(use_cases, er_input_use_case_backspace_and_control) {
     er_fake_keyboard_t fake = {.kind = KEYBOARD_KEY_BACKSPACE};
     keyboard_port_t port = er_fake_port(&fake);
     input_buffer_t buffer;
@@ -115,20 +115,18 @@ START_TEST(er_input_use_case_backspace_and_control) {
     input_use_case_t input;
     input_use_case_init(&input, &buffer, &port);
 
-    input_use_case_handle_key(&input, (unikey_t){code : 14, mods : 0, group : 0});
+    input_use_case_handle_key(&input, (unikey_t){.code = 14, .mods = 0, .group = 0});
     ck_assert_int_eq(buffer.pos, 1);
 
     // Shift+Backspace не удаляет: старое поведение change_key/add_to_buffer
-    input_use_case_handle_key(&input, (unikey_t){code : 14, mods : ERS_MOD_SHIFT, group : 0});
+    input_use_case_handle_key(&input, (unikey_t){.code = 14, .mods = ERS_MOD_SHIFT, .group = 0});
     ck_assert_int_eq(buffer.pos, 1);
 
     fake.kind = KEYBOARD_KEY_CONTROL;
-    input_use_case_handle_key(&input, (unikey_t){code : 111, mods : 0, group : 0});
+    input_use_case_handle_key(&input, (unikey_t){.code = 111, .mods = 0, .group = 0});
     ck_assert_int_eq(buffer.pos, 0);
 }
-END_TEST
-
-START_TEST(er_input_use_case_from_space) {
+Test(use_cases, er_input_use_case_from_space) {
     er_fake_keyboard_t fake = {0};
     fake.symbols[1] = 'a';
     fake.symbols[2] = ' ';
@@ -136,17 +134,15 @@ START_TEST(er_input_use_case_from_space) {
     keyboard_port_t port = er_fake_port(&fake);
     input_buffer_t buffer;
     input_buffer_init(&buffer);
-    input_buffer_push(&buffer, (unikey_t){code : 1}, fake.symbols[1]);
-    input_buffer_push(&buffer, (unikey_t){code : 2}, fake.symbols[2]);
-    input_buffer_push(&buffer, (unikey_t){code : 3}, fake.symbols[3]);
+    input_buffer_push(&buffer, (unikey_t){.code = 1}, fake.symbols[1]);
+    input_buffer_push(&buffer, (unikey_t){.code = 2}, fake.symbols[2]);
+    input_buffer_push(&buffer, (unikey_t){.code = 3}, fake.symbols[3]);
     input_use_case_t input;
     input_use_case_init(&input, &buffer, &port);
 
     ck_assert_int_eq(input_use_case_from_space(&input), 2);
 }
-END_TEST
-
-START_TEST(er_input_use_case_from_space_trailing_space) {
+Test(use_cases, er_input_use_case_from_space_trailing_space) {
     er_fake_keyboard_t fake = {0};
     fake.symbols[1] = 'a';
     fake.symbols[2] = ' ';
@@ -155,27 +151,25 @@ START_TEST(er_input_use_case_from_space_trailing_space) {
     keyboard_port_t port = er_fake_port(&fake);
     input_buffer_t buffer;
     input_buffer_init(&buffer);
-    input_buffer_push(&buffer, (unikey_t){code : 1}, fake.symbols[1]);
-    input_buffer_push(&buffer, (unikey_t){code : 2}, fake.symbols[2]);
-    input_buffer_push(&buffer, (unikey_t){code : 3}, fake.symbols[3]);
-    input_buffer_push(&buffer, (unikey_t){code : 4}, fake.symbols[4]);
+    input_buffer_push(&buffer, (unikey_t){.code = 1}, fake.symbols[1]);
+    input_buffer_push(&buffer, (unikey_t){.code = 2}, fake.symbols[2]);
+    input_buffer_push(&buffer, (unikey_t){.code = 3}, fake.symbols[3]);
+    input_buffer_push(&buffer, (unikey_t){.code = 4}, fake.symbols[4]);
     input_use_case_t input;
     input_use_case_init(&input, &buffer, &port);
 
     // Хвостовой пробел не должен обнулять последнее слово
     ck_assert_int_eq(input_use_case_from_space(&input), 2);
 }
-END_TEST
-
-START_TEST(er_translate_use_case_buffer) {
+Test(use_cases, er_translate_use_case_buffer) {
     er_fake_keyboard_t fake = {0};
     fake.layout_en = 0;
     fake.layout_ru = 1;
     fake.state.group = 0;
     keyboard_port_t port = er_fake_port(&fake);
     unikey_t word[2] = {
-        {code : 30, mods : 0, group : 0},
-        {code : 48, mods : 0, group : 1},
+        {.code = 30, .mods = 0, .group = 0},
+        {.code = 48, .mods = 0, .group = 1},
     };
 
     translate_use_case_buffer(&port, word, 2, 0, 1);
@@ -190,14 +184,12 @@ START_TEST(er_translate_use_case_buffer) {
     ck_assert_int_eq(fake.pressed[0].group, 1);
     ck_assert_int_eq(fake.pressed[1].group, 0);
 }
-END_TEST
-
-START_TEST(er_translate_use_case_invertcase) {
+Test(use_cases, er_translate_use_case_invertcase) {
     er_fake_keyboard_t fake = {0};
     keyboard_port_t port = er_fake_port(&fake);
     unikey_t word[2] = {
-        {code : 30, mods : 0, group : 0},
-        {code : 48, mods : ERS_MOD_SHIFT, group : 0},
+        {.code = 30, .mods = 0, .group = 0},
+        {.code = 48, .mods = ERS_MOD_SHIFT, .group = 0},
     };
 
     translate_use_case_invertcase(&port, word, 2, 0, 0);
@@ -208,21 +200,4 @@ START_TEST(er_translate_use_case_invertcase) {
     ck_assert_int_eq(fake.pressed_count, 2);
     ck_assert_int_eq(word[0].mods, ERS_MOD_SHIFT);
     ck_assert_int_eq(word[1].mods, 0);
-}
-END_TEST
-
-Suite* suite_use_cases() {
-    Suite* s = suite_create("use cases");
-
-    TCase* tc = tcase_create("input/translate");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_input_use_case_prints);
-    tcase_add_test(tc, er_input_use_case_backspace_and_control);
-    tcase_add_test(tc, er_input_use_case_from_space);
-    tcase_add_test(tc, er_input_use_case_from_space_trailing_space);
-    tcase_add_test(tc, er_translate_use_case_buffer);
-    tcase_add_test(tc, er_translate_use_case_invertcase);
-    suite_add_tcase(s, tc);
-
-    return s;
 }

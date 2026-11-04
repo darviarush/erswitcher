@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(config_reload, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * use-cases/config-reload: построение снимка конфигурации без X11 и файлов
  *
@@ -44,7 +46,7 @@ static const config_binding_t* er_find_binding(const config_t* config, config_ac
     return NULL;
 }
 
-START_TEST(er_config_reload_builds_model) {
+Test(config_reload, er_config_reload_builds_model) {
     config_options_t base = config_options_default();
     base.delay = 0.25;
 
@@ -108,9 +110,7 @@ START_TEST(er_config_reload_builds_model) {
 
     config_free(&config);
 }
-END_TEST
-
-START_TEST(er_config_reload_unescapes_values_and_cursor) {
+Test(config_reload, er_config_reload_unescapes_values_and_cursor) {
     er_config_log_t log = {0};
     config_reload_parse_context_t context = {
         .resolve_key = er_config_resolve,
@@ -136,9 +136,7 @@ START_TEST(er_config_reload_unescapes_values_and_cursor) {
 
     config_free(&config);
 }
-END_TEST
-
-START_TEST(er_config_reload_reports_bad_lines) {
+Test(config_reload, er_config_reload_reports_bad_lines) {
     er_config_log_t log = {0};
     config_reload_parse_context_t context = {
         .resolve_key = er_config_resolve,
@@ -165,9 +163,7 @@ START_TEST(er_config_reload_reports_bad_lines) {
 
     config_free(&config);
 }
-END_TEST
-
-START_TEST(er_config_reload_sorts_compose_by_length) {
+Test(config_reload, er_config_reload_sorts_compose_by_length) {
     er_config_log_t log = {0};
     config_reload_parse_context_t context = {
         .resolve_key = er_config_resolve,
@@ -192,9 +188,7 @@ START_TEST(er_config_reload_sorts_compose_by_length) {
 
     config_free(&config);
 }
-END_TEST
-
-START_TEST(er_config_reload_invalid_option_falls_back_to_default) {
+Test(config_reload, er_config_reload_invalid_option_falls_back_to_default) {
     config_options_t base = config_options_default();
     base.delay = 0.25;
     base.command_timeout = 42.0;
@@ -220,20 +214,4 @@ START_TEST(er_config_reload_invalid_option_falls_back_to_default) {
     ck_assert_int_eq(log.count, 2);
 
     config_free(&config);
-}
-END_TEST
-
-Suite* suite_config_reload() {
-    Suite* s = suite_create("config reload");
-
-    TCase* tc = tcase_create("model");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_config_reload_builds_model);
-    tcase_add_test(tc, er_config_reload_unescapes_values_and_cursor);
-    tcase_add_test(tc, er_config_reload_reports_bad_lines);
-    tcase_add_test(tc, er_config_reload_sorts_compose_by_length);
-    tcase_add_test(tc, er_config_reload_invalid_option_falls_back_to_default);
-    suite_add_tcase(s, tc);
-
-    return s;
 }

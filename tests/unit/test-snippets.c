@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(snippets, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * [snippets] — сниппеты, вставляемые через буфер обмена
  *
@@ -10,7 +12,7 @@
  *   - что повторный сниппет отменяет предыдущий таймер
  */
 
-START_TEST(er_snippets_inserts_text_into_clipboard) {
+Test(snippets, er_snippets_inserts_text_into_clipboard) {
     // Идентификаторы атомов нужны заранее: в жизни их создаёт open_display()
     utf8_atom = 2;
     clipboard_atom = 3;
@@ -25,9 +27,7 @@ START_TEST(er_snippets_inserts_text_into_clipboard) {
     ck_assert(mock_find("XSetSelectionOwner(") >= 0);
     ck_assert_int_gt(er_scheduler.size, 0);
 }
-END_TEST
-
-START_TEST(er_snippets_copies_into_own_memory) {
+Test(snippets, er_snippets_copies_into_own_memory) {
     char text[] = "темп";
     insert_from_clipboard(text);
 
@@ -35,17 +35,13 @@ START_TEST(er_snippets_copies_into_own_memory) {
     text[0] = 'X';
     ck_assert_str_eq(clipboard_s, "темп");
 }
-END_TEST
-
-START_TEST(er_snippets_second_replaces_first) {
+Test(snippets, er_snippets_second_replaces_first) {
     insert_from_clipboard("первый");
     insert_from_clipboard("второй");
 
     ck_assert_str_eq(clipboard_s, "второй");
 }
-END_TEST
-
-START_TEST(er_snippets_from_config) {
+Test(snippets, er_snippets_from_config) {
     er_load(
         "[snippets]\n"
         "Super+Shift+Pause=Готово.\n");
@@ -54,31 +50,11 @@ START_TEST(er_snippets_from_config) {
     ck_assert_str_eq(keyfn[0].arg, "Готово.");
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_SNIPPET);
 }
-END_TEST
-
-START_TEST(er_snippets_from_config_keeps_multiline) {
+Test(snippets, er_snippets_from_config_keeps_multiline) {
     er_load(
         "[snippets]\n"
         "Control+Shift+Pause=строка\\n\\tс табуляцией\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "строка\n\tс табуляцией");
-}
-END_TEST
-
-static TCase* tcase_snippets() {
-    TCase* tc = tcase_create("snippets");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_snippets_inserts_text_into_clipboard);
-    tcase_add_test(tc, er_snippets_copies_into_own_memory);
-    tcase_add_test(tc, er_snippets_second_replaces_first);
-    tcase_add_test(tc, er_snippets_from_config);
-    tcase_add_test(tc, er_snippets_from_config_keeps_multiline);
-    return tc;
-}
-
-Suite* suite_snippets() {
-    Suite* s = suite_create("[snippets]");
-    suite_add_tcase(s, tcase_snippets());
-    return s;
 }

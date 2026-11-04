@@ -2,26 +2,27 @@
 
 ## Юнит-тесты
 
-Каталог `tests/unit/`, фреймворк [Check](https://libcheck.github.io/check/).
+Каталог `tests/unit/`, фреймворк [Criterion](https://criterion.readthedocs.io/).
+Тесты собираются с AddressSanitizer и `-g`, Criterion даёт цветной вывод
+и стектрейсы падений.
 
 `make test-unit` собирает и запускает два бинарника:
 
-* `tests/unit/test` — тесты приложения и портов. К нему линкуются
-  `src/app/app.o`, `src/use-cases/**/*.o`, адаптеры
-  `src/infrastructure/**/*.o` и `src/presentation/tray-indicator.o`.
-  `test.h` подключает `tests/unit/mock.c` с заглушками X11; монолит
+* `tests/unit/test` — тесты приложения и портов. Исходники приложения и
+  адаптеров компилируются в этот бинарник напрямую с ASan; `test.h`
+  подключает `tests/unit/mock.c` с заглушками X11; монолит
   `erswitcher.c` больше не используется;
 * `tests/unit/test-domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
-  `config`). Они линкуются как обычные объектные файлы и не требуют X11.
+  `config`). Они компилируются в бинарник напрямую и не требуют X11.
 
 ```sh
 make test-unit
+make memcheck
 ```
 
-Большая часть доменных модулей уже используется монолитом (`unikey`,
-`input_buffer`, `text`, `case_invert`, `compose`, `command_template`);
-`config` пока покрыт только отдельными тестами. Клавиатурный X11-адаптер
+Доменные модули используются приложением (`unikey`, `input_buffer`,
+`text`, `case_invert`, `compose`, `command_template`, `config`). Клавиатурный X11-адаптер
 проверяется набором `keyboard port` через тот же мок: преобразования
 сканкодов и символов, переключение раскладки, инъекция клавиш и опрос
 `keymap`/`keymap_saved`, `poll`/`poll_saved`. Сценарии `input`/`translate`

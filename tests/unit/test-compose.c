@@ -1,6 +1,8 @@
 #include <linux/input-event-codes.h>
 #include "test.h"
 
+TestSuite(compose, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * [compose] — мнемоники
  *
@@ -49,7 +51,7 @@ static unikey_t er_key(char ch) {
     int code = ch == 'a' ? KEY_A : ch == 'b' ? KEY_B
                                : ch == 'c'   ? KEY_C
                                              : 0;
-    return (unikey_t){code : code, mods : 0, group : 0};
+    return (unikey_t){.code = code, .mods = 0, .group = 0};
 }
 
 static void er_input(char const* s) {
@@ -62,7 +64,7 @@ static void er_input(char const* s) {
 
 // @category разбор
 
-START_TEST(er_compose_single_letter) {
+Test(compose, er_compose_single_letter) {
     er_load(
         "[compose]\n"
         "a=б\n"
@@ -74,9 +76,7 @@ START_TEST(er_compose_single_letter) {
     ck_assert_int_eq(compose_map[0].cursor_back, 0);
     ck_assert_str_eq(compose_map[1].to, "в");
 }
-END_TEST
-
-START_TEST(er_compose_two_letter) {
+Test(compose, er_compose_two_letter) {
     er_load(
         "[compose]\n"
         "ab=аб\n");
@@ -87,9 +87,7 @@ START_TEST(er_compose_two_letter) {
     ck_assert_int_eq(compose_map[0].word[1], L'b');
     ck_assert_str_eq(compose_map[0].to, "аб");
 }
-END_TEST
-
-START_TEST(er_compose_cyrillic_key_is_utf32) {
+Test(compose, er_compose_cyrillic_key_is_utf32) {
     er_load(
         "[compose]\n"
         "ы=і\n");
@@ -99,9 +97,7 @@ START_TEST(er_compose_cyrillic_key_is_utf32) {
     ck_assert_int_eq(compose_map[0].word[0], (wint_t) 0x044B);
     ck_assert_str_eq(compose_map[0].to, "і");
 }
-END_TEST
-
-START_TEST(er_compose_sorted_by_key_length) {
+Test(compose, er_compose_sorted_by_key_length) {
     er_load(
         "[compose]\n"
         "a=1\n"
@@ -113,9 +109,7 @@ START_TEST(er_compose_sorted_by_key_length) {
     ck_assert_int_eq(compose_map[1].pos, 2);
     ck_assert_int_eq(compose_map[2].pos, 1);
 }
-END_TEST
-
-START_TEST(er_compose_escaped_equal_in_key) {
+Test(compose, er_compose_escaped_equal_in_key) {
     // \== — ключ «=», а не «\»
     er_load(
         "[compose]\n"
@@ -128,9 +122,7 @@ START_TEST(er_compose_escaped_equal_in_key) {
     ck_assert_int_eq(compose_map[0].pos, 2);
     ck_assert_str_eq(compose_map[0].to, "≤");
 }
-END_TEST
-
-START_TEST(er_compose_cursor_back) {
+Test(compose, er_compose_cursor_back) {
     er_load(
         "[compose]\n"
         "if=if(\\^) {\\n\\t\\n}\n");
@@ -142,9 +134,7 @@ START_TEST(er_compose_cursor_back) {
     ck_assert_int_eq(compose_map[0].cursor_back, 7);
     ck_assert_str_eq(compose_map[0].to, "if() {\n\t\n}");
 }
-END_TEST
-
-START_TEST(er_compose_escapes) {
+Test(compose, er_compose_escapes) {
     er_load(
         "[compose]\n"
         "pr=print \\^, \"\\\\n\";\n"
@@ -157,17 +147,13 @@ START_TEST(er_compose_escapes) {
     ck_assert_str_eq(compose_map[1].to, "a\tb");
     ck_assert_str_eq(compose_map[2].to, "a\nb");
 }
-END_TEST
-
-START_TEST(er_compose_unknown_escape_kept) {
+Test(compose, er_compose_unknown_escape_kept) {
     er_load("[compose]\na=\\x\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_str_eq(compose_map[0].to, "\\x");
 }
-END_TEST
-
-START_TEST(er_compose_too_long_key_is_skipped) {
+Test(compose, er_compose_too_long_key_is_skipped) {
     // COMPOSE_KEY_MAX = 20 символов, 21 — ошибка в конфиге
     er_load(
         "[compose]\n"
@@ -177,18 +163,14 @@ START_TEST(er_compose_too_long_key_is_skipped) {
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_str_eq(compose_map[0].to, "коротко");
 }
-END_TEST
-
-START_TEST(er_compose_empty_value_allowed) {
+Test(compose, er_compose_empty_value_allowed) {
     er_load("[compose]\nab=\n");
 
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_int_eq(compose_map[0].pos, 2);
     ck_assert_str_eq(compose_map[0].to, "");
 }
-END_TEST
-
-START_TEST(er_compose_reload_drops_old_map) {
+Test(compose, er_compose_reload_drops_old_map) {
     er_load("[compose]\na=1\nb=2\n");
     ck_assert_int_eq(compose_map_size, 2);
 
@@ -196,11 +178,9 @@ START_TEST(er_compose_reload_drops_old_map) {
     ck_assert_int_eq(compose_map_size, 1);
     ck_assert_str_eq(compose_map[0].to, "3");
 }
-END_TEST
-
 // @category выбор мнемоники и вставка
 
-START_TEST(er_compose_applies_longest_match) {
+Test(compose, er_compose_applies_longest_match) {
     er_layout_abc();
     er_load(
         "[compose]\n"
@@ -218,9 +198,7 @@ START_TEST(er_compose_applies_longest_match) {
     // (XTestFakeKeyEvent — по два вызова на клавишу: нажатие и отжатие)
     ck_assert_int_eq(mock_count("XTestFakeKeyEvent("), 6);
 }
-END_TEST
-
-START_TEST(er_compose_no_match_does_nothing) {
+Test(compose, er_compose_no_match_does_nothing) {
     er_layout_abc();
     clipboard_free();
     er_load("[compose]\nxyz=нет\n");
@@ -232,9 +210,7 @@ START_TEST(er_compose_no_match_does_nothing) {
     ck_assert_ptr_null((void*) clipboard_s);
     ck_assert_int_eq(mock_find("XTestFakeKeyEvent("), -1);
 }
-END_TEST
-
-START_TEST(er_compose_empty_buffer_does_nothing) {
+Test(compose, er_compose_empty_buffer_does_nothing) {
     er_layout_abc();
     clipboard_free();
     er_load("[compose]\na=б\n");
@@ -245,9 +221,7 @@ START_TEST(er_compose_empty_buffer_does_nothing) {
     ck_assert_ptr_null((void*) clipboard_s);
     ck_assert_int_eq(mock_n, 0);
 }
-END_TEST
-
-START_TEST(er_compose_partial_key_matches_head) {
+Test(compose, er_compose_partial_key_matches_head) {
     er_layout_abc();
     clipboard_free();
     er_load("[compose]\naa=б\n");
@@ -259,9 +233,7 @@ START_TEST(er_compose_partial_key_matches_head) {
 
     ck_assert_ptr_null((void*) clipboard_s);
 }
-END_TEST
-
-START_TEST(er_compose_key_after_other_symbols) {
+Test(compose, er_compose_key_after_other_symbols) {
     er_layout_abc();
     er_load("[compose]\nab=два\n");
 
@@ -271,9 +243,7 @@ START_TEST(er_compose_key_after_other_symbols) {
 
     ck_assert_str_eq(clipboard_s, "два");
 }
-END_TEST
-
-START_TEST(er_compose_key_with_switched_layout) {
+Test(compose, er_compose_key_with_switched_layout) {
     // «a» есть только в группе 1, а активна 0:
     // keysym_to_unikey() должен найти её перебором групп
     mock_keymap_clear();
@@ -294,43 +264,11 @@ START_TEST(er_compose_key_with_switched_layout) {
 
     er_load("[compose]\na=б\n");
 
-    unikey_t key = (unikey_t){code : CODE_A, mods : 0, group : 1};
+    unikey_t key = (unikey_t){.code = CODE_A, .mods = 0, .group = 1};
     input_buffer_push(&input, key, KEY_TO_INT(key));
     mock_reset();
     compose(NULL);
 
     ck_assert_str_eq(clipboard_s, "б");
     ck_assert_msg(mock_find("XkbLockGroup(") >= 0, "группа не переключилась");
-}
-END_TEST
-
-Suite* suite_compose() {
-    Suite* s = suite_create("[compose]");
-
-    TCase* parse = tcase_create("разбор");
-    tcase_add_checked_fixture(parse, er_fixture, er_fixture_teardown);
-    tcase_add_test(parse, er_compose_single_letter);
-    tcase_add_test(parse, er_compose_two_letter);
-    tcase_add_test(parse, er_compose_cyrillic_key_is_utf32);
-    tcase_add_test(parse, er_compose_sorted_by_key_length);
-    tcase_add_test(parse, er_compose_escaped_equal_in_key);
-    tcase_add_test(parse, er_compose_cursor_back);
-    tcase_add_test(parse, er_compose_escapes);
-    tcase_add_test(parse, er_compose_unknown_escape_kept);
-    tcase_add_test(parse, er_compose_too_long_key_is_skipped);
-    tcase_add_test(parse, er_compose_empty_value_allowed);
-    tcase_add_test(parse, er_compose_reload_drops_old_map);
-    suite_add_tcase(s, parse);
-
-    TCase* apply = tcase_create("применение");
-    tcase_add_checked_fixture(apply, er_fixture, er_fixture_teardown);
-    tcase_add_test(apply, er_compose_applies_longest_match);
-    tcase_add_test(apply, er_compose_no_match_does_nothing);
-    tcase_add_test(apply, er_compose_empty_buffer_does_nothing);
-    tcase_add_test(apply, er_compose_partial_key_matches_head);
-    tcase_add_test(apply, er_compose_key_after_other_symbols);
-    tcase_add_test(apply, er_compose_key_with_switched_layout);
-    suite_add_tcase(s, apply);
-
-    return s;
 }

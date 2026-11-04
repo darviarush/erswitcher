@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck test-build appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck valgrind test-build appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
@@ -8,12 +8,14 @@ CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
 ERSWITCHER_DEBUG ?= 0
 export ERSWITCHER_DEBUG
 
-# Тесты собираются с -Werror: предупреждения не должны оставаться незамеченными.
-# libbacktrace нужны символы (-g)
+# Тесты собираются с -Werror, AddressSanitizer и отладочными символами.
+# Criterion даёт цветной вывод и стектрейсы падений
 CC = cc
-TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -Werror
-TEST_LIBS = check libbacktrace
+TEST_SANITIZE ?= -fsanitize=address
+TEST_CFLAGS = -std=gnu17 -g -Wall -Wextra -Werror $(TEST_SANITIZE)
+TEST_LDFLAGS = $(TEST_SANITIZE)
 TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
+TEST_APP_SOURCES = src/app/app.c $(DOMAIN_SOURCES) $(USE_CASE_SOURCES) $(INFRASTRUCTURE_SOURCES) $(PRESENTATION_SOURCES)
 
 # Приложение — src/app/app.c + main.c плюс чистые модули,
 # X11-адаптеры инфраструктуры и presentation.
@@ -137,7 +139,9 @@ check-deps:	## Проверяет зависимости; C=Сборка/Тес�
 
 CPPCHECK ?= cppcheck
 CPPCHECK_FLAGS ?= --enable=warning,performance,portability --std=c17 --language=c \
-	--inline-suppr --suppress=missingIncludeSystem --error-exitcode=1
+	--inline-suppr --suppress=missingIncludeSystem \
+	--suppress='unknownMacro:tests/unit/*' \
+	--suppress='returnImplicitInt:tests/unit/*' --error-exitcode=1
 CPPCHECK_SOURCES = main.c $(shell find src -name '*.c' -print | sort) \
 	tests/unit/test.c tests/unit/test-domain.c
 
@@ -182,27 +186,37 @@ release: appimage	## Собирает AppImage и публикует его в G
 
 test: test-unit test-functional	## Все тесты
 
-# Один бинарник на все наборы: test.c содержит общий main(), а app.c
-# линкуется как обычный объектный файл.
-test-build: src/app/app.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
-		cd tests/unit && $(CC) $(TEST_CFLAGS) -rdynamic -o test test.c \
-			../../src/app/app.o $(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
-			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
-		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test-domain.c \
-			$(DOMAIN_OBJECTS) $$(pkg-config --cflags --libs check)
+# Criterion предоставляет main; test.c подключает все наборы в один
+# translation unit, чтобы использовать общие фикстуры и моки X11
+test-build: $(TEST_APP_SOURCES) $(wildcard tests/unit/*.c) $(wildcard tests/unit/*.h) $(wildcard src/*/*.h) $(wildcard src/*/*/*.h)
+		$(CC) $(TEST_CFLAGS) $(TEST_LDFLAGS) -rdynamic -o tests/unit/test \
+			tests/unit/test.c $(TEST_APP_SOURCES) \
+			$$(pkg-config --cflags --libs criterion) $(TEST_LIBS_LOCAL)
+		$(CC) $(TEST_CFLAGS) $(TEST_LDFLAGS) -o $(TEST_DOMAIN) \
+			tests/unit/test-domain.c $(DOMAIN_SOURCES) \
+			$$(pkg-config --cflags --libs criterion)
 
-test-unit: test-build	## Юнит-тесты на Check
-		cd tests/unit && ./test
-		./$(TEST_DOMAIN)
+test-unit: test-build	## Юнит-тесты на Criterion
+		tests/unit/test --color=always
+		$(TEST_DOMAIN) --color=always
+
+ASAN_OPTIONS ?= detect_leaks=1:abort_on_error=1:halt_on_error=1
+
+memcheck: test-build	## Полный прогон тестов с ASan
+		ASAN_OPTIONS="$(ASAN_OPTIONS)" tests/unit/test --color=always
+		ASAN_OPTIONS="$(ASAN_OPTIONS)" $(TEST_DOMAIN) --color=always
 
 VALGRIND ?= valgrind
+VALGRIND_FILTER ?= commands/*
 VALGRIND_FLAGS ?= --leak-check=full --show-leak-kinds=definite,indirect \
 	--errors-for-leak-kinds=definite,indirect --track-origins=yes --error-exitcode=1
 
-memcheck: test-build	## Юнит-тесты под valgrind
+valgrind:	## Valgrind для выбранных тестов: VALGRIND_FILTER=...
 		@command -v $(VALGRIND) >/dev/null 2>&1 || { echo "FAIL: не найден $(VALGRIND)" >&2; exit 1; }
-		cd tests/unit && $(VALGRIND) $(VALGRIND_FLAGS) ./test
-		$(VALGRIND) $(VALGRIND_FLAGS) ./$(TEST_DOMAIN)
+		$(MAKE) test-build TEST_SANITIZE=
+		cd tests/unit && CRITERION_JOBS=1 $(VALGRIND) $(VALGRIND_FLAGS) \
+			--trace-children=yes --trace-children-skip=/bin/sh,/usr/bin/rm,/bin/rm \
+			./test --filter '$(VALGRIND_FILTER)' --color=never
 
 # Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
 # виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate

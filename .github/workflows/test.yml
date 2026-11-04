@@ -26,13 +26,13 @@ jobs:
         if: matrix.distro == 'ubuntu'
         run: |
           apt-get update
-          apt-get install -y build-essential check pkg-config \
+          apt-get install -y build-essential criterion-dev pkg-config \
             libx11-dev libxkbcommon-dev libxtst-dev tcl tk xvfb xauth
 
       - name: Install dependencies (Arch Linux)
         if: matrix.distro == 'archlinux'
         run: |
-          pacman -Sy --noconfirm --needed base-devel check pkgconf \
+          pacman -Sy --noconfirm --needed base-devel criterion pkgconf \
             libx11 libxkbcommon libxtst tcl tk xorg-server-xvfb xorg-xauth
 
       - name: Run Test
@@ -51,7 +51,7 @@ jobs:
         # На macOS пакеты ставятся через стандартный менеджер brew
         run: |
           brew update
-          brew install check pkg-config
+          brew install criterion pkg-config
 
       - name: Run Test
         run: make test
@@ -71,5 +71,5 @@ jobs:
           usescache: true
           run: |
             pkg update -f
-            pkg install -y gmake gcc check pkgconf
+            pkg install -y gmake gcc criterion pkgconf
             gmake test

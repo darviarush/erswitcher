@@ -1,5 +1,7 @@
 #include "test.h"
 
+TestSuite(sendkeys, .init = er_fixture, .fini = er_fixture_teardown);
+
 /*
  * [sendkeys] — шаблоны, вводимые эмуляцией нажатий
  *
@@ -56,7 +58,7 @@ static void er_layout() {
 
 // @category шаблоны
 
-START_TEST(er_sendkeys_presses_each_symbol) {
+Test(sendkeys, er_sendkeys_presses_each_symbol) {
     er_layout();
     mock_fake_key_hook = er_record_key;
 
@@ -71,9 +73,7 @@ START_TEST(er_sendkeys_presses_each_symbol) {
     }
     ck_assert_int_eq(mock_find("XkbLockGroup("), -1);
 }
-END_TEST
-
-START_TEST(er_sendkeys_switches_layout_for_cyrillic) {
+Test(sendkeys, er_sendkeys_switches_layout_for_cyrillic) {
     er_layout();
     mock_fake_key_hook = er_record_key;
 
@@ -83,9 +83,7 @@ START_TEST(er_sendkeys_switches_layout_for_cyrillic) {
     ck_assert_int_eq(er_keys_n, 2);
     ck_assert_msg(mock_find("XkbLockGroup(") >= 0, "раскладка не переключилась");
 }
-END_TEST
-
-START_TEST(er_sendkeys_empty_string) {
+Test(sendkeys, er_sendkeys_empty_string) {
     er_layout();
     mock_fake_key_hook = er_record_key;
 
@@ -93,9 +91,7 @@ START_TEST(er_sendkeys_empty_string) {
 
     ck_assert_int_eq(er_keys_n, 0);
 }
-END_TEST
-
-START_TEST(er_sendkeys_missing_symbol_is_skipped) {
+Test(sendkeys, er_sendkeys_missing_symbol_is_skipped) {
     er_layout();
     mock_fake_key_hook = er_record_key;
 
@@ -104,11 +100,9 @@ START_TEST(er_sendkeys_missing_symbol_is_skipped) {
 
     ck_assert_int_eq(er_keys_n, 2);
 }
-END_TEST
-
 // @category разбор
 
-START_TEST(er_sendkeys_from_config) {
+Test(sendkeys, er_sendkeys_from_config) {
     er_load(
         "[sendkeys]\n"
         "Pause=abc\n");
@@ -117,30 +111,11 @@ START_TEST(er_sendkeys_from_config) {
     ck_assert_int_eq(keyfn[0].action, CONFIG_ACTION_SENDKEYS);
     ck_assert_str_eq(keyfn[0].arg, "abc");
 }
-END_TEST
-
-START_TEST(er_sendkeys_escapes) {
+Test(sendkeys, er_sendkeys_escapes) {
     er_load(
         "[sendkeys]\n"
         "Pause=Готово.\\n\\tКонец\n");
 
     ck_assert_int_eq(keyfn_size, 1);
     ck_assert_str_eq(keyfn[0].arg, "Готово.\n\tКонец");
-}
-END_TEST
-
-Suite* suite_sendkeys() {
-    Suite* s = suite_create("[sendkeys]");
-
-    TCase* tc = tcase_create("ввод");
-    tcase_add_checked_fixture(tc, er_fixture, er_fixture_teardown);
-    tcase_add_test(tc, er_sendkeys_presses_each_symbol);
-    tcase_add_test(tc, er_sendkeys_switches_layout_for_cyrillic);
-    tcase_add_test(tc, er_sendkeys_empty_string);
-    tcase_add_test(tc, er_sendkeys_missing_symbol_is_skipped);
-    tcase_add_test(tc, er_sendkeys_from_config);
-    tcase_add_test(tc, er_sendkeys_escapes);
-    suite_add_tcase(s, tc);
-
-    return s;
 }

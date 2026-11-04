@@ -125,7 +125,7 @@ static void init_impl(keyboard_x11_t* s) {
 static unikey_t state_impl(keyboard_x11_t* s, int code) {
     XkbStateRec state;
     XkbGetState(s->display, XkbUseCoreKbd, &state);
-    return (unikey_t){code : code, mods : state.mods, group : state.group};
+    return (unikey_t){.code = code, .mods = state.mods, .group = state.group};
 }
 
 static KeySym to_keysym_impl(keyboard_x11_t* s, unikey_t key) {
@@ -171,7 +171,7 @@ static unikey_t from_keysym_impl(keyboard_x11_t* s, KeySym ks) {
         for(int code = 0; code < KEYBOARD_SIZE; ++code)
             for(int shift = 0; shift < 2; ++shift) {
                 KeySym search_ks = XkbKeycodeToKeysym(s->display, code, s->maybe_group, shift);
-                if(ks == search_ks) return (unikey_t){code : code, mods : shift ? ShiftMask : 0, group : s->maybe_group};
+                if(ks == search_ks) return (unikey_t){.code = code, .mods = shift ? ShiftMask : 0, .group = s->maybe_group};
             }
     }
 
@@ -181,11 +181,11 @@ static unikey_t from_keysym_impl(keyboard_x11_t* s, KeySym ks) {
                 KeySym search_ks = XkbKeycodeToKeysym(s->display, code, group, shift);
                 if(ks == search_ks) {
                     s->maybe_group = group;
-                    return (unikey_t){code : code, mods : shift ? ShiftMask : 0, group : group};
+                    return (unikey_t){.code = code, .mods = shift ? ShiftMask : 0, .group = group};
                 }
             }
 
-    return (unikey_t){code : 0, mods : 0, group : 0};
+    return (unikey_t){.code = 0, .mods = 0, .group = 0};
 }
 
 static void press_code(keyboard_x11_t* s, int code, int is_press) {
