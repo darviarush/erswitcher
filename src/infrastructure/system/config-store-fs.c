@@ -4,7 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "config_store_fs.h"
+#include "config-store-fs.h"
 
 #define CONFIG_STORE_PATH ".config/erswitcher.conf"
 #define CONFIG_STORE_ETC "/usr/share/erswitcher.conf.simple"

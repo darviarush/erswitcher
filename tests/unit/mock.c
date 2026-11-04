@@ -36,7 +36,7 @@ typedef struct {
     char str[256];
 } mock_call_t;
 
-// Подключается тестом: перехват эмуляции нажатий (см. test_sendkeys.c)
+// Подключается тестом: перехват эмуляции нажатий (см. test-sendkeys.c)
 // Отдельная переменная, потому что XTestFakeKeyEvent — функция из XTest.h
 static int (*mock_fake_key_hook)(Display*, unsigned int, Bool, unsigned long) = NULL;
 

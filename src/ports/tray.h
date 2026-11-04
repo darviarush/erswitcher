@@ -6,7 +6,7 @@
  *
  * Точка входа не должна знать про X11: она отдаёт порту непрозрачный
  * native event и получает одно из событий лотка. Отрисовка/состояние
- * иконки и реакция на клик живут в presentation/tray_indicator
+ * иконки и реакция на клик живут в presentation/tray-indicator
  */
 
 typedef struct tray_port tray_port_t;

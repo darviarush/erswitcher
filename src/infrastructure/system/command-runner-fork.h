@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-#include "../../ports/command_runner.h"
+#include "../../ports/command-runner.h"
 
 /*
  * fork/system-реализация command_runner

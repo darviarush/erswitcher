@@ -4,9 +4,9 @@
  * Секции конфига, которые настраивают поведение без комбинаций клавиш —
  * [options] и общая оболочка разбора
  *
- * [functions] проверяется в test_functions.c, [compose] — в test_compose.c,
- * [sendkeys] — в test_sendkeys.c, [snippets] — в test_snippets.c,
- * [commands] — в test_commands.c
+ * [functions] проверяется в test-functions.c, [compose] — в test-compose.c,
+ * [sendkeys] — в test-sendkeys.c, [snippets] — в test-snippets.c,
+ * [commands] — в test-commands.c
  */
 
 // @category [options]

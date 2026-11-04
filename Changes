@@ -2,16 +2,16 @@
 
 8.0 Ср 04 ноя 2026 00:30:06 MSK
 
-    - Монолит erswitcher.c разобран на слои src/: domain, use_cases, ports,
+    - Монолит erswitcher.c разобран на слои src/: domain, use-cases, ports,
       infrastructure, presentation и app; main.c стал отдельной точкой входа
     - Конфиг загружается в заменяемый снимок config_t; SIGHUP только выставляет
       флаг, а разбор и применение идут в главном цикле
     - Добавлены порты scheduler и event_loop; таймеры и ожидание X11-событий
       вынесены из главного цикла
-    - Команды, snippets и sendkeys перенесены в use_cases; добавлен порт
+    - Команды, snippets и sendkeys перенесены в use-cases; добавлен порт
       command_runner и fork-реализация с %i/%o, таймаутом и временными файлами
     - Трей и системная интеграция вынесены в ports/tray,
-      infrastructure/x11/tray, presentation/tray_indicator и
+      infrastructure/x11/tray, presentation/tray-indicator и
       infrastructure/system/desktop
     - Юнит-тесты линкуются с модулями, без #include монолита; добавлены наборы
       commands, desktop, tray и config reload

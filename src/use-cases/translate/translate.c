@@ -1,6 +1,6 @@
 #include "translate.h"
 
-#include "../../domain/case_invert/case_invert.h"
+#include "../../domain/case-invert/case-invert.h"
 
 void translate_use_case_buffer(keyboard_port_t* keyboard, unikey_t* word, int pos,
                                int from, int backspace) {

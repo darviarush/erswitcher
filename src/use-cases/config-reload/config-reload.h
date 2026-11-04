@@ -2,12 +2,12 @@
 #define __ERSWITCHER_USE_CASES_CONFIG_RELOAD__H__
 
 #include "../../domain/config/config.h"
-#include "../../ports/config_store.h"
+#include "../../ports/config-store.h"
 
 /*
  * Загрузка и разбор конфигурации
  *
- * Файловый ввод-вывод выполняет ports/config_store. Здесь только построение
+ * Файловый ввод-вывод выполняет ports/config-store. Здесь только построение
  * нового снимка config_t: привязки хранят действие-enum и аргумент, без
  * function pointer и sentinel-значений
  */

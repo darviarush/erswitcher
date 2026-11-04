@@ -1,7 +1,7 @@
 #include <string.h>
 #include <wctype.h>
 
-#include "input_buffer.h"
+#include "input-buffer.h"
 
 void input_buffer_init(input_buffer_t* buffer) {
     memset(buffer, 0, sizeof(*buffer));

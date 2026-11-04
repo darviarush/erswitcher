@@ -2,7 +2,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "scheduler_time.h"
+#include "scheduler-time.h"
 #include "../../ports/logger.h"
 
 scheduler_system_t er_scheduler;

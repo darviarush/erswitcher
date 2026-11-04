@@ -1,7 +1,7 @@
 /*
  * Юнит-тесты чистых доменных модулей
  *
- * Собираются отдельным бинарником (tests/unit/test_domain), потому что
+ * Собираются отдельным бинарником (tests/unit/test-domain), потому что
  * монолит пока определяет одноимённые функции (utf8_strlen, from_space…)
  * После шага 2 эти тесты можно будет слить с основным набором
  */
@@ -15,10 +15,10 @@
 
 #include "../../src/domain/unikey/unikey.h"
 #include "../../src/domain/text/text.h"
-#include "../../src/domain/input_buffer/input_buffer.h"
-#include "../../src/domain/case_invert/case_invert.h"
+#include "../../src/domain/input-buffer/input-buffer.h"
+#include "../../src/domain/case-invert/case-invert.h"
 #include "../../src/domain/compose/compose.h"
-#include "../../src/domain/command_template/command_template.h"
+#include "../../src/domain/command-template/command-template.h"
 #include "../../src/domain/config/config.h"
 
 //@category unikey

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "command_template.h"
+#include "command-template.h"
 
 typedef struct {
     char* data;

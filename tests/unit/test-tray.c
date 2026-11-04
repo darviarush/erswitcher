@@ -2,7 +2,7 @@
 
 /*
  * Трей: X11-адаптер раскладывает native events в tray_event_t, а
- * presentation/tray_indicator реагирует на клик и размер, не зная X11
+ * presentation/tray-indicator реагирует на клик и размер, не зная X11
  */
 
 typedef struct {

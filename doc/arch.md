@@ -32,7 +32,7 @@ main.c / app (composition root)
         └──────────────► infrastructure ──► ports (интерфейсы)
                                                    ▲
                                                    │
-                                             use_cases
+                                             use-cases
                                                    │
                                                    ▼
                                                domain
@@ -41,13 +41,13 @@ main.c / app (composition root)
 Правила:
 
 - `domain` не знает ни о X11, ни о файлах, ни о процессах, ни о времени.
-- `use_cases` знает `domain` и **интерфейсы** из `ports`, но не их
+- `use-cases` знает `domain` и **интерфейсы** из `ports`, но не их
   реализации.
 - `infrastructure` реализует `ports`; здесь живут X11, `fork/exec`,
   файловая система и системные часы.
-- `presentation` — трей и консольный вывод; использует `use_cases`/`ports`.
+- `presentation` — трей и консольный вывод; использует `use-cases`/`ports`.
 - `main.c` и `app/` — единственное место, где всё связывается вместе.
-- В `domain/` и `use_cases/` запрещены `#include <X11/...>`, `fork`,
+- В `domain/` и `use-cases/` запрещены `#include <X11/...>`, `fork`,
   `exec*`, `open`, `system`, `pthread` и т.п.
 
 ## 3. Семантика транслитерации (вариант А)
@@ -88,29 +88,29 @@ main.c / app (composition root)
 src/
 ├── domain/                         # чистые правила, без I/O
 │   ├── unikey.h/.c                 # unikey_t, доменные ERS_MOD_*, операции над ключом
-│   ├── input_buffer.h/.c           # word[], symbol[], pos: init/reset/push/backspace/from_space
-│   ├── case_invert.h/.c            # инверсия ShiftMask у unikey_t
+│   ├── input-buffer.h/.c           # word[], symbol[], pos: init/reset/push/backspace/from_space
+│   ├── case-invert.h/.c            # инверсия ShiftMask у unikey_t
 │   ├── compose.h/.c                # compose_t, поиск мнемоники в буфере
 │   ├── config.h/.c                 # Config, Binding, ComposeEntry, Snippet, Command, Options
-│   ├── command_template.h/.c       # чистая подстановка %i/%o/%%
+│   ├── command-template.h/.c       # чистая подстановка %i/%o/%%
 │   └── text.h/.c                   # utf8_strlen, обход UTF-8 (перенос из монолита)
 │
-├── use_cases/                      # сценарии приложения
+├── use-cases/                      # сценарии приложения
 │   ├── input.h/.c                  # приём клавиши, Backspace, сброс при смене окна/мыши
 │   ├── translate.h/.c              # word/text/selected translate и invertcase
 │   ├── compose_input.h/.c          # применение compose и возврат курсора
 │   ├── sendkeys.h/.c               # ввод строки через клавиатуру
 │   ├── snippets.h/.c               # вставка сниппета через clipboard
 │   ├── commands.h/.c               # координация [commands]
-│   └── config_reload.h/.c          # загрузка/перезагрузка конфига, привязка функций
+│   └── config-reload.h/.c          # загрузка/перезагрузка конфига, привязка функций
 │
 ├── ports/                          # только объявления контрактов
 │   ├── keyboard.h                  # состояние, раскладки, инъекция, модификаторы
 │   ├── clipboard.h                 # асинхронные get/set, INCR
 │   ├── scheduler.h                 # after/tick/таймауты
-│   ├── event_loop.h                # ожидание и доставка X11-событий
-│   ├── config_store.h              # чтение/запись/путь конфига
-│   ├── command_runner.h            # запуск шелл-команд, timeout, %i/%o
+│   ├── event-loop.h                # ожидание и доставка X11-событий
+│   ├── config-store.h              # чтение/запись/путь конфига
+│   ├── command-runner.h            # запуск шелл-команд, timeout, %i/%o
 │   ├── tray.h                      # systray: dock, клик, запуск конфигуратора
 │   └── logger.h                    # debug/warn/info
 │
@@ -122,13 +122,13 @@ src/
 │   │   ├── events.h/.c             # XNextEvent/XPending/select
 │   │   └── tray.h/.c               # _NET_SYSTEM_TRAY, окно, клики
 │   └── system/
-│       ├── config_store_fs.h/.c    # ~/.config/erswitcher.conf
-│       ├── command_runner_fork.h/.c # fork/system, временные файлы, timeout
-│       ├── scheduler_time.h/.c     # gettimeofday/select
+│       ├── config-store-fs.h/.c    # ~/.config/erswitcher.conf
+│       ├── command-runner-fork.h/.c # fork/system, временные файлы, timeout
+│       ├── scheduler-time.h/.c     # gettimeofday/select
 │       └── desktop.h/.c            # autostart/desktop, goto_home
 │
 ├── presentation/
-│   └── tray_indicator.h/.c         # отрисовка/состояние иконки, поверх tray-порта
+│   └── tray-indicator.h/.c         # отрисовка/состояние иконки, поверх tray-порта
 │
 └── app/
     ├── app.h                       # состояние, обёртки, API для main/тестов
@@ -140,7 +140,7 @@ main.c                              # только вызов app_run()
 `tests/`:
 
 ```
-tests/unit/          # domain и use_cases с фейковыми портами
+tests/unit/          # domain и use-cases с фейковыми портами
 tests/functional/    # существующие Tcl/Tk-тесты конфигуратора
 ```
 
@@ -152,18 +152,18 @@ tests/functional/    # существующие Tcl/Tk-тесты конфигу
 | `init_keyboard`, `groups`, `group_ru`, `group_en`, `maybe_group`, `set_group`, `set_locks` | раскладки и локи | `ports/keyboard` + `infrastructure/x11/keyboard` |
 | `press`, `send_mods`, `press_mods`, `send_key`, `press_key`, `active_codes`, `active_state`, `clear_active_mods`, `recover_active_mods` | инъекция клавиш и активные модификаторы | `infrastructure/x11/keyboard` |
 | `keyboard_buf1/2`, `saved`, `keys` | опрос нажатых клавиш | `infrastructure/x11/keyboard` |
-| `pos`, `word`, `keys_pressed`, `add_to_buffer`, `from_space` | кольцевой буфер ввода | `domain/input_buffer` + `use_cases/input`; `keys_pressed` остаётся состоянием опроса |
-| `change_key` | классификация клавиши и диспетчеризация | `use_cases/input` + привязки конфига |
-| `print_translate_buffer`, `print_invertcase_buffer`, `word_*`, `text_*`, `selection_*` | сценарии трансляции/регистра | `use_cases/translate` + `domain/case_invert`; `selection_*` используют clipboard-порт |
-| `sendkeys`, `to_buffer`, `utf8_strlen`, `FOR_UTF8`, `press_key_multi` | ввод UTF-8 строки | `use_cases/sendkeys` + `domain/text` |
-| `compose_map`, `compose`, `cursor_back`, `cursor_back__fn` | мнемоники и возврат курсора | `domain/compose` + `use_cases/compose_input` |
+| `pos`, `word`, `keys_pressed`, `add_to_buffer`, `from_space` | кольцевой буфер ввода | `domain/input-buffer` + `use-cases/input`; `keys_pressed` остаётся состоянием опроса |
+| `change_key` | классификация клавиши и диспетчеризация | `use-cases/input` + привязки конфига |
+| `print_translate_buffer`, `print_invertcase_buffer`, `word_*`, `text_*`, `selection_*` | сценарии трансляции/регистра | `use-cases/translate` + `domain/case-invert`; `selection_*` используют clipboard-порт |
+| `sendkeys`, `to_buffer`, `utf8_strlen`, `FOR_UTF8`, `press_key_multi` | ввод UTF-8 строки | `use-cases/sendkeys` + `domain/text` |
+| `compose_map`, `compose`, `cursor_back`, `cursor_back__fn` | мнемоники и возврат курсора | `domain/compose` + `use-cases/compose_input` |
 | `get_selection`, `set_clipboard`, `clipboard_*`, `selection_*`, `incr_*`, части `event_next` | буфер обмена и INCR | `ports/clipboard` + `infrastructure/x11/clipboard` |
-| `shift_leftArrow`, `control_insert`, `shift_insert`, `copy_selection`, `insert_from_clipboard`, `copy_selection_next` | операции через clipboard | `use_cases` (translate/snippets/compose) + `ports/clipboard` |
-| `timers`, `timers_size`, `after`, `timers_apply` | отложенные вызовы | `ports/scheduler` + `infrastructure/system/scheduler_time` |
+| `shift_leftArrow`, `control_insert`, `shift_insert`, `copy_selection`, `insert_from_clipboard`, `copy_selection_next` | операции через clipboard | `use-cases` (translate/snippets/compose) + `ports/clipboard` |
+| `timers`, `timers_size`, `after`, `timers_apply` | отложенные вызовы | `ports/scheduler` + `infrastructure/system/scheduler-time` |
 | `event_next`, `event_delay`, `XQueryKeymap`-опрос из `app_run` | событийный цикл | `ports/event_loop` + `infrastructure/x11/events` + `app/app_run` |
-| `load_config`, `keyfn*`, `compose_map*`, `signal_load_config` | конфиг и привязки | `domain/config` + `use_cases/config_reload` + `ports/config_store` |
-| `run_command`, `command_fmt2ptr`, `on_run_command`, `_interval_run_command`, `curcommand*` | `[commands]` | `use_cases/commands` + `ports/command_runner` + `infrastructure/system/command_runner_fork` |
-| `send_systray_message`, окно в `open_display`, `ButtonPress`, `ClientMessage`, `ConfigureNotify` | systray | `ports/tray` + `infrastructure/x11/tray` + `presentation/tray_indicator` |
+| `load_config`, `keyfn*`, `compose_map*`, `signal_load_config` | конфиг и привязки | `domain/config` + `use-cases/config-reload` + `ports/config-store` |
+| `run_command`, `command_fmt2ptr`, `on_run_command`, `_interval_run_command`, `curcommand*` | `[commands]` | `use-cases/commands` + `ports/command-runner` + `infrastructure/system/command-runner-fork` |
+| `send_systray_message`, окно в `open_display`, `ButtonPress`, `ClientMessage`, `ConfigureNotify` | systray | `ports/tray` + `infrastructure/x11/tray` + `presentation/tray-indicator` |
 | `goto_home`, `init_desktop`, `check_any_instance` | системная интеграция | `infrastructure/system/desktop` |
 | `print_sym`, `get_event_type`, `DEBUG`, диагностика | логирование | `ports/logger` + `presentation/console`; `print_sym` пока в X11-адаптере |
 | `open_display`, атомы, `xerror` | X11-соединение | `infrastructure/x11/display` |
@@ -236,7 +236,7 @@ X11-адаптер. Обёртки исчезнут после переноса 
 - ожидание события с таймаутом (`select` по `ConnectionNumber`);
 - доставка X11-событий;
 - опрос клавиатуры (`XQueryKeymap`) остаётся в X11-адаптере, а решение
-  «что делать с изменением» — в `use_cases/input`.
+  «что делать с изменением» — в `use-cases/input`.
 
 ### config_store
 
@@ -285,7 +285,7 @@ typedef struct {
 Правила:
 
 - `InputBuffer` владеет `word[]`, `symbol[]`, `pos`; `keys_pressed`
-  относится к опросу клавиатуры и остаётся в `use_cases/input`/
+  относится к опросу клавиатуры и остаётся в `use-cases/input`/
   X11-адаптере;
 - `Config` — неизменяемый снимок; при перезагрузке новый конфиг
   собирается целиком и заменяет старый, старый освобождается;
@@ -333,11 +333,11 @@ typedef struct {
 Вынести и покрыть тестами:
 
 - `domain/unikey`;
-- `domain/input_buffer`;
-- `domain/case_invert`;
+- `domain/input-buffer`;
+- `domain/case-invert`;
 - `domain/compose` (поиск, без вставки);
 - `domain/text` (UTF-8);
-- `domain/command_template`;
+- `domain/command-template`;
 - `domain/config` (модель и разбор значений без I/O и X11).
 
 Монолит продолжает работать; новые модули используются через адаптеры
@@ -360,12 +360,12 @@ typedef struct {
 - добавлен отдельный набор `keyboard port` в юнит-тестах: контракт
   проверяется через мок X11;
 - `add_to_buffer`/`from_space` и обработка Backspace/управляющих клавиш
-  перенесены в `use_cases/input`; классификация клавиши идёт через
+  перенесены в `use-cases/input`; классификация клавиши идёт через
   `keyboard->kind()`, без X11 в сценарии;
 - `print_translate_buffer`/`print_invertcase_buffer` и `word_*`/`text_*`
-  перенесены в `use_cases/translate` (вариант А);
-- глобальные `pos/word` заменены на `domain/input_buffer` (`input`):
-  `use_cases/input` пополняет `word[]` и `symbol[]`, `from_space` читает
+  перенесены в `use-cases/translate` (вариант А);
+- глобальные `pos/word` заменены на `domain/input-buffer` (`input`):
+  `use-cases/input` пополняет `word[]` и `symbol[]`, `from_space` читает
   сохранённые символы; `to_buffer` тоже заполняет оба массива;
 - добавлен набор `use cases` с фейковым портом клавиатуры;
 - `delay` из `[options]` устанавливается через `keyboard->set_delay()`,
@@ -401,7 +401,7 @@ typedef struct {
 Сделано:
 
 - введён `ports/scheduler`: `after(seconds, fn, context)` и `tick()`;
-  системная реализация `infrastructure/system/scheduler_time` хранит
+  системная реализация `infrastructure/system/scheduler-time` хранит
   очередь из 256 одноразовых таймеров и по-прежнему использует
   `gettimeofday`, поэтому задержки команд и snippets не изменились;
 - введён `ports/event_loop`: `wait(timeout)` и `drain(handler)`;
@@ -425,10 +425,10 @@ typedef struct {
 
 Сделано:
 
-- введён `ports/config_store` (`path`/`read`/`ensure_default`) и файловая
-  реализация `infrastructure/system/config_store_fs`; текст конфига по
+- введён `ports/config-store` (`path`/`read`/`ensure_default`) и файловая
+  реализация `infrastructure/system/config-store-fs`; текст конфига по
   умолчанию перенесён туда без изменений;
-- введён `use_cases/config_reload`: текст разбирается в `config_t` с
+- введён `use-cases/config-reload`: текст разбирается в `config_t` с
   `options`, привязками и `[compose]`; файловый ввод-вывод остаётся за
   портом, X11 — за резолвером клавиш;
 - `keyfn_t` с `void (*fn)(char*)` и sentinel-значениями удалён: привязки
@@ -451,17 +451,17 @@ typedef struct {
 
 Сделано:
 
-- введён `ports/command_runner` (`prepare`/`start`/`poll`/`cancel`/
+- введён `ports/command-runner` (`prepare`/`start`/`poll`/`cancel`/
   `output`) и fork-реализация
-  `infrastructure/system/command_runner_fork`: подстановки `%i`/`%o`/`%%`,
+  `infrastructure/system/command-runner-fork`: подстановки `%i`/`%o`/`%%`,
   временные файлы, `system`, `waitpid` и убийство группы процессов;
-- `use_cases/commands` хранит только состояние сценария: запрет
+- `use-cases/commands` хранит только состояние сценария: запрет
   параллельного запуска, ожидание clipboard для `%i`, интервал опроса,
   таймаут и вставку вывода; время идёт через `ports/scheduler`, процессы —
-  через `ports/command_runner`;
-- `use_cases/sendkeys` вводит UTF-8 строку через `ports/keyboard`, без
+  через `ports/command-runner`;
+- `use-cases/sendkeys` вводит UTF-8 строку через `ports/keyboard`, без
   X11 и без старых макросов `FOR_UTF8`;
-- `use_cases/snippets` кладёт текст в `ports/clipboard` и ставит
+- `use-cases/snippets` кладёт текст в `ports/clipboard` и ставит
   отложенный Shift+Insert через `ports/scheduler`/`ports/keyboard`;
 - монолит оставил только compatibility-обёртки `sendkeys()`,
   `insert_from_clipboard()`, `run_command()`, `command_fmt2ptr()`;
@@ -484,7 +484,7 @@ typedef struct {
   `infrastructure/x11/tray` (`_NET_SYSTEM_TRAY_S0`,
   `_NET_SYSTEM_TRAY_OPCODE`, ClientMessage/ButtonPress/ConfigureNotify/
   Expose);
-- `presentation/tray_indicator` хранит размер иконки и вызывает callback
+- `presentation/tray-indicator` хранит размер иконки и вызывает callback
   клика, не зная про X11; в приложении этот callback запускает
   конфигуратор;
 - `infrastructure/system/desktop` владеет `goto_home`, desktop/autostart
@@ -516,7 +516,7 @@ typedef struct {
   snippet, sendkeys, compose, `word translate`, SIGHUP.
 
 Критерии готовности из раздела 11 выполнены: в `domain/` и
-`use_cases/` нет X11/файлов/процессов/часов; `main.c` только запускает
+`use-cases/` нет X11/файлов/процессов/часов; `main.c` только запускает
 `app_run`; сборка идёт из объектных файлов.
 
 После каждого шага обязательны:
@@ -531,7 +531,7 @@ make test
 ## 10. Тесты после разделения
 
 - `domain` — чистые тесты без X11 и без файлов.
-- `use_cases` — тесты с фейковыми `keyboard`, `clipboard`, `scheduler`,
+- `use-cases` — тесты с фейковыми `keyboard`, `clipboard`, `scheduler`,
   `command_runner`, `config_store`.
 - `infrastructure/x11` — минимум интеграционных тестов; основная
   проверка — существующие функциональные тесты и ручной smoke.
@@ -542,7 +542,7 @@ make test
 
 ## 11. Критерии готовности
 
-1. В `domain/` и `use_cases/` нет X11, файлового I/O, `fork/exec`,
+1. В `domain/` и `use-cases/` нет X11, файлового I/O, `fork/exec`,
    `system`, работы со временем.
 2. `main.c` только собирает зависимости и запускает `app_run`.
 3. `erswitcher.c` удалён; сборка идёт из объектных файлов.

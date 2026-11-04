@@ -5,7 +5,7 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "config_reload.h"
+#include "config-reload.h"
 #include "../../domain/text/text.h"
 
 static void report_at(

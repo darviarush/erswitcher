@@ -1,7 +1,7 @@
 #ifndef __ERSWITCHER_INFRASTRUCTURE_SYSTEM_CONFIG_STORE_FS__H__
 #define __ERSWITCHER_INFRASTRUCTURE_SYSTEM_CONFIG_STORE_FS__H__
 
-#include "../../ports/config_store.h"
+#include "../../ports/config-store.h"
 
 /*
  * Файловая реализация config_store

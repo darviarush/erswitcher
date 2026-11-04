@@ -1,13 +1,13 @@
 #ifndef __ERSWITCHER_USE_CASES_INPUT__H__
 #define __ERSWITCHER_USE_CASES_INPUT__H__
 
-#include "../../domain/input_buffer/input_buffer.h"
+#include "../../domain/input-buffer/input-buffer.h"
 #include "../../ports/keyboard.h"
 
 /*
  * Сценарий ввода
  *
- * Владелец буфера — domain/input_buffer: word[], symbol[], pos
+ * Владелец буфера — domain/input-buffer: word[], symbol[], pos
  * Сценарий не знает, откуда берутся клавиши; классификацию
  * (Backspace/управляющая/печатная) даёт порт клавиатуры
  */

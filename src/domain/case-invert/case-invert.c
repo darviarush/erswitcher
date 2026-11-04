@@ -1,4 +1,4 @@
-#include "case_invert.h"
+#include "case-invert.h"
 
 unikey_t unikey_invert_shift(unikey_t key) {
     key.mods ^= ERS_MOD_SHIFT;

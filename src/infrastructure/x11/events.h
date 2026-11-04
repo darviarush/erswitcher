@@ -3,7 +3,7 @@
 
 #include <X11/Xlib.h>
 
-#include "../../ports/event_loop.h"
+#include "../../ports/event-loop.h"
 
 typedef struct {
     Display* display;

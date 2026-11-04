@@ -2,7 +2,7 @@
 #define __ERSWITCHER_USE_CASES_COMMANDS__H__
 
 #include "../../ports/clipboard.h"
-#include "../../ports/command_runner.h"
+#include "../../ports/command-runner.h"
 #include "../../ports/scheduler.h"
 
 /*

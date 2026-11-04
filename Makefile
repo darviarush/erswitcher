@@ -21,21 +21,21 @@ TEST_LIBS_LOCAL = -lm -lX11 -lxkbcommon
 # Чистые доменные модули: без X11, файлов и процессов.
 DOMAIN_SOURCES = \
 	src/domain/text/text.c \
-	src/domain/input_buffer/input_buffer.c \
-	src/domain/case_invert/case_invert.c \
+	src/domain/input-buffer/input-buffer.c \
+	src/domain/case-invert/case-invert.c \
 	src/domain/compose/compose.c \
-	src/domain/command_template/command_template.c \
+	src/domain/command-template/command-template.c \
 	src/domain/config/config.c
 DOMAIN_OBJECTS = $(DOMAIN_SOURCES:.c=.o)
 
 # Сценарии приложения: зависят от domain и ports, но не от X11.
 USE_CASE_SOURCES = \
-	src/use_cases/input/input.c \
-	src/use_cases/translate/translate.c \
-	src/use_cases/sendkeys/sendkeys.c \
-	src/use_cases/snippets/snippets.c \
-	src/use_cases/commands/commands.c \
-	src/use_cases/config_reload/config_reload.c
+	src/use-cases/input/input.c \
+	src/use-cases/translate/translate.c \
+	src/use-cases/sendkeys/sendkeys.c \
+	src/use-cases/snippets/snippets.c \
+	src/use-cases/commands/commands.c \
+	src/use-cases/config-reload/config-reload.c
 USE_CASE_OBJECTS = $(USE_CASE_SOURCES:.c=.o)
 
 # Инфраструктурные адаптеры. В доменных тестах не участвуют.
@@ -44,20 +44,20 @@ INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/clipboard.c \
 	src/infrastructure/x11/events.c \
 	src/infrastructure/x11/tray.c \
-	src/infrastructure/system/scheduler_time.c \
+	src/infrastructure/system/scheduler-time.c \
 	src/infrastructure/system/logger.c \
-	src/infrastructure/system/config_store_fs.c \
-	src/infrastructure/system/command_runner_fork.c \
+	src/infrastructure/system/config-store-fs.c \
+	src/infrastructure/system/command-runner-fork.c \
 	src/infrastructure/system/desktop.c
 INFRASTRUCTURE_OBJECTS = $(INFRASTRUCTURE_SOURCES:.c=.o)
 
 # Слой представления: состояние иконки поверх ports/tray.
 PRESENTATION_SOURCES = \
-	src/presentation/tray_indicator.c
+	src/presentation/tray-indicator.c
 PRESENTATION_OBJECTS = $(PRESENTATION_SOURCES:.c=.o)
 
 APP_OBJECTS = src/app/app.o main.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)
-TEST_DOMAIN = tests/unit/test_domain
+TEST_DOMAIN = tests/unit/test-domain
 
 # AppImage и GitHub Releases. VERSION берётся из README.md, но её можно
 # переопределить: make appimage VERSION=7.3
@@ -75,7 +75,7 @@ RELEASE_TITLE ?= erswitcher $(VERSION)
 erswitcher: $(APP_OBJECTS)	## Компилирует erswitcher
 		gcc $(CFLAGS) $(CLIBS) -o $@ $^
 
-src/app/app.o: src/app/app.c $(wildcard src/app/*.h) $(wildcard src/domain/*/*.h) $(wildcard src/use_cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h) $(wildcard src/presentation/*.h)
+src/app/app.o: src/app/app.c $(wildcard src/app/*.h) $(wildcard src/domain/*/*.h) $(wildcard src/use-cases/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h) $(wildcard src/presentation/*.h)
 		gcc $(CFLAGS) -c -o $@ src/app/app.c
 
 main.o: main.c
@@ -84,7 +84,7 @@ main.o: main.c
 $(DOMAIN_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
 
-$(USE_CASE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/use_cases/*/*.h)
+$(USE_CASE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/use-cases/*/*.h)
 		gcc $(CFLAGS) -c -o $@ $<
 
 $(INFRASTRUCTURE_OBJECTS): %.o: %.c $(wildcard src/domain/*/*.h) $(wildcard src/ports/*.h) $(wildcard src/infrastructure/x11/*.h) $(wildcard src/infrastructure/system/*.h)
@@ -179,7 +179,7 @@ test-unit: src/app/app.o $(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_
 			../../src/app/app.o $(addprefix ../../,$(DOMAIN_OBJECTS) $(USE_CASE_OBJECTS) $(INFRASTRUCTURE_OBJECTS) $(PRESENTATION_OBJECTS)) \
 			$$(pkg-config --cflags --libs $(TEST_LIBS)) $(TEST_LIBS_LOCAL)
 		cd tests/unit && ./test
-		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test_domain.c \
+		$(CC) $(TEST_CFLAGS) -o $(TEST_DOMAIN) tests/unit/test-domain.c \
 			$(DOMAIN_OBJECTS) $$(pkg-config --cflags --libs check)
 		./$(TEST_DOMAIN)
 

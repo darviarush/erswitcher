@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "tray_indicator.h"
+#include "tray-indicator.h"
 #include "../ports/logger.h"
 
 static void tray_indicator_update_size(tray_indicator_t* self) {

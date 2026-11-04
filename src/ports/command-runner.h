@@ -15,7 +15,7 @@
  *  - output() отдаёт захваченный вывод %o до следующего start()/cancel()
  *
  * Таймаут остаётся в сценарии: он отсчитывается через ports/scheduler,
- * а не через wall-clock API внутри use_cases
+ * а не через wall-clock API внутри use-cases
  */
 
 typedef struct command_runner_port command_runner_port_t;

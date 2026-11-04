@@ -7,11 +7,11 @@
 `make test-unit` собирает и запускает два бинарника:
 
 * `tests/unit/test` — тесты приложения и портов. К нему линкуются
-  `src/app/app.o`, `src/use_cases/**/*.o`, адаптеры
-  `src/infrastructure/**/*.o` и `src/presentation/tray_indicator.o`.
+  `src/app/app.o`, `src/use-cases/**/*.o`, адаптеры
+  `src/infrastructure/**/*.o` и `src/presentation/tray-indicator.o`.
   `test.h` подключает `tests/unit/mock.c` с заглушками X11; монолит
   `erswitcher.c` больше не используется;
-* `tests/unit/test_domain` — чистые доменные модули из `src/domain/`
+* `tests/unit/test-domain` — чистые доменные модули из `src/domain/`
   (`text`, `input_buffer`, `case_invert`, `compose`, `command_template`,
   `config`). Они линкуются как обычные объектные файлы и не требуют X11.
 
@@ -39,12 +39,12 @@ escape-последовательности и предупреждения о �
 `command_runner`, `clipboard` и `scheduler`: `%i`/`%o`, вставка вывода,
 таймаут, пустая команда и запрет параллельного запуска. `sendkeys` и
 `snippets` проверяются существующими наборами через compatibility-обёртки
-монолита; их реализация уже вынесена в `src/use_cases/`.
+монолита; их реализация уже вынесена в `src/use-cases/`.
 
 Системная интеграция проверяется наборами `desktop` и `tray`: создание
 `.desktop`/autostart-файлов без перезаписи, `desktop_goto_home`, запуск
 конфигуратора по fork/exec; раскладка X11-событий трея в `tray_event_t`
-и callback клика в `presentation/tray_indicator`.
+и callback клика в `presentation/tray-indicator`.
 
 Буфер обмена проверяется набором `clipboard`: `set`/`clear`, отдача
 собственного буфера, вызов callback при отсутствии владельца,

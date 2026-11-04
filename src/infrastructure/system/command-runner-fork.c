@@ -7,8 +7,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "command_runner_fork.h"
-#include "../../domain/command_template/command_template.h"
+#include "command-runner-fork.h"
+#include "../../domain/command-template/command-template.h"
 
 #define COMMAND_RUNNER_INFILE "/tmp/erswitcher-input"
 #define COMMAND_RUNNER_OUTFILE "/tmp/erswitcher-output"
