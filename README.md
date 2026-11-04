@@ -136,6 +136,20 @@ sudo pacman -S --needed base-devel git pkgconf libx11 libxkbcommon libxtst \
 yay -S --needed appimagetool-bin
 ```
 
+# DEBUG
+
+Отладочный вывод по умолчанию выключен. Включить его можно переменной
+окружения:
+
+```sh
+ERSWITCHER_DEBUG=1 ./erswitcher
+ERSWITCHER_DEBUG=1 make test
+```
+
+Каждая строка отладочного вывода имеет временную метку в секундах от
+запуска приложения, например `[         0.123456]`. По разнице меток
+можно измерять интервалы между событиями. Вывод идёт в stderr.
+
 # AUTOLOAD
 
 При старте _EN—RU Switcher_ переписывает файлы в каталоге пользователя **~/.local/applications/erswitcher.desktop** и **~/.config/autostart/erswitcher.desktop**. Таким образом он сразу же запускается при старте рабочего стола поддерживающего стандарт _freedesktop.org_.

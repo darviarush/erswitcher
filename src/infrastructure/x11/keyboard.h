@@ -2,6 +2,7 @@
 #define __ERSWITCHER_INFRASTRUCTURE_X11_KEYBOARD__H__
 
 #include <X11/Xlib.h>
+#include <stddef.h>
 
 #include "../../ports/keyboard.h"
 
@@ -40,7 +41,10 @@ extern keyboard_x11_t er_kbd;
 // Заполняет порт колбэками, работающими с state
 void keyboard_x11_port(keyboard_port_t* port, keyboard_x11_t* state);
 
-// Отладочная печать модификаторов и имени клавиши (перенесена из монолита)
+// Форматирует модификаторы и имя клавиши в буфер
+int keyboard_x11_format_sym(char* out, size_t size, int mods, uint32_t keysym);
+
+// Отладочная печать модификаторов и имени клавиши
 void keyboard_x11_print_sym(int mods, uint32_t keysym);
 
 #endif /* __ERSWITCHER_INFRASTRUCTURE_X11_KEYBOARD__H__ */

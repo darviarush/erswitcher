@@ -53,6 +53,7 @@
 #include "../ports/config_store.h"
 #include "../ports/command_runner.h"
 #include "../ports/tray.h"
+#include "../ports/logger.h"
 #include "../infrastructure/x11/keyboard.h"
 #include "../infrastructure/x11/clipboard.h"
 #include "../infrastructure/x11/events.h"

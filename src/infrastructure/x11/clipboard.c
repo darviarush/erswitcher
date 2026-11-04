@@ -4,8 +4,7 @@
 #include <string.h>
 
 #include "clipboard.h"
-
-#define CLIPBOARD_DEBUG 1
+#include "../../ports/logger.h"
 
 clipboard_x11_t er_clipboard;
 
@@ -88,18 +87,12 @@ static void get_impl(clipboard_x11_t* state, clipboard_selection_t selection,
         return;
     }
 
-    if(CLIPBOARD_DEBUG) {
-        printf("get_selection: owner = 0x%lX %s\n", owner,
-               state->window == owner ? "одинаков с w" : "разный с w");
-        fflush(stdout);
-    }
+    DEBUG_LOG("get_selection: owner = 0x%lX %s\n", owner,
+              state->window == owner ? "одинаков с w" : "разный с w");
 
     // Если владелец буфера мы же, отдаём копию своих данных сразу
     if(state->window == owner) {
-        if(CLIPBOARD_DEBUG) {
-            printf("get_selection: буфер - мы же\n");
-            fflush(stdout);
-        }
+        DEBUG_LOG("get_selection: буфер - мы же\n");
 
         if(state->send_data) {
             char* copy = malloc((size_t) state->send_len + 1);
@@ -120,9 +113,9 @@ static void get_impl(clipboard_x11_t* state, clipboard_selection_t selection,
                       state->window, CurrentTime);
     XSync(state->display, False);
 
-    if(CLIPBOARD_DEBUG) {
+    if(ERSWITCHER_DEBUG) {
         char* fmt_name = XGetAtomName(state->display, fmt);
-        fprintf(stderr, "get_selection %s!\n", fmt_name ? fmt_name : "(none)");
+        DEBUG_LOG("get_selection %s!\n", fmt_name ? fmt_name : "(none)");
         if(fmt_name) XFree(fmt_name);
     }
 }
@@ -143,9 +136,8 @@ static void set_impl(clipboard_x11_t* state, char* data, int len,
     XFlush(state->display);
 
     Window owner = XGetSelectionOwner(state->display, state->clipboard_atom);
-    if(CLIPBOARD_DEBUG)
-        fprintf(stderr, "set_clipboard `%s`, my window %s owner\n",
-                data ? data : "", state->window == owner ? "is" : "no");
+    DEBUG_LOG("set_clipboard `%s`, my window %s owner\n", data ? data : "",
+              state->window == owner ? "is" : "no");
 }
 
 static void clear_impl(clipboard_x11_t* state) {
@@ -198,12 +190,11 @@ static void selection_notify(clipboard_x11_t* state, XEvent* event) {
                        &format, &length, &bytesafter,
                        &result);
 
-    if(CLIPBOARD_DEBUG) {
+    if(ERSWITCHER_DEBUG) {
         char* type_name = XGetAtomName(state->display, state->receive_type);
-        printf("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s format=%i\n",
-               result ? (char*) result : "", length, bytesafter,
-               type_name ? type_name : "(none)", format);
-        fflush(stdout);
+        DEBUG_LOG("read selection: s=`%s` len=%lu after=%lu selection_retrive_type=%s format=%i\n",
+                  result ? (char*) result : "", length, bytesafter,
+                  type_name ? type_name : "(none)", format);
         if(type_name) XFree(type_name);
     }
 
@@ -264,11 +255,12 @@ static void selection_request(clipboard_x11_t* state, XEvent* event) {
         XChangeProperty(state->display, win, pty, XA_ATOM, 32, PropModeReplace,
                         (unsigned char*) types, sizeof(types) / sizeof(Atom));
 
-        if(CLIPBOARD_DEBUG) fprintf(stderr, "отправляем targets\n");
+        DEBUG_LOG("отправляем targets\n");
     } else if(target_sel != state->send_target || pty == None) {
-        if(CLIPBOARD_DEBUG) {
+        if(ERSWITCHER_DEBUG) {
             char* name = XGetAtomName(state->display, target_sel);
-            fprintf(stderr, "Запрошен clipboard в формате '%s'\n", name ? name : "(none)");
+            DEBUG_LOG("Запрошен clipboard в формате '%s'\n",
+                      name ? name : "(none)");
             if(name) XFree(name);
         }
         return;
@@ -281,11 +273,8 @@ static void selection_request(clipboard_x11_t* state, XEvent* event) {
     } else {
         XChangeProperty(state->display, win, pty, target_sel, 8, PropModeReplace,
                         (unsigned char*) state->send_data, state->send_len);
-        if(CLIPBOARD_DEBUG) {
-            printf("отправляем clipboard_s: `%s` len=%i\n",
-                   state->send_data ? state->send_data : "", state->send_len);
-            fflush(stdout);
-        }
+        DEBUG_LOG("отправляем clipboard_s: `%s` len=%i\n",
+                  state->send_data ? state->send_data : "", state->send_len);
     }
 
     XEvent res;
@@ -307,10 +296,7 @@ static void property_notify(clipboard_x11_t* state, XEvent* event) {
     if(!state->send_data) return;
     if(state->send_len <= state->selection_chunk_size) return;
 
-    if(CLIPBOARD_DEBUG) {
-        printf("state == PropertyDelete\n");
-        fflush(stdout);
-    }
+    DEBUG_LOG("state == PropertyDelete\n");
 
     int len = state->send_pos + state->selection_chunk_size < state->send_data + state->send_len ? state->selection_chunk_size : (int) (state->send_data + state->send_len - state->send_pos);
 
@@ -360,8 +346,7 @@ void clipboard_x11_init(clipboard_x11_t* state, Display* display, Window window)
     state->selection_chunk_size = XExtendedMaxRequestSize(display) / 4;
     if(!state->selection_chunk_size) state->selection_chunk_size = XMaxRequestSize(display) / 4;
 
-    printf("selection_chunk_size = %i\n", state->selection_chunk_size);
-    fflush(stdout);
+    DEBUG_LOG("selection_chunk_size = %i\n", state->selection_chunk_size);
 }
 
 void clipboard_x11_reset(clipboard_x11_t* state) {

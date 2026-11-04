@@ -42,6 +42,8 @@
 #include "test_tray.c"
 
 int main(void) {
+    logger_init();
+
     int failed = 0;
 
     Suite* suites[] = {

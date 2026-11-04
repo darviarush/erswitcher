@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "tray_indicator.h"
+#include "../ports/logger.h"
 
 static void tray_indicator_update_size(tray_indicator_t* self) {
     self->tray->size(self->tray, &self->width, &self->height);
@@ -32,7 +33,7 @@ int tray_indicator_handle_event(tray_indicator_t* self,
     switch(self->tray->event(self->tray, native_event)) {
     case TRAY_EVENT_DOCKED:
         tray_indicator_update_size(self);
-        printf("win = %i x %i\n", self->width, self->height);
+        DEBUG_LOG("win = %i x %i\n", self->width, self->height);
         return 1;
 
     case TRAY_EVENT_CLICK:
@@ -41,8 +42,7 @@ int tray_indicator_handle_event(tray_indicator_t* self,
 
     case TRAY_EVENT_RESIZED:
         tray_indicator_update_size(self);
-        printf("width: %i height: %i\n", self->width, self->height);
-        fflush(stdout);
+        DEBUG_LOG("width: %i height: %i\n", self->width, self->height);
         return 1;
 
     case TRAY_EVENT_EXPOSED:

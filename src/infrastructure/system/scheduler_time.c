@@ -3,6 +3,7 @@
 #include <sys/time.h>
 
 #include "scheduler_time.h"
+#include "../../ports/logger.h"
 
 scheduler_system_t er_scheduler;
 
@@ -51,7 +52,7 @@ static void tick_impl(scheduler_port_t* port) {
             scheduler_callback_t fn = state->timers[i].fn;
             void* context = state->timers[i].context;
 
-            if(state->debug) fprintf(stderr, "fn by timer %i\n", i);
+            DEBUG_LOG("fn by timer %i\n", i);
 
             fn(context);
 

@@ -3,6 +3,11 @@
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4
 
+# Отладочный вывод включается во время запуска: ERSWITCHER_DEBUG=1 make s
+# или ERSWITCHER_DEBUG=1 ./erswitcher. На сборку это не влияет
+ERSWITCHER_DEBUG ?= 0
+export ERSWITCHER_DEBUG
+
 # Тесты собираются без -Werror и без -O4: предупреждения компилятора не должны
 # валить прогон, а libbacktrace нужны символы (-g)
 CC = cc
@@ -40,6 +45,7 @@ INFRASTRUCTURE_SOURCES = \
 	src/infrastructure/x11/events.c \
 	src/infrastructure/x11/tray.c \
 	src/infrastructure/system/scheduler_time.c \
+	src/infrastructure/system/logger.c \
 	src/infrastructure/system/config_store_fs.c \
 	src/infrastructure/system/command_runner_fork.c \
 	src/infrastructure/system/desktop.c

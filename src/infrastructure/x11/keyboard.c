@@ -10,6 +10,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "keyboard.h"
+#include "../../ports/logger.h"
 
 #define BIT(VECTOR, BIT_IDX) (((char*) (VECTOR))[BIT_IDX / 8] & (1 << (BIT_IDX % 8)))
 
@@ -20,64 +21,84 @@ static keyboard_x11_t* state_of(keyboard_port_t* port) {
     return (keyboard_x11_t*) port->context;
 }
 
-static void print_sym_impl(int mods, KeySym ks) {
+static void append_sym(char* out, size_t size, const char* text) {
+    size_t len = strlen(out);
+    if(len < size - 1) snprintf(out + len, size - len, "%s", text);
+}
+
+static void format_sym_impl(char* out, size_t size, int mods, KeySym ks) {
     int begin = 0;
+    out[0] = '\0';
+
     for(int i = 0; i < 32; i++) {
         int mask = mods & (1 << i);
         if(!mask) continue;
         if(begin)
-            printf("+");
+            append_sym(out, size, "+");
         else
             begin = 1;
         switch(mask) {
         case ShiftMask:
-            printf("⇧Shift");
+            append_sym(out, size, "⇧Shift");
             break;
         case LockMask:
-            printf("⇪🄰CapsLock");
+            append_sym(out, size, "⇪🄰CapsLock");
             break;
         case ControlMask:
-            printf("⌃⎈Ctrl");
+            append_sym(out, size, "⌃⎈Ctrl");
             break;
         case Mod1Mask:
-            printf("⌥⎇Alt");
+            append_sym(out, size, "⌥⎇Alt");
             break;
         case Mod2Mask:
-            printf("⇭NumLock");
+            append_sym(out, size, "⇭NumLock");
             break;
         case Mod3Mask:
-            printf("❖Meta");
+            append_sym(out, size, "❖Meta");
             break;
         case Mod4Mask:
-            printf("⌘⊞❖Super");
+            append_sym(out, size, "⌘⊞❖Super");
             break;
         case Mod5Mask:
-            printf("✦Hyper");
+            append_sym(out, size, "✦Hyper");
             break;
-        default:
-            printf("Mod%i", i);
+        default: {
+            char buf[32];
+            snprintf(buf, sizeof buf, "Mod%i", i);
+            append_sym(out, size, buf);
+        }
         }
     }
 
-    if(begin) printf("+");
+    if(begin) append_sym(out, size, "+");
     switch(ks) {
-    case XK_Escape: printf("⎋"); break;
-    case XK_BackSpace: printf("⌫←"); break;
-    case XK_Delete: printf("⌦"); break;
-    case XK_Return: printf("↵↩⏎⌤⌅⎆"); break;
-    case XK_Tab: printf("↹"); break;
-    case XK_Home: printf("⇱"); break;
-    case XK_End: printf("⇲"); break;
-    case XK_Menu: printf("≣"); break;
-    case XK_Pause: printf("⎉"); break;
-    case XK_Print: printf("⎙"); break;
-    case XK_Multi_key: printf("⎄"); break;
+    case XK_Escape: append_sym(out, size, "⎋"); break;
+    case XK_BackSpace: append_sym(out, size, "⌫←"); break;
+    case XK_Delete: append_sym(out, size, "⌦"); break;
+    case XK_Return: append_sym(out, size, "↵↩⏎⌤⌅⎆"); break;
+    case XK_Tab: append_sym(out, size, "↹"); break;
+    case XK_Home: append_sym(out, size, "⇱"); break;
+    case XK_End: append_sym(out, size, "⇲"); break;
+    case XK_Menu: append_sym(out, size, "≣"); break;
+    case XK_Pause: append_sym(out, size, "⎉"); break;
+    case XK_Print: append_sym(out, size, "⎙"); break;
+    case XK_Multi_key: append_sym(out, size, "⎄"); break;
     }
-    printf("%s", XKeysymToString(ks));
+
+    const char* name = XKeysymToString(ks);
+    if(name) append_sym(out, size, name);
+}
+
+int keyboard_x11_format_sym(char* out, size_t size, int mods, uint32_t keysym) {
+    if(!out || !size) return 0;
+    format_sym_impl(out, size, mods, (KeySym) keysym);
+    return 1;
 }
 
 void keyboard_x11_print_sym(int mods, uint32_t keysym) {
-    print_sym_impl(mods, (KeySym) keysym);
+    char sym[256];
+    keyboard_x11_format_sym(sym, sizeof sym, mods, keysym);
+    DEBUG_LOG("%s", sym);
 }
 
 static void init_impl(keyboard_x11_t* s) {
@@ -168,10 +189,13 @@ static unikey_t from_keysym_impl(keyboard_x11_t* s, KeySym ks) {
 }
 
 static void press_code(keyboard_x11_t* s, int code, int is_press) {
-    unikey_t key = state_impl(s, code);
-    printf("   %s: %i ", is_press ? "press" : "release", code);
-    print_sym_impl(key.mods, to_keysym_impl(s, key));
-    printf("\n");
+    if(ERSWITCHER_DEBUG) {
+        unikey_t key = state_impl(s, code);
+        char sym[256];
+        keyboard_x11_format_sym(sym, sizeof sym, key.mods, to_keysym_impl(s, key));
+        DEBUG_LOG("   %s: %i %s\n", is_press ? "press" : "release", code, sym);
+    }
+
     XTestFakeKeyEvent(s->display, code, is_press ? 1 : 0, CurrentTime);
     XSync(s->display, False);
 }
@@ -232,19 +256,20 @@ static void set_group_impl(keyboard_x11_t* s, int group) {
     XkbLockGroup(s->display, XkbUseCoreKbd, group);
     XkbStateRec state;
     XkbGetState(s->display, XkbUseCoreKbd, &state);
-    printf("set_group: %i\n", group);
+    DEBUG_LOG("set_group: %i\n", group);
     usleep(s->delay_us);
 }
 
 static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press) {
     if(key.code == 0) {
-        printf("send_key: No Key!\n");
+        DEBUG_LOG("send_key: No Key!\n");
         return;
     }
 
     KeySym ks = to_keysym_impl(s, key);
     const char* name = XKeysymToString(ks);
-    printf("send_key: %s %s\n", name ? name : "(null)", is_press == 2 ? "" : (is_press ? "PRESS" : "RELEASE"));
+    DEBUG_LOG("send_key: %s %s\n", name ? name : "(null)",
+              is_press == 2 ? "" : (is_press ? "PRESS" : "RELEASE"));
 
     int xdelay = s->delay_us / 2;
     if(xdelay <= 0) xdelay = 1;
@@ -278,7 +303,7 @@ static void clear_active_mods_impl(keyboard_x11_t* s) {
     }
     s->active_use++;
 
-    printf("===== clear_active_mods START =====\n");
+    DEBUG_LOG("===== clear_active_mods START =====\n");
 
     init_impl(s);
     s->active_state = state_impl(s, 0);
@@ -300,11 +325,11 @@ static void clear_active_mods_impl(keyboard_x11_t* s) {
 
     set_locks(s, s->active_state.mods);
 
-    printf("===== clear_active_mods END =====\n");
+    DEBUG_LOG("===== clear_active_mods END =====\n");
 }
 
 static void recover_active_mods_impl(keyboard_x11_t* s) {
-    printf("===== recover_active_mods START =====\n");
+    DEBUG_LOG("===== recover_active_mods START =====\n");
 
     unikey_t state = state_impl(s, 0);
     send_mods(s, state.mods, 0);
@@ -321,7 +346,7 @@ static void recover_active_mods_impl(keyboard_x11_t* s) {
     set_locks(s, s->active_state.mods);
     set_group_impl(s, s->active_state.group);
 
-    printf("===== recover_active_mods END =====\n");
+    DEBUG_LOG("===== recover_active_mods END =====\n");
 
     // Парный к active_use++ в clear_active_mods_impl(). Без этого второй
     // вызов clear_active_mods() в том же процессе считает, что вложенный

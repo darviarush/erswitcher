@@ -19,7 +19,6 @@ typedef struct {
 typedef struct {
     scheduler_timer_t timers[SCHEDULER_MAX_TIMERS];
     int size;
-    int debug;
 } scheduler_system_t;
 
 extern scheduler_system_t er_scheduler;

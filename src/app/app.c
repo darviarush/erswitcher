@@ -9,7 +9,6 @@
 
 #include "app.h"
 
-#define DEBUG 1
 
 input_buffer_t input; // буфер ввода: word[], symbol[], pos
 int keys_pressed; // нажато клавишь
@@ -125,7 +124,9 @@ void set_group(int group) {
 // int meta_mask = 1 << 5;
 
 void print_sym(int mods, KeySym ks) {
-    keyboard_x11_print_sym(mods, (uint32_t) ks);
+    char sym[256];
+    keyboard_x11_format_sym(sym, sizeof sym, mods, (uint32_t) ks);
+    DEBUG_LOG("%s", sym);
 }
 
 // входит в массив
@@ -141,7 +142,6 @@ static scheduler_port_t scheduler_state;
 
 static void scheduler_port_ensure(void) {
     if(!scheduler_state.after) scheduler_system_port(&scheduler_state, &er_scheduler);
-    er_scheduler.debug = DEBUG;
 }
 
 // Единая точка постановки таймера: лениво инициализирует порт
@@ -422,7 +422,8 @@ static void handle_x_event(void* context, const void* native_event) {
     (void) context;
     XEvent* event = (XEvent*) native_event;
 
-    if(DEBUG) fprintf(stderr, "[%i %s], ", event->type, get_event_type(event->type));
+    const char* event_name = get_event_type(event->type);
+    DEBUG_LOG("event %i %s\n", event->type, event_name ? event_name : "?");
 
     if(tray_indicator_handle_event(&tray_indicator_state, event)) return;
 
@@ -448,25 +449,32 @@ void change_key(int code) {
     unikey_t key = keyboard_state(code);
     KeySym ks = KEY_TO_SYM(key);
 
-    // XkbKeysymToModifiers()
-    unsigned int state = get_input_state();
-    printf("change_key %i (", code);
-    for(int i = 0; i < 32; i++)
-        if(state & (1 << i))
-            printf("%i", i);
+    if(ERSWITCHER_DEBUG) {
+        // XkbKeysymToModifiers()
+        unsigned int state = get_input_state();
+        char state_buf[128];
+        size_t pos = 0;
+        for(int i = 0; i < 32; i++) {
+            if(state & (1 << i))
+                pos += (size_t) snprintf(state_buf + pos, sizeof state_buf - pos, "%i", i);
+            else if(pos + 1 < sizeof state_buf)
+                state_buf[pos++] = ' ';
+        }
+        state_buf[pos] = '\0';
+
+        char layout[16];
+        if(key.group == kbd_port.layout_en(&kbd_port))
+            snprintf(layout, sizeof layout, "en");
+        else if(key.group == kbd_port.layout_ru(&kbd_port))
+            snprintf(layout, sizeof layout, "ru");
         else
-            printf(" ");
-    printf(") ");
-    if(key.group == kbd_port.layout_en(&kbd_port))
-        printf("en");
-    else if(key.group == kbd_port.layout_ru(&kbd_port))
-        printf("ru");
-    else
-        printf("%i", key.group);
-    printf(": ");
-    print_sym(key.mods, ks);
-    printf("\n");
-    fflush(stdout);
+            snprintf(layout, sizeof layout, "%i", key.group);
+
+        char sym[256];
+        keyboard_x11_format_sym(sym, sizeof sym, key.mods, (uint32_t) ks);
+        DEBUG_LOG("change_key %i (%s) %s: %s\n", code, state_buf, layout, sym);
+    }
+
     // нажата комбинация? выполняем действие
     int mods = key.mods & ~(LockMask | NumMask);
 
@@ -573,7 +581,7 @@ void run_command(char* s) {
 int cursor_back = 0;
 void cursor_back__fn(void* context) {
     (void) context;
-    fprintf(stderr, "Курсор влево на %i позиций\n", cursor_back);
+    DEBUG_LOG("Курсор влево на %i позиций\n", cursor_back);
     press_key_multi(SYM_TO_KEY(XK_Left), cursor_back);
     cursor_back = 0;
 }
@@ -587,7 +595,7 @@ void compose(char*) {
 
     int match = compose_find(compose_map, compose_map_size, symbols, input.pos);
     if(match < 0) {
-        fprintf(stderr, "compose: Ничего не найдено!\n");
+        DEBUG_LOG("compose: Ничего не найдено!\n");
         return;
     }
 
@@ -597,10 +605,7 @@ void compose(char*) {
 
     cursor_back = entry->cursor_back;
 
-    if(DEBUG) {
-        printf("compose -> %s\n", to);
-        fflush(stdout);
-    }
+    DEBUG_LOG("compose -> %s\n", to);
 
     // удаляем мнемонику введённую ранее
     // Модификаторов тут не нужно: раскладку берём из последнего введённого символа,
@@ -668,36 +673,33 @@ static void apply_config_options(const config_options_t* options) {
     command_interval = options->command_interval;
     commands_use_case_set_options(&commands_uc, command_timeout, command_interval);
 
-    if(DEBUG) {
-        printf("delay = %i микросекунд\n", delay_us);
-        printf("loop_delay = %i микросекунд\n", loop_delay);
-        printf("command_timeout = %g секунд\n", command_timeout);
-        printf("command_interval = %g секунд\n", command_interval);
-    }
+    DEBUG_LOG("delay = %i микросекунд\n", delay_us);
+    DEBUG_LOG("loop_delay = %i микросекунд\n", loop_delay);
+    DEBUG_LOG("command_timeout = %g секунд\n", command_timeout);
+    DEBUG_LOG("command_interval = %g секунд\n", command_interval);
 }
 
 static void print_config_debug(void) {
-    if(!DEBUG) return;
+    if(!ERSWITCHER_DEBUG) return;
 
     for(int i = 0; i < keyfn_size; i++) {
         const config_binding_t* binding = &keyfn[i];
         KeySym ks = KEY_TO_SYM(binding->key);
-        printf("------------------------------\n");
-        print_sym(binding->key.mods, ks);
-        printf(" = %s\n", binding->arg ? binding->arg : "(null)");
-        fflush(stdout);
+        char sym[256];
+        keyboard_x11_format_sym(sym, sizeof sym, binding->key.mods, (uint32_t) ks);
+        DEBUG_LOG("------------------------------\n");
+        DEBUG_LOG("%s = %s\n", sym, binding->arg ? binding->arg : "(null)");
     }
 
     for(int i = 0; i < compose_map_size; i++) {
-        printf("compose[%i]: pos=%i cursor_back=%i -> %s\n",
-               i, compose_map[i].pos, compose_map[i].cursor_back,
-               compose_map[i].to ? compose_map[i].to : "");
+        DEBUG_LOG("compose[%i]: pos=%i cursor_back=%i -> %s\n", i,
+                  compose_map[i].pos, compose_map[i].cursor_back,
+                  compose_map[i].to ? compose_map[i].to : "");
     }
-    fflush(stdout);
 }
 
 void load_config() {
-    if(DEBUG) fprintf(stderr, "Конфигурация применяется ...\n");
+    DEBUG_LOG("Конфигурация применяется ...\n");
 
     config_store_ensure();
 
@@ -722,7 +724,7 @@ void load_config() {
         config_free(&next);
         config_clear_entries(&current_config);
         keyfn_active = -1;
-        if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
+        DEBUG_LOG("Конфигурация применена!\n");
         return;
     }
 
@@ -733,7 +735,7 @@ void load_config() {
     apply_config_options(&current_config.options);
     print_config_debug();
 
-    if(DEBUG) fprintf(stderr, "Конфигурация применена!\n");
+    DEBUG_LOG("Конфигурация применена!\n");
 }
 
 static void execute_config_action(const config_binding_t* binding) {
@@ -760,6 +762,7 @@ static void execute_config_action(const config_binding_t* binding) {
 void app_run(int ac, char** av);
 
 void app_run(int ac, char** av) {
+    logger_init();
 
     if(!ac) fprintf(stderr, "ERROR: а где путь к программе?\n");
 
