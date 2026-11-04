@@ -5,11 +5,11 @@
 #include "../../ports/config_store.h"
 
 /*
- * Загрузка и разбор конфигурации.
+ * Загрузка и разбор конфигурации
  *
  * Файловый ввод-вывод выполняет ports/config_store. Здесь только построение
  * нового снимка config_t: привязки хранят действие-enum и аргумент, без
- * function pointer и sentinel-значений.
+ * function pointer и sentinel-значений
  */
 
 typedef void (*config_reload_log_t)(void* context, const char* message);

@@ -4,9 +4,9 @@
 #include "test.h"
 
 /*
- * Системная интеграция: desktop/autostart-файлы и переход в $HOME.
+ * Системная интеграция: desktop/autostart-файлы и переход в $HOME
  * Запуск конфигуратора здесь не проверяем: это fork/exec, его покрывает
- * ручной smoke с реальным треем.
+ * ручной smoke с реальным треем
  */
 
 START_TEST(er_desktop_creates_files) {

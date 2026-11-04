@@ -4,10 +4,10 @@
 #include "../ports/tray.h"
 
 /*
- * Состояние иконки в лотке поверх ports/tray.
+ * Состояние иконки в лотке поверх ports/tray
  *
  * Клик не запускает конфигуратор напрямую: сценарий приложения передаёт
- * callback, а конкретный запуск процесса остаётся в infrastructure/system.
+ * callback, а конкретный запуск процесса остаётся в infrastructure/system
  */
 typedef struct {
     tray_port_t* tray;

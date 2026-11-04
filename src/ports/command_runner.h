@@ -2,7 +2,7 @@
 #define __ERSWITCHER_PORTS_COMMAND_RUNNER__H__
 
 /*
- * Порт запуска шелл-команд.
+ * Порт запуска шелл-команд
  *
  * Сценарий [commands] не должен знать про fork/system/waitpid, временные
  * файлы и таймауты. Порт:
@@ -12,10 +12,10 @@
  *  - start() запускает подготовленную команду в отдельном процессе и
  *    забирает строку в собственность;
  *  - poll() не блокирует и сообщает, закончился ли процесс;
- *  - output() отдаёт захваченный вывод %o до следующего start()/cancel().
+ *  - output() отдаёт захваченный вывод %o до следующего start()/cancel()
  *
  * Таймаут остаётся в сценарии: он отсчитывается через ports/scheduler,
- * а не через wall-clock API внутри use_cases.
+ * а не через wall-clock API внутри use_cases
  */
 
 typedef struct command_runner_port command_runner_port_t;
@@ -33,8 +33,8 @@ struct command_runner_port {
     char* (*prepare)(command_runner_port_t* self, const char* command,
                      const char* input, int input_len);
 
-    /* Забирает command (malloc) в собственность в любом случае.
-     * capture_output — читать ли временный outfile после завершения.
+    /* Забирает command (malloc) в собственность в любом случае
+     * capture_output — читать ли временный outfile после завершения
      * 1 — запущено, 0 — уже выполняется, -1 — ошибка */
     int (*start)(command_runner_port_t* self, char* command, int capture_output);
 
@@ -44,7 +44,7 @@ struct command_runner_port {
     /* Убивает процесс (если он есть) и освобождает временное состояние */
     void (*cancel)(command_runner_port_t* self);
 
-    /* Вывод последней завершённой команды; пустая строка, если вывода нет.
+    /* Вывод последней завершённой команды; пустая строка, если вывода нет
      * Указатель живёт до следующего start()/cancel() */
     const char* (*output)(command_runner_port_t* self, int* len);
 };

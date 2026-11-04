@@ -6,10 +6,10 @@
 #include "../../ports/command_runner.h"
 
 /*
- * fork/system-реализация command_runner.
+ * fork/system-реализация command_runner
  *
  * Состояние содержит pid, временные пути и последний вывод %o. Один
- * экземпляр на процесс: параллельный запуск запрещён контрактом.
+ * экземпляр на процесс: параллельный запуск запрещён контрактом
  */
 typedef struct {
     const char* infile;

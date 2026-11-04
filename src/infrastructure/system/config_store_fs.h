@@ -4,10 +4,10 @@
 #include "../../ports/config_store.h"
 
 /*
- * Файловая реализация config_store.
+ * Файловая реализация config_store
  *
  * Путь относительный: app_run() уже перешёл в $HOME через goto_home(),
- * поэтому `.config/erswitcher.conf` сохраняет прежнее поведение.
+ * поэтому `.config/erswitcher.conf` сохраняет прежнее поведение
  */
 
 typedef struct {

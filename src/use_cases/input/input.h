@@ -5,11 +5,11 @@
 #include "../../ports/keyboard.h"
 
 /*
- * Сценарий ввода.
+ * Сценарий ввода
  *
- * Владелец буфера — domain/input_buffer: word[], symbol[], pos.
+ * Владелец буфера — domain/input_buffer: word[], symbol[], pos
  * Сценарий не знает, откуда берутся клавиши; классификацию
- * (Backspace/управляющая/печатная) даёт порт клавиатуры.
+ * (Backspace/управляющая/печатная) даёт порт клавиатуры
  */
 typedef struct {
     input_buffer_t* buffer;

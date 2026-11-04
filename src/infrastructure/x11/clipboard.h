@@ -6,11 +6,11 @@
 #include "../../ports/clipboard.h"
 
 /*
- * Состояние X11-адаптера буфера обмена.
+ * Состояние X11-адаптера буфера обмена
  *
  * Здесь же лежат Selection/INCR-буферы и ожидающий get()-callback. Монолит
  * на время переноса обращается к ним через compatibility-макросы, но новые
- * сценарии должны использовать clipboard_port.
+ * сценарии должны использовать clipboard_port
  */
 typedef struct {
     Display* display;

@@ -7,7 +7,7 @@
 
 /*
  * X11-реализация systray: _NET_SYSTEM_TRAY_S0, _NET_SYSTEM_TRAY_OPCODE,
- * докинг окна и разбор ClientMessage/ButtonPress/ConfigureNotify/Expose.
+ * докинг окна и разбор ClientMessage/ButtonPress/ConfigureNotify/Expose
  */
 
 typedef struct {
