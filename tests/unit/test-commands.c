@@ -403,6 +403,8 @@ START_TEST(er_commands_use_case_rejects_blank_and_parallel) {
 
     commands_use_case_run(&f.use_case, "echo three");
     ck_assert_int_eq(f.runner_state.prepare_calls, 2);
+
+    commands_use_case_reset(&f.use_case);
 }
 END_TEST
 
