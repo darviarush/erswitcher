@@ -238,6 +238,7 @@ FUZZ_CFLAGS ?= -std=gnu17 -g -O1 -fno-omit-frame-pointer -Wall -Wextra -Werror \
 	-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all
 FUZZ_BINARIES = $(addprefix $(FUZZ_DIR)/fuzz-,$(FUZZ_TARGETS))
 
+# Внутренняя проверка для fuzz-build; в make help не показывается
 fuzz-check:
 		@command -v $(FUZZ_CC) >/dev/null 2>&1 || { echo "FAIL: не найден $(FUZZ_CC); установите clang" >&2; exit 1; }
 
