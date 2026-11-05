@@ -38,6 +38,7 @@
     - Найден и исправлен overflow порядка в config_parse_seconds
     - Добавлены граничные тесты UTF-8, input_buffer и config
     - Добавлено руководство doc/tests/fuzzing.md
+    - Функциональные тесты по умолчанию запускаются через xvfb-run
 
 7.2  Чт 01 авг 2024 13:22:06 MSK
 

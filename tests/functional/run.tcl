@@ -16,7 +16,8 @@ package require tcltest
 
 # Без X11 функциональные тесты выполнить нельзя: Tk не создаст окно.
 # Это ошибка, а не пропуск — иначе прогон был бы ложно зелёным.
-# В headless-окружении запускайте через xvfb-run (см. Makefile).
+# make test-functional по умолчанию запускает через xvfb-run, чтобы окно
+# не появлялось на рабочем столе (см. Makefile).
 if {[catch {package require Tk} err]} {
 	puts stderr "FAIL: Tk недоступен, функциональные тесты не выполнены ($err)"
 	exit 1

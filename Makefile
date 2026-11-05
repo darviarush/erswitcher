@@ -337,18 +337,25 @@ coverage: coverage-run	## Сводка исходников и build/coverage-ht
 coverage-clean:	## Удаляет артефакты покрытия
 		rm -rf $(COVERAGE_DIR) $(COVERAGE_HTML_DIR) coverage.html coverage.*.html coverage.css coverage.js
 
-# Окно конфигуратора требует X11. Без DISPLAY пробуем xvfb-run: в его
-# виртуальном фреймбуфере Tk создаёт настоящее окно, а event generate
-# доставляет в виджеты синтетические события. Если нет ни дисплея, ни
-# xvfb-run, пробуем Tk напрямую (Aqua на macOS). Если и это не выйдет —
-# это ОШИБКА, а не пропуск: зелёный прогон не должен скрывать, что
-# функциональные тесты не выполнялись. Юнит-тесты от X11 не зависят
-# и запускаются отдельно через `make test-unit`.
+# По умолчанию функциональные тесты идут через xvfb-run: окно не
+# появляется на рабочем столе и не перехватывает ввод пользователя. Если
+# xvfb-run не установлен, используется текущий DISPLAY; на macOS Tk
+# работает напрямую. FUNCTIONAL_HEADLESS=0 запускает тесты на текущем
+# дисплее даже при наличии xvfb-run. Если выполнить тесты нельзя — это
+# ОШИБКА, а не пропуск: зелёный прогон не должен скрывать, что
+# функциональные тесты не выполнялись.
+FUNCTIONAL_HEADLESS ?= 1
+
 test-functional:	## Функциональные тесты окна конфигуратора (Tcl/Tk)
 		@if ! command -v tclsh >/dev/null 2>&1; then \
 			echo "FAIL: нет tclsh — функциональные тесты не выполнены" >&2; \
 			exit 1; \
+		elif [ "$(FUNCTIONAL_HEADLESS)" = 1 ] && command -v xvfb-run >/dev/null 2>&1; then \
+			cd tests/functional && xvfb-run -a ./run.tcl; \
 		elif [ -n "$$DISPLAY" ]; then \
+			if [ "$(FUNCTIONAL_HEADLESS)" = 1 ] && ! command -v xvfb-run >/dev/null 2>&1; then \
+				echo "WARN: xvfb-run не найден; тесты используют DISPLAY=$$DISPLAY" >&2; \
+			fi; \
 			cd tests/functional && ./run.tcl; \
 		elif command -v xvfb-run >/dev/null 2>&1; then \
 			cd tests/functional && xvfb-run -a ./run.tcl; \

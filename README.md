@@ -105,7 +105,7 @@ make check-deps C=Упаковка
 * clang/clang-format — форматирование и фаззинг;
 * cppcheck — статический анализ;
 * gcovr — отчёт о покрытии;
-* xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
+* xorg-server-xvfb — `xvfb-run` для изолированного запуска функциональных тестов;
 * xdotool — ручной smoke-тест клавиатуры и окна;
 * desktop-file-utils — проверка `.desktop`-файлов.
 

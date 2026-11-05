@@ -164,15 +164,19 @@ make fuzz-clean
 make test-functional
 ```
 
-Tk требует X11. Если `DISPLAY` не задан, `make test-functional` сам
-попробует `xvfb-run -a`. Если нет ни дисплея, ни `xvfb-run`, прогон
-завершается **ошибкой**: функциональные тесты не должны молча
-пропускаться, иначе зелёный результат врёт. Явно через виртуальный
-дисплей:
+Tk требует X11. По умолчанию `make test-functional` запускает тесты
+через `xvfb-run -a`, даже если `DISPLAY` задан: окно не появляется на
+рабочем столе и не перехватывает ввод. Для запуска на текущем дисплее:
 
 ```sh
-xvfb-run -a ./tests/functional/run.tcl
+make test-functional FUNCTIONAL_HEADLESS=0
 ```
+
+Если `xvfb-run` не установлен, используется текущий `DISPLAY`; на macOS
+Tk работает напрямую. Для headless-запуска на Linux установите
+`xorg-server-xvfb`. Если выполнить тесты нельзя, прогон завершается
+**ошибкой**, а не пропуском: функциональные тесты не должны молча
+исчезать из зелёного результата.
 
 ## Все тесты
 
@@ -189,7 +193,7 @@ make test
 |---|---|
 | `make test-unit` | Юнит-тесты Criterion: приложение, порты и домен; ASan включён |
 | `make test-sanitize` | Те же юнит-тесты с ASan, LSan и UBSan; UBSan останавливает тест при первом UB |
-| `make test-functional` | Функциональные тесты окна конфигуратора на Tcl/Tk; при необходимости через `xvfb-run` |
+| `make test-functional` | Функциональные тесты окна конфигуратора на Tcl/Tk; по умолчанию через `xvfb-run` |
 | `make test` | Полный обычный набор: `test-unit` + `test-functional` |
 | `make memcheck` | Полный ASan/LSan-прогон юнит-тестов с проверкой утечек |
 | `make valgrind VALGRIND_FILTER='commands/*'` | Выбранные тесты под Valgrind: утечки, неинициализированная память, неверные освобождения |
