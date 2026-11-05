@@ -106,6 +106,21 @@ Test(keyboard, er_keyboard_port_polls_keymaps) {
     // Опрос X11 остаётся внутри адаптера, приложение зовёт только порт
     ck_assert_int_eq(mock_count("XQueryKeymap("), 2);
 }
+Test(keyboard, er_keyboard_port_switches_language_by_key) {
+    er_keyboard_layout();
+    mock_keymap_set_all_groups(KEY_CAPSLOCK, XK_Caps_Lock);
+    keyboard_port_ensure();
+
+    unikey_t caps = {.code = KEY_CAPSLOCK, .mods = 0, .group = 0};
+    kbd_port.set_switch_key(&kbd_port, &caps);
+    mock_reset();
+
+    kbd_port.switch_language(&kbd_port, 1);
+
+    // В режиме эмуляции XkbLockGroup не вызывается, а CapsLock нажимается
+    ck_assert_int_eq(mock_find("XkbLockGroup("), -1);
+    ck_assert_int_eq(mock_count("XTestFakeKeyEvent("), 2);
+}
 Test(keyboard, er_keyboard_port_presses_key) {
     er_keyboard_layout();
     keyboard_port_ensure();

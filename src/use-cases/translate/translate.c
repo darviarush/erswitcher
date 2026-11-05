@@ -11,7 +11,7 @@ void translate_use_case_buffer(keyboard_port_t* keyboard, unikey_t* word, int po
     unikey_t state = keyboard->state(keyboard, 0);
     int en = keyboard->layout_en(keyboard);
     int ru = keyboard->layout_ru(keyboard);
-    keyboard->set_active_group(keyboard, state.group == en ? ru : en);
+    keyboard->switch_language(keyboard, state.group == en ? ru : en);
 
     if(backspace) {
         unikey_t bs = keyboard->from_keysym(keyboard, KEYBOARD_SYMBOL_BACKSPACE);

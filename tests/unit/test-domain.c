@@ -411,6 +411,7 @@ Test(domain, config_options_defaults_and_updates) {
     ck_assert(near(options.loop_delay, CONFIG_DEFAULT_LOOP_DELAY));
     ck_assert(near(options.command_timeout, CONFIG_DEFAULT_COMMAND_TIMEOUT));
     ck_assert(near(options.command_interval, CONFIG_DEFAULT_COMMAND_INTERVAL));
+    ck_assert_str_eq(options.switch_language, CONFIG_DEFAULT_SWITCH_LANGUAGE);
 
     ck_assert_int_eq(config_set_option(&options, "delay", "0,5"), CONFIG_OPTION_OK);
     ck_assert(near(options.delay, 0.5));
@@ -440,6 +441,11 @@ Test(domain, config_options_defaults_and_updates) {
     double saved = options.loop_delay;
     ck_assert_int_eq(config_set_option(&options, "no_such_option", "1"), CONFIG_OPTION_UNKNOWN);
     ck_assert(near(options.loop_delay, saved));
+
+    ck_assert_int_eq(config_set_option(&options, "switch_language", "Caps_Lock"), CONFIG_OPTION_OK);
+    ck_assert_str_eq(options.switch_language, "Caps_Lock");
+    ck_assert_int_eq(config_set_option(&options, "switch_language", ""), CONFIG_OPTION_INVALID);
+    ck_assert_str_eq(options.switch_language, CONFIG_DEFAULT_SWITCH_LANGUAGE);
 }
 Test(domain, config_key_expression_modifiers) {
     unikey_t key = {0};

@@ -46,8 +46,13 @@ static void report_option_error(
         report_at(context, path, lineno,
                   "ошибка: неизвестная опция `%s`. Пропущено", name);
     } else if(result == CONFIG_OPTION_INVALID) {
-        report_at(context, path, lineno,
-                  "ошибка: %s в секундах, а не `%s`. Пропущено", name, value);
+        if(strcmp(name, "switch_language") == 0) {
+            report_at(context, path, lineno,
+                      "ошибка: пустое или слишком длинное значение switch_language");
+        } else {
+            report_at(context, path, lineno,
+                      "ошибка: %s в секундах, а не `%s`. Пропущено", name, value);
+        }
     }
 }
 

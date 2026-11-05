@@ -132,6 +132,7 @@ config_options_t config_options_default(void) {
         .loop_delay = CONFIG_DEFAULT_LOOP_DELAY,
         .command_timeout = CONFIG_DEFAULT_COMMAND_TIMEOUT,
         .command_interval = CONFIG_DEFAULT_COMMAND_INTERVAL,
+        .switch_language = CONFIG_DEFAULT_SWITCH_LANGUAGE,
     };
 }
 
@@ -247,6 +248,16 @@ config_option_result_t config_set_option(config_options_t* options, const char* 
 
     if(strcmp(name, "command_interval") == 0) {
         return set_seconds(&options->command_interval, value, CONFIG_DEFAULT_COMMAND_INTERVAL);
+    }
+
+    if(strcmp(name, "switch_language") == 0) {
+        if(!value || !*value || strlen(value) >= sizeof(options->switch_language)) {
+            memcpy(options->switch_language, CONFIG_DEFAULT_SWITCH_LANGUAGE,
+                   sizeof(CONFIG_DEFAULT_SWITCH_LANGUAGE));
+            return CONFIG_OPTION_INVALID;
+        }
+        memcpy(options->switch_language, value, strlen(value) + 1);
+        return CONFIG_OPTION_OK;
     }
 
     return CONFIG_OPTION_UNKNOWN;

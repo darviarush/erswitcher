@@ -182,6 +182,8 @@ static void er_reset_state() {
 
     er_kbd.active_use = 0;
     er_kbd.active_len = 0;
+    er_kbd.switch_key_set = 0;
+    er_kbd.os_switch_active = 0;
 }
 
 /*
@@ -201,6 +203,7 @@ static void er_keyboard_config() {
     mock_keymap_set(73, 0, 0, XK_Scroll_Lock);
     mock_keymap_set(74, 0, 0, XK_F1);
     mock_keymap_set_all_groups(KEY_D, XK_d);
+    mock_keymap_set_all_groups(KEY_CAPSLOCK, XK_Caps_Lock);
     mock_modifiers_fill();
     er_kbd.groups = 1;
     er_kbd.group_en = 0;
@@ -213,6 +216,7 @@ static void er_fixture() {
     er_reset_state();
     mock_keymap_clear();
     mock_keymap_set(75, 0, 0, 0xff13);
+    mock_keymap_set_all_groups(KEY_CAPSLOCK, XK_Caps_Lock);
     er_kbd.groups = 1;
     er_kbd.maybe_group = 0;
 }

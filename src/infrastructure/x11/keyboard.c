@@ -250,7 +250,19 @@ static void set_active_group_impl(keyboard_x11_t* s, int group) {
     s->active_state.group = group;
 }
 
+static void set_switch_key_impl(keyboard_x11_t* s, const unikey_t* key) {
+    memset(&s->switch_key, 0, sizeof(s->switch_key));
+    s->switch_key_set = 0;
+    s->os_switch_active = 0;
+
+    if(key && key->code) {
+        s->switch_key = *key;
+        s->switch_key_set = 1;
+    }
+}
+
 static void set_group_impl(keyboard_x11_t* s, int group) {
+    if(s->switch_key_set) return;
     if(state_impl(s, 0).group == group) return;
 
     XkbLockGroup(s->display, XkbUseCoreKbd, group);
@@ -260,7 +272,7 @@ static void set_group_impl(keyboard_x11_t* s, int group) {
     usleep(s->delay_us);
 }
 
-static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press) {
+static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press, int set_layout) {
     if(key.code == 0) {
         DEBUG_LOG("send_key: No Key!\n");
         return;
@@ -274,7 +286,7 @@ static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press) {
     int xdelay = s->delay_us / 2;
     if(xdelay <= 0) xdelay = 1;
 
-    set_group_impl(s, key.group);
+    if(set_layout) set_group_impl(s, key.group);
     set_locks(s, key.mods);
     press_mods(s, key.code, key.mods, is_press);
 
@@ -287,8 +299,20 @@ static void send_key_impl(keyboard_x11_t* s, unikey_t key, int is_press) {
     usleep(xdelay);
 }
 
+static void switch_language_impl(keyboard_x11_t* s, int group) {
+    if(s->switch_key_set) {
+        // Сначала включаем режим, чтобы сам switch_key не вызвал XkbLockGroup
+        s->os_switch_active = 1;
+        send_key_impl(s, s->switch_key, KEYBOARD_PRESS_AND_RELEASE, 0);
+        return;
+    }
+
+    s->os_switch_active = 0;
+    set_active_group_impl(s, group);
+}
+
 static void press_key_impl(keyboard_x11_t* s, unikey_t key) {
-    send_key_impl(s, key, KEYBOARD_PRESS_AND_RELEASE);
+    send_key_impl(s, key, KEYBOARD_PRESS_AND_RELEASE, 1);
 }
 
 static void press_key_multi_impl(keyboard_x11_t* s, unikey_t key, int n) {
@@ -344,7 +368,8 @@ static void recover_active_mods_impl(keyboard_x11_t* s) {
     }
 
     set_locks(s, s->active_state.mods);
-    set_group_impl(s, s->active_state.group);
+    if(!s->os_switch_active) set_group_impl(s, s->active_state.group);
+    s->os_switch_active = 0;
 
     DEBUG_LOG("===== recover_active_mods END =====\n");
 
@@ -396,11 +421,17 @@ static void cb_set_layout(keyboard_port_t* port, int group) {
 static void cb_set_active_group(keyboard_port_t* port, int group) {
     set_active_group_impl(state_of(port), group);
 }
+static void cb_set_switch_key(keyboard_port_t* port, const unikey_t* key) {
+    set_switch_key_impl(state_of(port), key);
+}
+static void cb_switch_language(keyboard_port_t* port, int group) {
+    switch_language_impl(state_of(port), group);
+}
 static void cb_set_delay(keyboard_port_t* port, int microseconds) {
     state_of(port)->delay_us = microseconds;
 }
 static void cb_send_key(keyboard_port_t* port, unikey_t key, keyboard_event_t event) {
-    send_key_impl(state_of(port), key, (int) event);
+    send_key_impl(state_of(port), key, (int) event, 1);
 }
 static void cb_press_key(keyboard_port_t* port, unikey_t key) {
     press_key_impl(state_of(port), key);
@@ -453,6 +484,8 @@ void keyboard_x11_port(keyboard_port_t* port, keyboard_x11_t* state) {
     port->set_layout_hint = cb_set_layout_hint;
     port->set_layout = cb_set_layout;
     port->set_active_group = cb_set_active_group;
+    port->set_switch_key = cb_set_switch_key;
+    port->switch_language = cb_switch_language;
     port->set_delay = cb_set_delay;
     port->send_key = cb_send_key;
     port->press_key = cb_press_key;

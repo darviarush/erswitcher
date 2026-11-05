@@ -50,6 +50,9 @@ static int er_fake_layout_ru(keyboard_port_t* port) {
 static void er_fake_restore_group(keyboard_port_t* port, int group) {
     ((er_fake_keyboard_t*) port->context)->restore_group = group;
 }
+static void er_fake_switch_language(keyboard_port_t* port, int group) {
+    ((er_fake_keyboard_t*) port->context)->restore_group = group;
+}
 static void er_fake_clear(keyboard_port_t* port) {
     ((er_fake_keyboard_t*) port->context)->clear_count++;
 }
@@ -84,6 +87,7 @@ static keyboard_port_t er_fake_port(er_fake_keyboard_t* fake) {
     port.layout_en = er_fake_layout_en;
     port.layout_ru = er_fake_layout_ru;
     port.set_active_group = er_fake_restore_group;
+    port.switch_language = er_fake_switch_language;
     port.clear_active_mods = er_fake_clear;
     port.recover_active_mods = er_fake_recover;
     port.from_keysym = er_fake_from_keysym;

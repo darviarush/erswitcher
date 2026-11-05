@@ -60,6 +60,12 @@ struct keyboard_port {
     // Группа, которая будет восстановлена после recover_active_mods()
     void (*set_active_group)(keyboard_port_t* self, int group);
 
+    // Способ переключения языка: OSSwitchLanguage (NULL) или эмулируемая
+    // комбинация клавиш, например Caps_Lock
+    void (*set_switch_key)(keyboard_port_t* self, const unikey_t* key);
+    // Переключает язык для перевода: XKB-группой или эмуляцией клавиши
+    void (*switch_language)(keyboard_port_t* self, int group);
+
     void (*set_delay)(keyboard_port_t* self, int microseconds);
     void (*send_key)(keyboard_port_t* self, unikey_t key, keyboard_event_t event);
     void (*press_key)(keyboard_port_t* self, unikey_t key);

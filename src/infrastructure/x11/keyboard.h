@@ -32,6 +32,10 @@ typedef struct {
     int active_len;
     unikey_t active_state;
     int active_use;
+
+    unikey_t switch_key;
+    int switch_key_set;
+    int os_switch_active;
 } keyboard_x11_t;
 
 // Единственный экземпляр на процесс; монолит и тесты видят его через

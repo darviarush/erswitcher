@@ -240,7 +240,14 @@ Scroll_Lock=compose
 delay=0,01
 # Задержка между нажатиями клавишь в секундах
 loop_delay=0,01
+# Переключение языка: OSSwitchLanguage — через X11/XKB,
+# Caps_Lock — эмуляция CapsLock (для VM и систем с таким shortcut)
+switch_language=Caps_Lock
 ```
+
+`OSSwitchLanguage` — старое переключение через X11/XKB. Любая другая
+комбинация, например `Caps_Lock` или `Alt+Shift`, эмулируется как нажатие
+клавиш и передаёт смену языка операционной системе или виртуальной машине.
 
 ## [compose]
 

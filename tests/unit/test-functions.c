@@ -146,6 +146,19 @@ Test(functions, er_functions_empty_section) {
     er_load("[functions]\n");
     ck_assert_int_eq(keyfn_size, 0);
 }
+Test(functions, er_functions_switch_language_option) {
+    er_keyboard_config();
+    er_load("[options]\nswitch_language=Caps_Lock\n");
+
+    ck_assert_int_eq(er_kbd.switch_key_set, 1);
+    ck_assert_int_eq(er_kbd.switch_key.code, KEY_CAPSLOCK);
+}
+Test(functions, er_functions_switch_language_os_option) {
+    er_keyboard_config();
+    er_load("[options]\nswitch_language=OSSwitchLanguage\n");
+
+    ck_assert_int_eq(er_kbd.switch_key_set, 0);
+}
 Test(functions, er_functions_old_combinations_are_dropped_on_reload) {
     er_keyboard_config();
     er_load("[functions]\nPause=word translate\n");

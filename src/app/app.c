@@ -670,6 +670,26 @@ static int config_resolve_key(const char* name, unikey_t* key, void* context) {
     return 1;
 }
 
+static void apply_switch_language(const char* value) {
+    keyboard_port_ensure();
+
+    unikey_t key = {0};
+    if(!value || strcmp(value, CONFIG_DEFAULT_SWITCH_LANGUAGE) == 0) {
+        kbd_port.set_switch_key(&kbd_port, NULL);
+        DEBUG_LOG("switch_language = OSSwitchLanguage\n");
+        return;
+    }
+
+    if(config_parse_key_expression(value, config_resolve_key, NULL, &key) == CONFIG_KEY_OK) {
+        kbd_port.set_switch_key(&kbd_port, &key);
+        DEBUG_LOG("switch_language = %s\n", value);
+        return;
+    }
+
+    fprintf(stderr, "WARN: не распознана комбинация switch_language=%s; используется OSSwitchLanguage\n", value);
+    kbd_port.set_switch_key(&kbd_port, NULL);
+}
+
 static void apply_config_options(const config_options_t* options) {
     keyboard_port_ensure();
 
@@ -679,6 +699,7 @@ static void apply_config_options(const config_options_t* options) {
     command_timeout = options->command_timeout;
     command_interval = options->command_interval;
     commands_use_case_set_options(&commands_uc, command_timeout, command_interval);
+    apply_switch_language(options->switch_language);
 
     DEBUG_LOG("delay = %i микросекунд\n", delay_us);
     DEBUG_LOG("loop_delay = %i микросекунд\n", loop_delay);

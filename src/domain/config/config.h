@@ -45,12 +45,17 @@ typedef enum {
 #define CONFIG_DEFAULT_LOOP_DELAY 0.01
 #define CONFIG_DEFAULT_COMMAND_TIMEOUT 13.0
 #define CONFIG_DEFAULT_COMMAND_INTERVAL 0.1
+#define CONFIG_SWITCH_LANGUAGE_MAX 64
+#define CONFIG_DEFAULT_SWITCH_LANGUAGE "OSSwitchLanguage"
 
 typedef struct {
     double delay; // секунды
     double loop_delay; // секунды
     double command_timeout; // секунды
     double command_interval; // секунды
+    // OSSwitchLanguage — переключение через X11/XKB
+    // Иначе — комбинация клавиш для эмуляции, например Caps_Lock
+    char switch_language[CONFIG_SWITCH_LANGUAGE_MAX];
 } config_options_t;
 
 typedef struct {
