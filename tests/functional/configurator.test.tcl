@@ -75,7 +75,9 @@ test window-text-options {текст редактируется с undo и пе�
 } -result {word 1 -1}
 
 test window-geometry {окно получает размер по умолчанию 800x500} -body {
-	expr {[regexp {^800x500[+-][0-9]+[+-][0-9]+$} [wm geometry .]]}
+	# В маленьком Xvfb окно центрируется с отрицательными координатами:
+	# 800x500+-80+-10. Проверяем размер, а не позицию
+	expr {[regexp {^800x500[+-][-+]?[0-9]+[+-][-+]?[0-9]+$} [wm geometry .]]}
 } -result 1
 
 test window-close-protocol {на закрытие окна назначен обработчик} -body {
