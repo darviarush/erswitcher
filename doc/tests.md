@@ -84,7 +84,8 @@ make fuzz-clean
 Цели: `fuzz-text`, `fuzz-config`, `fuzz-command`, `fuzz-input` и
 `fuzz-compose`. Начальный корпус лежит в `tests/fuzz/corpus/`, найденные
 регрессии — в `tests/fuzz/regressions/`. Артефакты сборки и падения
-пишутся в `build/fuzz/`.
+пишутся в `build/fuzz/`. Как читать вывод и что делать при падении —
+в [tests/fuzzing.md](tests/fuzzing.md).
 
 ## Функциональные тесты
 

@@ -169,7 +169,9 @@ make fuzz-all FUZZ_SECONDS=60
 `make memcheck` запускает полный набор тестов с AddressSanitizer и
 проверкой утечек. `make test-sanitize` добавляет UBSan.
 `make fuzz-all` запускает libFuzzer-цели из `tests/fuzz`; короткий
-прогон задаётся через `FUZZ_SECONDS`. `make valgrind` запускает выбранные тесты под Valgrind;
+прогон задаётся через `FUZZ_SECONDS`. Как читать вывод фаззера и
+разбирать падения — в [doc/tests/fuzzing.md](doc/tests/fuzzing.md).
+`make valgrind` запускает выбранные тесты под Valgrind;
 Criterion изолирует каждый тест в отдельном процессе, поэтому полный
 прогон под Valgrind занимает минуты, и фильтр обязателен.
 `make coverage` собирает тесты с `--coverage`, печатает цветную сводку

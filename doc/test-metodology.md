@@ -187,6 +187,9 @@ make fuzz FUZZ_TARGET=config FUZZ_SECONDS=60 \
 
 ### 3.4. Запуск
 
+Практическое руководство по выводу libFuzzer, артефактам и регрессиям —
+в [tests/fuzzing.md](tests/fuzzing.md).
+
 Целевые команды:
 
 ```sh
