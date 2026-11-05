@@ -251,12 +251,21 @@ config_option_result_t config_set_option(config_options_t* options, const char* 
     }
 
     if(strcmp(name, "switch_language") == 0) {
-        if(!value || !*value || strlen(value) >= sizeof(options->switch_language)) {
+        const char* begin = value;
+        while(begin && isspace((unsigned char) *begin))
+            begin++;
+
+        size_t len = begin ? strlen(begin) : 0;
+        while(len > 0 && isspace((unsigned char) begin[len - 1]))
+            len--;
+
+        if(!begin || len == 0 || len >= sizeof(options->switch_language)) {
             memcpy(options->switch_language, CONFIG_DEFAULT_SWITCH_LANGUAGE,
                    sizeof(CONFIG_DEFAULT_SWITCH_LANGUAGE));
             return CONFIG_OPTION_INVALID;
         }
-        memcpy(options->switch_language, value, strlen(value) + 1);
+        memcpy(options->switch_language, begin, len);
+        options->switch_language[len] = '\0';
         return CONFIG_OPTION_OK;
     }
 

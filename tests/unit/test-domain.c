@@ -444,6 +444,8 @@ Test(domain, config_options_defaults_and_updates) {
 
     ck_assert_int_eq(config_set_option(&options, "switch_language", "Caps_Lock"), CONFIG_OPTION_OK);
     ck_assert_str_eq(options.switch_language, "Caps_Lock");
+    ck_assert_int_eq(config_set_option(&options, "switch_language", "  Caps_Lock  "), CONFIG_OPTION_OK);
+    ck_assert_str_eq(options.switch_language, "Caps_Lock");
     ck_assert_int_eq(config_set_option(&options, "switch_language", ""), CONFIG_OPTION_INVALID);
     ck_assert_str_eq(options.switch_language, CONFIG_DEFAULT_SWITCH_LANGUAGE);
 }

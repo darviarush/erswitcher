@@ -3,8 +3,8 @@
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
 
-# Отладочный вывод включается во время запуска: ERSWITCHER_DEBUG=1 make s
-# или ERSWITCHER_DEBUG=1 ./erswitcher. На сборку это не влияет
+# make s всегда запускает erswitcher с ERSWITCHER_DEBUG=1.
+# Для ручного запуска: ERSWITCHER_DEBUG=1 ./erswitcher. На сборку это не влияет
 ERSWITCHER_DEBUG ?= 0
 export ERSWITCHER_DEBUG
 
@@ -118,8 +118,8 @@ sync:	## Копирует конфиг из ~/.config в dist
 launch: kill	## Перезапускает erswitcher из ~/.local/bin
 		~/.local/bin/erswitcher &> /dev/null &
 
-s: erswitcher	## Собирает и запускает ./erswitcher
-		./erswitcher
+s: erswitcher	## Собирает и запускает ./erswitcher с отладочным выводом
+		ERSWITCHER_DEBUG=1 ./erswitcher
 
 kill:	## Убивает процесс erswitcher-а
 		killall -9 erswitcher || true

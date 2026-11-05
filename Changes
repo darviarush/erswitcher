@@ -41,6 +41,8 @@
     - Функциональные тесты по умолчанию запускаются через xvfb-run
     - window-geometry принимает отрицательные координаты Xvfb
     - Добавлен [options] switch_language: OSSwitchLanguage или эмуляция клавиш
+    - switch_language игнорирует пробелы вокруг значения
+    - make s запускает erswitcher с ERSWITCHER_DEBUG=1
 
 7.2  Чт 01 авг 2024 13:22:06 MSK
 

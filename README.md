@@ -144,6 +144,7 @@ yay -S --needed appimagetool-bin
 окружения:
 
 ```sh
+make s                         # make s всегда включает отладочный вывод
 ERSWITCHER_DEBUG=1 ./erswitcher
 ERSWITCHER_DEBUG=1 make test
 ```
