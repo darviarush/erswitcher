@@ -75,6 +75,23 @@ Test(domain, text_utf8_decode_invalid) {
     // Overlong-последовательность
     ck_assert_int_eq(utf8_decode("\xC0\x80", &out), -1);
 }
+Test(domain, text_utf8_decode_boundaries) {
+    wint_t out = 0;
+
+    // Первый символ за пределами BMP и максимальная кодовая точка
+    ck_assert_int_eq(utf8_decode("\xF0\x90\x80\x80", &out), 4);
+    ck_assert_int_eq(out, 0x10000);
+    ck_assert_int_eq(utf8_decode("\xF4\x8F\xBF\xBF", &out), 4);
+    ck_assert_int_eq(out, 0x10FFFF);
+
+    // Выше U+10FFFF, суррогат, overlong и обрезанные хвосты
+    ck_assert_int_eq(utf8_decode("\xF4\x90\x80\x80", &out), -1);
+    ck_assert_int_eq(utf8_decode("\xED\xA0\x80", &out), -1);
+    ck_assert_int_eq(utf8_decode("\xE0\x80\x80", &out), -1);
+    ck_assert_int_eq(utf8_decode("\xF0\x80\x80\x80", &out), -1);
+    ck_assert_int_eq(utf8_decode("\xE2\x82", &out), -1);
+    ck_assert_int_eq(utf8_decode("\xF0\x90\x80", &out), -1);
+}
 //@category input_buffer
 
 static unikey_t key_of(int code) {
@@ -176,6 +193,22 @@ Test(domain, input_buffer_wraps_at_capacity) {
     // Как в монолите: при переполнении pos сбрасывается в 0
     ck_assert_int_eq(buffer.pos, 5);
     ck_assert_int_eq(buffer.word[0].code, INPUT_BUFFER_CAPACITY % 250 + 1);
+}
+Test(domain, input_buffer_exactly_at_capacity) {
+    input_buffer_t buffer;
+    input_buffer_init(&buffer);
+
+    for(int i = 0; i < INPUT_BUFFER_CAPACITY; i++)
+        input_buffer_push(&buffer, key_of(i % 250 + 1), L'a');
+
+    ck_assert_int_eq(buffer.pos, INPUT_BUFFER_CAPACITY);
+    ck_assert_int_eq(input_buffer_from_space(&buffer), 0);
+
+    // Следующий символ начинает буфер заново
+    input_buffer_push(&buffer, key_of(99), L'b');
+    ck_assert_int_eq(buffer.pos, 1);
+    ck_assert_int_eq(buffer.word[0].code, 99);
+    ck_assert_int_eq(buffer.symbol[0], L'b');
 }
 //@category case_invert
 
@@ -331,6 +364,13 @@ Test(domain, config_sections_and_actions) {
     ck_assert_int_eq(config_action_for_section(CONFIG_SECTION_COMMANDS), CONFIG_ACTION_COMMAND);
     ck_assert_int_eq(config_action_for_section(CONFIG_SECTION_FUNCTIONS), CONFIG_ACTION_NONE);
 }
+static int domain_any_key(const char* name, unikey_t* key, void* context) {
+    (void) name;
+    (void) context;
+    key->code = 1;
+    return 1;
+}
+
 Test(domain, config_parse_seconds_locale_independent) {
     double value = 0;
 
@@ -355,6 +395,15 @@ Test(domain, config_parse_seconds_locale_independent) {
     ck_assert_int_eq(config_parse_seconds("abc", &value), 0);
     ck_assert_int_eq(config_parse_seconds("", &value), 0);
     ck_assert_int_eq(config_parse_seconds(NULL, &value), 0);
+}
+Test(domain, config_parse_seconds_exponent_boundaries) {
+    double value = 0;
+
+    // Раньше длинный порядок переполнял int до проверки предела
+    ck_assert_int_eq(config_parse_seconds("0.e111111111111111111111111111111", &value), 0);
+    ck_assert_int_eq(config_parse_seconds("1e309", &value), 0);
+    ck_assert_int_eq(config_parse_seconds("1e308", &value), 1);
+    ck_assert(value > 1e307);
 }
 Test(domain, config_options_defaults_and_updates) {
     config_options_t options = config_options_default();
@@ -404,6 +453,18 @@ Test(domain, config_key_expression_modifiers) {
     ck_assert_int_eq(key.code, 74);
     ck_assert_int_eq(key.mods, ERS_MOD_CONTROL | ERS_MOD_ALT | ERS_MOD_SUPER);
     ck_assert_int_eq(key.group, 2);
+}
+Test(domain, config_key_expression_token_length) {
+    char expression[130];
+    unikey_t key = {0};
+
+    memset(expression, 'A', 127);
+    expression[127] = '\0';
+    ck_assert_int_eq(config_parse_key_expression(expression, domain_any_key, NULL, &key), CONFIG_KEY_OK);
+
+    expression[127] = 'A';
+    expression[128] = '\0';
+    ck_assert_int_eq(config_parse_key_expression(expression, domain_any_key, NULL, &key), CONFIG_KEY_UNKNOWN_KEY);
 }
 Test(domain, config_key_expression_errors) {
     unikey_t key = {0};
@@ -465,4 +526,20 @@ Test(domain, config_parse_compose_key_escapes) {
     ck_assert_int_eq(config_parse_compose_key("", out, CONFIG_COMPOSE_KEY_MAX), 0);
     ck_assert_int_eq(config_parse_compose_key("\\", out, CONFIG_COMPOSE_KEY_MAX), 0);
     ck_assert_int_eq(config_parse_compose_key("abcd", out, 3), -1);
+}
+Test(domain, config_parse_compose_key_capacity) {
+    char key[CONFIG_COMPOSE_KEY_MAX + 2];
+    wint_t out[CONFIG_COMPOSE_KEY_MAX];
+
+    memset(key, 'a', CONFIG_COMPOSE_KEY_MAX);
+    key[CONFIG_COMPOSE_KEY_MAX] = '\0';
+    ck_assert_int_eq(config_parse_compose_key(key, out, CONFIG_COMPOSE_KEY_MAX),
+                     CONFIG_COMPOSE_KEY_MAX);
+
+    key[CONFIG_COMPOSE_KEY_MAX] = 'a';
+    key[CONFIG_COMPOSE_KEY_MAX + 1] = '\0';
+    ck_assert_int_eq(config_parse_compose_key(key, out, CONFIG_COMPOSE_KEY_MAX), -1);
+
+    ck_assert_int_eq(config_parse_compose_key(key, out, 0), 0);
+    ck_assert_int_eq(config_parse_compose_key(NULL, out, CONFIG_COMPOSE_KEY_MAX), 0);
 }

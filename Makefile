@@ -1,4 +1,4 @@
-.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck valgrind coverage coverage-build coverage-run coverage-text coverage-html coverage-clean test-build appimage appimage-clean release dist help test test-unit test-functional
+.PHONY: clean install launch s kill format format-check check-deps cppcheck memcheck valgrind coverage coverage-build coverage-run coverage-text coverage-html coverage-clean fuzz fuzz-check fuzz-build fuzz-all fuzz-clean test-build test-sanitize appimage appimage-clean release dist help test test-unit test-functional
 
 CLIBS = -lX11 -lxkbcommon -lXtst
 CFLAGS = -Wall -Wextra -Werror -fmax-errors=1 -O4 -fanalyzer
@@ -143,7 +143,7 @@ CPPCHECK_FLAGS ?= --enable=warning,performance,portability --std=c17 --language=
 	--suppress='unknownMacro:tests/unit/*' \
 	--suppress='returnImplicitInt:tests/unit/*' --error-exitcode=1
 CPPCHECK_SOURCES = main.c $(shell find src -name '*.c' -print | sort) \
-	tests/unit/test.c tests/unit/test-domain.c
+	tests/unit/test.c tests/unit/test-domain.c $(wildcard tests/fuzz/*.c)
 
 cppcheck:	## Статический анализ cppcheck
 		@command -v $(CPPCHECK) >/dev/null 2>&1 || { echo "FAIL: не найден $(CPPCHECK)" >&2; exit 1; }
@@ -206,6 +206,13 @@ memcheck: test-build	## Полный прогон тестов с ASan
 		ASAN_OPTIONS="$(ASAN_OPTIONS)" tests/unit/test --color=always
 		ASAN_OPTIONS="$(ASAN_OPTIONS)" $(TEST_DOMAIN) --color=always
 
+SANITIZE ?= -fsanitize=address,undefined -fno-sanitize-recover=all
+UBSAN_OPTIONS ?= halt_on_error=1:print_stacktrace=1
+
+test-sanitize:	## Юнит-тесты с ASan + UBSan
+		ASAN_OPTIONS="$(ASAN_OPTIONS)" UBSAN_OPTIONS="$(UBSAN_OPTIONS)" \
+			$(MAKE) test-unit TEST_SANITIZE='$(SANITIZE)'
+
 VALGRIND ?= valgrind
 VALGRIND_FILTER ?= commands/*
 VALGRIND_FLAGS ?= --leak-check=full --show-leak-kinds=definite,indirect \
@@ -217,6 +224,65 @@ valgrind:	## Valgrind для выбранных тестов: VALGRIND_FILTER=..
 		cd tests/unit && CRITERION_JOBS=1 $(VALGRIND) $(VALGRIND_FLAGS) \
 			--trace-children=yes --trace-children-skip=/bin/sh,/usr/bin/rm,/bin/rm \
 			./test --filter '$(VALGRIND_FILTER)' --color=never
+
+# Фаззинг: libFuzzer из Clang, отдельные бинарники и корпус
+FUZZ_CC ?= clang
+FUZZ_DIR ?= build/fuzz
+FUZZ_CORPUS ?= $(FUZZ_DIR)/corpus
+FUZZ_ARTIFACTS ?= $(FUZZ_DIR)/artifacts
+FUZZ_SECONDS ?= 60
+FUZZ_TARGETS ?= text config command input compose
+FUZZ_TARGET ?= text
+FUZZ_ARGS ?=
+FUZZ_CFLAGS ?= -std=gnu17 -g -O1 -fno-omit-frame-pointer -Wall -Wextra -Werror \
+	-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all
+FUZZ_BINARIES = $(addprefix $(FUZZ_DIR)/fuzz-,$(FUZZ_TARGETS))
+
+fuzz-check:
+		@command -v $(FUZZ_CC) >/dev/null 2>&1 || { echo "FAIL: не найден $(FUZZ_CC); установите clang" >&2; exit 1; }
+
+$(FUZZ_DIR)/fuzz-text: tests/fuzz/fuzz-text.c src/domain/text/text.c
+		@mkdir -p $(FUZZ_DIR)
+		$(FUZZ_CC) $(FUZZ_CFLAGS) -o $@ $^
+
+$(FUZZ_DIR)/fuzz-config: tests/fuzz/fuzz-config.c src/use-cases/config-reload/config-reload.c src/domain/config/config.c src/domain/text/text.c
+		@mkdir -p $(FUZZ_DIR)
+		$(FUZZ_CC) $(FUZZ_CFLAGS) -o $@ $^
+
+$(FUZZ_DIR)/fuzz-command: tests/fuzz/fuzz-command.c src/domain/command-template/command-template.c
+		@mkdir -p $(FUZZ_DIR)
+		$(FUZZ_CC) $(FUZZ_CFLAGS) -o $@ $^
+
+$(FUZZ_DIR)/fuzz-input: tests/fuzz/fuzz-input.c src/domain/input-buffer/input-buffer.c
+		@mkdir -p $(FUZZ_DIR)
+		$(FUZZ_CC) $(FUZZ_CFLAGS) -o $@ $^
+
+$(FUZZ_DIR)/fuzz-compose: tests/fuzz/fuzz-compose.c src/domain/compose/compose.c src/domain/config/config.c src/domain/text/text.c
+		@mkdir -p $(FUZZ_DIR)
+		$(FUZZ_CC) $(FUZZ_CFLAGS) -o $@ $^
+
+fuzz-build: fuzz-check $(FUZZ_BINARIES)	## Собирает libFuzzer-бинарники
+
+fuzz: fuzz-build	## Один фаззер: FUZZ_TARGET=text FUZZ_SECONDS=60
+		@test -n "$(FUZZ_TARGET)" || { echo "FAIL: задайте FUZZ_TARGET=text|config|command|input|compose" >&2; exit 1; }
+		@test -x $(FUZZ_DIR)/fuzz-$(FUZZ_TARGET) || { echo "FAIL: нет $(FUZZ_DIR)/fuzz-$(FUZZ_TARGET)" >&2; exit 1; }
+		@mkdir -p $(FUZZ_CORPUS)/$(FUZZ_TARGET) $(FUZZ_ARTIFACTS)
+		@if [ -d tests/fuzz/corpus/$(FUZZ_TARGET) ]; then cp -R tests/fuzz/corpus/$(FUZZ_TARGET)/. $(FUZZ_CORPUS)/$(FUZZ_TARGET)/; fi
+		@if [ -d tests/fuzz/regressions/$(FUZZ_TARGET) ]; then cp -R tests/fuzz/regressions/$(FUZZ_TARGET)/. $(FUZZ_CORPUS)/$(FUZZ_TARGET)/; fi
+		$(FUZZ_DIR)/fuzz-$(FUZZ_TARGET) -max_total_time=$(FUZZ_SECONDS) \
+			-artifact_prefix=$(FUZZ_ARTIFACTS)/ $(FUZZ_ARGS) $(FUZZ_CORPUS)/$(FUZZ_TARGET)
+
+fuzz-all: fuzz-build	## Все фаззеры: FUZZ_SECONDS=60
+		@set -e; for t in $(FUZZ_TARGETS); do \
+			mkdir -p $(FUZZ_CORPUS)/$$t $(FUZZ_ARTIFACTS); \
+			if [ -d tests/fuzz/corpus/$$t ]; then cp -R tests/fuzz/corpus/$$t/. $(FUZZ_CORPUS)/$$t/; fi; \
+			if [ -d tests/fuzz/regressions/$$t ]; then cp -R tests/fuzz/regressions/$$t/. $(FUZZ_CORPUS)/$$t/; fi; \
+			$(FUZZ_DIR)/fuzz-$$t -max_total_time=$(FUZZ_SECONDS) \
+				-artifact_prefix=$(FUZZ_ARTIFACTS)/ $(FUZZ_ARGS) $(FUZZ_CORPUS)/$$t; \
+		done
+
+fuzz-clean:	## Удаляет бинарники и корпус фаззера
+		rm -rf $(FUZZ_DIR)
 
 # Покрытие: отдельные объекты с --coverage, чтобы не смешивать с ASan-сборкой
 COVERAGE_DIR ?= build/coverage

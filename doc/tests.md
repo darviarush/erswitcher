@@ -67,6 +67,25 @@ make coverage-clean  # удалить артефакты
 Полный отчёт: `make coverage COVERAGE_FILTER='.*'`. Управление цветом:
 `COVERAGE_COLOR=always` или `COVERAGE_COLOR=never`.
 
+## Динамический анализ и фаззинг
+
+`make test-sanitize` запускает юнит-тесты с ASan, LSan и UBSan.
+`make memcheck` — полный ASan-прогон с проверкой утечек.
+
+Фаззеры находятся в `tests/fuzz/`:
+
+```sh
+make fuzz-build
+make fuzz FUZZ_TARGET=text FUZZ_SECONDS=60
+make fuzz-all FUZZ_SECONDS=60
+make fuzz-clean
+```
+
+Цели: `fuzz-text`, `fuzz-config`, `fuzz-command`, `fuzz-input` и
+`fuzz-compose`. Начальный корпус лежит в `tests/fuzz/corpus/`, найденные
+регрессии — в `tests/fuzz/regressions/`. Артефакты сборки и падения
+пишутся в `build/fuzz/`.
+
 ## Функциональные тесты
 
 Каталог `tests/functional/`, фреймворк `tcltest` и настоящие виджеты Tk.

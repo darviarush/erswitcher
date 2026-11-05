@@ -182,6 +182,9 @@ static int parse_double(const char* s, double* out) {
         int exponent = 0;
         int exponent_digits = 0;
         while(isdigit((unsigned char) *p)) {
+            // Не накапливаем заведомо слишком большой порядок: иначе
+            // умножение на 10 переполняет int ещё до проверки предела
+            if(exponent > 308) return 0;
             exponent = exponent * 10 + (*p - '0');
             exponent_digits++;
             p++;

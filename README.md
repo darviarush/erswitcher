@@ -102,7 +102,7 @@ make check-deps C=Упаковка
 * git;
 * criterion — юнит-тесты и стектрейсы;
 * gcov/gcovr — покрытие тестами;
-* clang/clang-format — форматирование;
+* clang/clang-format — форматирование и фаззинг;
 * cppcheck — статический анализ;
 * gcovr — отчёт о покрытии;
 * xorg-server-xvfb — `xvfb-run` для функциональных тестов без дисплея;
@@ -157,15 +157,19 @@ ERSWITCHER_DEBUG=1 make test
 ```sh
 make cppcheck
 make memcheck
+make test-sanitize
 make valgrind VALGRIND_FILTER='commands/*'
 make coverage
+make fuzz-all FUZZ_SECONDS=60
 ```
 
 Сборка приложения выполняется с `-fanalyzer` (GCC static analyzer);
 предупреждения анализатора считаются ошибками сборки. Для `cppcheck`
 используется набор проверок `warning,performance,portability`.
 `make memcheck` запускает полный набор тестов с AddressSanitizer и
-проверкой утечек. `make valgrind` запускает выбранные тесты под Valgrind;
+проверкой утечек. `make test-sanitize` добавляет UBSan.
+`make fuzz-all` запускает libFuzzer-цели из `tests/fuzz`; короткий
+прогон задаётся через `FUZZ_SECONDS`. `make valgrind` запускает выбранные тесты под Valgrind;
 Criterion изолирует каждый тест в отдельном процессе, поэтому полный
 прогон под Valgrind занимает минуты, и фильтр обязателен.
 `make coverage` собирает тесты с `--coverage`, печатает цветную сводку

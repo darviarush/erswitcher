@@ -35,6 +35,7 @@ test|cmd|wish|required|Tk/wish
 test|cmd|xvfb-run|conditional|xvfb-run без DISPLAY
 
 # --- Разработка ---
+dev|cmd|clang|optional|фаззинг и ASan/UBSan
 dev|cmd|clang-format|optional|форматирование
 dev|cmd|cppcheck|optional|статический анализ
 dev|cmd|gcovr|optional|покрытие тестами
