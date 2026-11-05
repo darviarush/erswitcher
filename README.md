@@ -169,7 +169,8 @@ make coverage
 Criterion изолирует каждый тест в отдельном процессе, поэтому полный
 прогон под Valgrind занимает минуты, и фильтр обязателен.
 `make coverage` собирает тесты с `--coverage`, печатает цветную сводку
-покрытия только по `src/` (ветви и строки) и создаёт `coverage.html`.
+покрытия только по `src/` (ветви и строки) и создаёт
+`build/coverage-html/index.html`.
 Полный отчёт вместе с тестами: `make coverage COVERAGE_FILTER='.*'`.
 Цветом можно управлять через `COVERAGE_COLOR=always|never`.
 

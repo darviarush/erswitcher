@@ -32,6 +32,7 @@
     - Юнит-тесты переведены на Criterion, сборка тестов с AddressSanitizer
     - Добавлены gcovr и цели make coverage/coverage-html/coverage-text
     - coverage-text показывает цветную сводку только по src
+    - HTML-отчёт покрытия перенесён в build/coverage-html
 
 7.2  Чт 01 авг 2024 13:22:06 MSK
 

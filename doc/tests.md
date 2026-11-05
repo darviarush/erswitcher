@@ -56,7 +56,7 @@ escape-последовательности и предупреждения о �
 Покрытие собирается отдельными объектами с `--coverage`:
 
 ```sh
-make coverage        # сводка исходников + coverage.html
+make coverage        # сводка исходников + build/coverage-html/index.html
 make coverage-text   # только цветная сводка исходников
 make coverage-html   # только HTML по исходникам
 make coverage-clean  # удалить артефакты
