@@ -98,7 +98,7 @@ $(PRESENTATION_OBJECTS): %.o: %.c $(wildcard src/ports/*.h) $(wildcard src/prese
 clean:	## Удаляет исходники
 		rm -fr erswitcher keyboard $(APP_OBJECTS) $(DOMAIN_OBJECTS) tests/unit/test $(TEST_DOMAIN)
 
-install:	## Устанавливает erswitcher в ~/
+install:	## Устанавливает erswitcher в ~/.local/bin, а конфигурацию в ~/.config/
 		mkdir -p ~/.local/bin
 		mv -f erswitcher ~/.local/bin/erswitcher
 		cp -a erswitcher-configurator.tcl ~/.local/bin/erswitcher-configurator.tcl
