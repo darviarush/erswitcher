@@ -1,5 +1,8 @@
 # Тесты
 
+Стратегия проверок и место каждого инструмента описаны в
+[test-metodology.md](test-metodology.md).
+
 ## Юнит-тесты
 
 Каталог `tests/unit/`, фреймворк [Criterion](https://criterion.readthedocs.io/).
@@ -40,8 +43,8 @@ escape-последовательности и предупреждения о �
 Сценарий `commands` проверяется набором `[commands]` на фейковых
 `command_runner`, `clipboard` и `scheduler`: `%i`/`%o`, вставка вывода,
 таймаут, пустая команда и запрет параллельного запуска. `sendkeys` и
-`snippets` проверяются существующими наборами через compatibility-обёртки
-монолита; их реализация уже вынесена в `src/use-cases/`.
+`snippets` проверяются через app-API и X11-мок; их реализация находится
+в `src/use-cases/`.
 
 Системная интеграция проверяется наборами `desktop` и `tray`: создание
 `.desktop`/autostart-файлов без перезаписи, `desktop_goto_home`, запуск
